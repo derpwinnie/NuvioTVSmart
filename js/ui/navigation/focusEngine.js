@@ -59,12 +59,14 @@ export const FocusEngine = {
     this.boundHandlePointerClick = this.handlePointerClick.bind(this);
     document.addEventListener("keydown", this.boundHandleKey, true);
     document.addEventListener("keyup", this.boundHandleKeyUp, true);
-    if (Platform.isWebOS()) {
+    if (Platform.isWebOS() || Platform.isVidaa()) {
       document.addEventListener("mousemove", this.boundHandlePointerMove, true);
       document.addEventListener("pointermove", this.boundHandlePointerMove, true);
       document.addEventListener("click", this.boundHandlePointerClick, true);
-      document.documentElement?.classList?.add("webos-pointer-remote");
-      document.body?.classList?.add("webos-pointer-remote");
+      if (Platform.isWebOS()) {
+        document.documentElement?.classList?.add("webos-pointer-remote");
+        document.body?.classList?.add("webos-pointer-remote");
+      }
     }
   },
 
@@ -151,6 +153,29 @@ export const FocusEngine = {
       this.activeBackKeyIdentities.add(backKeyIdentity);
       this.handleBack(event, normalizedEvent);
       return;
+    }
+
+    const isArrowKey =
+      normalizedEvent.isArrow || (normalizedEvent.keyCode >= 37 && normalizedEvent.keyCode <= 40);
+
+    if (Platform.isVidaa()) {
+      if (isArrowKey || normalizedEvent.keyCode === 13) {
+        document.documentElement?.classList?.remove("vidaa-pointer-active");
+        document.body?.classList?.remove("vidaa-pointer-active");
+        this.lastPointerFocusTarget = null;
+      }
+    }
+
+    if (isArrowKey) {
+      const targetTag = String(event?.target?.tagName || "").toUpperCase();
+      const isEditable =
+        Boolean(event?.target?.isContentEditable) ||
+        targetTag === "INPUT" ||
+        targetTag === "TEXTAREA" ||
+        targetTag === "SELECT";
+      if (!isEditable) {
+        normalizedEvent.preventDefault();
+      }
     }
 
     const currentScreen = Router.getCurrentScreen();
@@ -272,7 +297,7 @@ export const FocusEngine = {
   },
 
   handlePointerMove(event) {
-    if (!Platform.isWebOS()) {
+    if (!Platform.isWebOS() && !Platform.isVidaa()) {
       return;
     }
     this.pendingPointerMoveEvent = event;
@@ -293,8 +318,12 @@ export const FocusEngine = {
   },
 
   processPointerMove(event) {
-    if (!Platform.isWebOS()) {
+    if (!Platform.isWebOS() && !Platform.isVidaa()) {
       return;
+    }
+    if (Platform.isVidaa()) {
+      document.documentElement?.classList?.add("vidaa-pointer-active");
+      document.body?.classList?.add("vidaa-pointer-active");
     }
     const currentScreen = Router.getCurrentScreen();
     currentScreen?.onPointerMove?.(event);
@@ -309,7 +338,7 @@ export const FocusEngine = {
   },
 
   handlePointerClick(event) {
-    if (!Platform.isWebOS()) {
+    if (!Platform.isWebOS() && !Platform.isVidaa()) {
       return;
     }
     const target = this.getPointerFocusable(event);
