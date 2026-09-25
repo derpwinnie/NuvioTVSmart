@@ -16,6 +16,9 @@ function buildNormalizedEvent(event) {
     metaKey: Boolean(event?.metaKey),
     repeat: Boolean(event?.repeat),
     defaultPrevented: Boolean(event?.defaultPrevented),
+    isArrow: Boolean(normalizedKey.isArrow),
+    isEnter: Boolean(normalizedKey.isEnter),
+    isBack: Boolean(normalizedKey.isBack),
     keyCode: normalizedCode,
     which: normalizedCode,
     originalKeyCode: Number(normalizedKey.originalKeyCode || event?.keyCode || 0),
@@ -43,6 +46,7 @@ function hasActiveModal() {
 }
 
 const BACK_DEBOUNCE_MS = 250;
+const VIDAA_SELECT_KEY_CODE = 13;
 
 export const FocusEngine = {
   lastBackHandledAt: 0,
@@ -71,6 +75,9 @@ export const FocusEngine = {
       if (Platform.isWebOS()) {
         document.documentElement?.classList?.add("webos-pointer-remote");
         document.body?.classList?.add("webos-pointer-remote");
+      } else {
+        document.documentElement?.classList?.add("vidaa-pointer-remote");
+        document.body?.classList?.add("vidaa-pointer-remote");
       }
     }
   },
@@ -142,8 +149,21 @@ export const FocusEngine = {
 
     const normalizedEvent = buildNormalizedEvent(event);
     const keyIdentity = this.getKeyIdentity(normalizedEvent);
-    if (keyIdentity && (!normalizedEvent.repeat || !this.activeKeyDownStartedAt.has(keyIdentity))) {
-      this.activeKeyDownStartedAt.set(keyIdentity, Date.now());
+    const isVidaaSelectKey =
+      Platform.isVidaa() && normalizedEvent.keyCode === VIDAA_SELECT_KEY_CODE;
+    if (keyIdentity) {
+      if (isVidaaSelectKey) {
+        // Some VIDAA browser builds emit repeated OK keydown events without
+        // setting KeyboardEvent.repeat. Treat every additional keydown before
+        // the matching keyup as repeat so one physical hold stays one action.
+        if (this.activeKeyDownStartedAt.has(keyIdentity)) {
+          normalizedEvent.repeat = true;
+        } else {
+          this.activeKeyDownStartedAt.set(keyIdentity, Date.now());
+        }
+      } else if (!normalizedEvent.repeat || !this.activeKeyDownStartedAt.has(keyIdentity)) {
+        this.activeKeyDownStartedAt.set(keyIdentity, Date.now());
+      }
     }
 
     if (
@@ -177,11 +197,20 @@ export const FocusEngine = {
     const isArrowKey =
       normalizedEvent.isArrow || (normalizedEvent.keyCode >= 37 && normalizedEvent.keyCode <= 40);
 
-    if (Platform.isVidaa()) {
-      if (isArrowKey || normalizedEvent.keyCode === 13) {
-        document.documentElement?.classList?.remove("vidaa-pointer-active");
-        document.body?.classList?.remove("vidaa-pointer-active");
-        this.lastPointerFocusTarget = null;
+    if (Platform.isVidaa() && (isArrowKey || normalizedEvent.keyCode === VIDAA_SELECT_KEY_CODE)) {
+      // VIDAA's WebApp guide explicitly requires app-owned spatial navigation
+      // to prevent the browser default. Stop the event at capture phase too,
+      // so the browser/DOM cannot perform a second navigation or synthetic OK.
+      normalizedEvent.preventDefault();
+      normalizedEvent.stopPropagation();
+      normalizedEvent.stopImmediatePropagation();
+      this.lastPointerFocusTarget = null;
+
+      // Arrow repeat remains useful for fast TV navigation. OK repeat must not
+      // become multiple activations; existing screen hold timers still run
+      // from the first keydown and keyup keeps the true hold duration.
+      if (normalizedEvent.keyCode === VIDAA_SELECT_KEY_CODE && normalizedEvent.repeat) {
+        return;
       }
     }
 
@@ -221,18 +250,30 @@ export const FocusEngine = {
     ) {
       this.activeBackKeyIdentities.delete(keyIdentity || "back");
     }
-    if (event?.target && !document.contains(event.target)) return;
-    if (hasActiveModal()) {
-      if (keyIdentity) {
-        this.activeKeyDownStartedAt.delete(keyIdentity);
-      }
-      return;
-    }
-
     if (keyIdentity) {
       const startedAt = Number(this.activeKeyDownStartedAt.get(keyIdentity) || 0);
       normalizedEvent.keyDownDurationMs = startedAt > 0 ? Math.max(0, Date.now() - startedAt) : 0;
       this.activeKeyDownStartedAt.delete(keyIdentity);
+    }
+
+    const isArrowKey =
+      normalizedEvent.isArrow || (normalizedEvent.keyCode >= 37 && normalizedEvent.keyCode <= 40);
+    if (
+      Platform.isVidaa() &&
+      (isArrowKey || normalizedEvent.keyCode === VIDAA_SELECT_KEY_CODE)
+    ) {
+      normalizedEvent.preventDefault();
+      normalizedEvent.stopPropagation();
+      normalizedEvent.stopImmediatePropagation();
+      this.lastPointerFocusTarget = null;
+    }
+
+    // Always release the internal key state first. VIDAA long-press actions can
+    // rerender their focused node before keyup arrives, so a detached original
+    // target must not leave OK permanently marked as held.
+    if (event?.target && !document.contains(event.target) && !Platform.isVidaa()) return;
+    if (hasActiveModal()) {
+      return;
     }
 
     const currentScreen = Router.getCurrentScreen();

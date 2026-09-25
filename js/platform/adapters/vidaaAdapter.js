@@ -1,5 +1,101 @@
 import { isBackEvent, normalizeKeyEvent } from "../sharedKeys.js";
 
+const VIDAA_LOGICAL_WIDTH = 1920;
+const VIDAA_LOGICAL_HEIGHT = 1080;
+
+function syncVidaaBrowserViewportFit() {
+  const documentRef = globalThis.document;
+  const screens = documentRef?.querySelectorAll?.("#app > .screen:not(#player)");
+  if (!documentRef || !screens?.length) return;
+
+  const visualViewport = globalThis.visualViewport;
+  const smallestPositive = (values, fallback) => {
+    const candidates = values
+      .map((value) => Number(value || 0))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    return candidates.length ? Math.min(...candidates) : fallback;
+  };
+  const viewportWidth = smallestPositive(
+    [
+      visualViewport?.width,
+      globalThis.innerWidth,
+      globalThis.outerWidth,
+      documentRef.documentElement?.clientWidth
+    ],
+    VIDAA_LOGICAL_WIDTH
+  );
+  const viewportHeight = smallestPositive(
+    [
+      visualViewport?.height,
+      globalThis.innerHeight,
+      globalThis.outerHeight,
+      documentRef.documentElement?.clientHeight
+    ],
+    VIDAA_LOGICAL_HEIGHT
+  );
+
+  // A packaged VIDAA WebApp normally exposes the full 1920x1080 canvas.
+  // The hosted Browser can expose a smaller viewport because browser chrome
+  // remains visible. Keep 1920x1080 as the logical layout and fit only the
+  // non-player UI into the actually visible browser area.
+  const zoom = Math.min(
+    1,
+    viewportWidth / VIDAA_LOGICAL_WIDTH,
+    viewportHeight / VIDAA_LOGICAL_HEIGHT
+  );
+  const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+  const renderedWidth = VIDAA_LOGICAL_WIDTH * safeZoom;
+  const renderedHeight = VIDAA_LOGICAL_HEIGHT * safeZoom;
+  const physicalOffsetX = Math.max(0, (viewportWidth - renderedWidth) / 2);
+  const physicalOffsetY = Math.max(0, (viewportHeight - renderedHeight) / 2);
+  const logicalOffsetX = physicalOffsetX / safeZoom;
+  const logicalOffsetY = physicalOffsetY / safeZoom;
+
+  documentRef.documentElement?.style?.setProperty("--vidaa-ui-zoom", String(safeZoom));
+  documentRef.documentElement?.style?.setProperty("--vidaa-ui-offset-x", `${logicalOffsetX}px`);
+  documentRef.documentElement?.style?.setProperty("--vidaa-ui-offset-y", `${logicalOffsetY}px`);
+
+  screens.forEach((screen) => {
+    // CSS zoom is deliberate here: unlike transform:scale(), it keeps pointer
+    // hit testing and layout coordinates coherent on older TV Chromium/WebKit.
+    screen.style.zoom = String(safeZoom);
+    screen.style.left = `${logicalOffsetX}px`;
+    screen.style.top = `${logicalOffsetY}px`;
+  });
+}
+
+function installVidaaBrowserViewportFit() {
+  const globalRef = globalThis;
+  if (globalRef.__NUVIO_VIDAA_VIEWPORT_FIT_INSTALLED__) {
+    syncVidaaBrowserViewportFit();
+    return;
+  }
+  globalRef.__NUVIO_VIDAA_VIEWPORT_FIT_INSTALLED__ = true;
+
+  let frame = null;
+  const schedule = () => {
+    if (frame) {
+      try {
+        globalRef.cancelAnimationFrame?.(frame);
+      } catch (_) {}
+    }
+    const run = () => {
+      frame = null;
+      syncVidaaBrowserViewportFit();
+    };
+    frame = globalRef.requestAnimationFrame?.(run) || globalRef.setTimeout?.(run, 0) || null;
+  };
+
+  globalRef.addEventListener?.("resize", schedule);
+  globalRef.visualViewport?.addEventListener?.("resize", schedule);
+  globalRef.visualViewport?.addEventListener?.("scroll", schedule);
+  schedule();
+  globalRef.setTimeout?.(schedule, 120);
+  globalRef.setTimeout?.(schedule, 500);
+}
+
+// VIDAA keeps a 1920x1080 logical UI. Packaged apps receive that canvas
+// directly; the hosted Browser may expose less visible space, handled above.
 function applyVidaaViewport() {
   const documentRef = globalThis.document;
   if (!documentRef?.head) return;
@@ -153,6 +249,9 @@ export function launchVidaaNativePlayer(url, title = "Nuvio TV") {
   return false;
 }
 
+// VIDAA's official WebApp mapping is VK_BACK_SPACE = 8. The remaining
+// values are compatibility fallbacks seen in hosted-browser/TV firmware paths
+// and are intentionally kept so Back remains usable outside a packaged app.
 const VIDAA_BACK_CODES = [8, 461, 10009, 27];
 
 export const vidaaAdapter = {
@@ -160,6 +259,7 @@ export const vidaaAdapter = {
 
   init() {
     applyVidaaViewport();
+    installVidaaBrowserViewportFit();
     installVidaaKeyboardFix();
     installFKeyCrashSuppressor();
     registerTrustedDomains();
