@@ -1,9 +1,20 @@
 /* eslint-disable no-unused-vars */
+import { Platform } from "../../../platform/index.js";
 import * as internals from "./playerScreenContext.js";
 
 export function createPlayerScreenMethods62() {
-  const { PlayerController, streamRepository, orderStreamsByAddonOrder, DebridStreamPresentation, isSelectKeyCode, t, clamp, escapeHtml } =
-    internals;
+  const {
+    PlayerController,
+    streamRepository,
+    orderStreamsByAddonOrder,
+    DebridStreamPresentation,
+    isSelectKeyCode,
+    t,
+    clamp,
+    escapeHtml,
+    streamMergeKey,
+    streamDirectPlaybackUrl
+  } = internals;
 
   return {
     renderAudioControlItem(control, index) {
@@ -299,10 +310,31 @@ export function createPlayerScreenMethods62() {
       this.moreActionsVisible = false;
 
       const filters = this.getSourceFilters();
-      this.sourcesFocus = {
-        zone: "filter",
-        index: clamp(filters.indexOf(this.sourceFilter), 0, Math.max(0, filters.length - 1))
-      };
+      const filteredSources = this.getFilteredSources();
+      if (Platform.isVidaa() && filteredSources.length) {
+        const currentStream = this.getCurrentStreamCandidate();
+        const currentKey = currentStream ? streamMergeKey(currentStream) : "";
+        const activePlaybackUrl = String(this.activePlaybackUrl || "").trim();
+        const currentIndex = filteredSources.findIndex((stream) => {
+          if (stream === currentStream) {
+            return true;
+          }
+          const streamKey = streamMergeKey(stream);
+          if (currentKey && streamKey && streamKey === currentKey) {
+            return true;
+          }
+          return Boolean(activePlaybackUrl && streamDirectPlaybackUrl(stream) === activePlaybackUrl);
+        });
+        this.sourcesFocus = {
+          zone: "list",
+          index: currentIndex >= 0 ? currentIndex : 0
+        };
+      } else {
+        this.sourcesFocus = {
+          zone: "filter",
+          index: clamp(filters.indexOf(this.sourceFilter), 0, Math.max(0, filters.length - 1))
+        };
+      }
 
       this.renderControlButtons();
       this.renderSubtitleDialog();
@@ -310,6 +342,9 @@ export function createPlayerScreenMethods62() {
       this.renderSpeedDialog();
       this.renderSourcesPanel();
       this.updateModalBackdrop();
+      if (Platform.isVidaa() && this.controlsVisible) {
+        this.syncControlFocusDom();
+      }
       void this.preloadPlayerSourceLogos();
 
       const sourceRequestKey = this.getSourceRequestKey();

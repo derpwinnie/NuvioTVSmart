@@ -1,4 +1,5 @@
 /* eslint-disable no-unused-vars */
+import { Platform } from "../../../platform/index.js";
 import * as internals from "./playerScreenContext.js";
 
 export function createPlayerScreenMethods63() {
@@ -181,6 +182,7 @@ export function createPlayerScreenMethods63() {
       const badgeSettings = StreamBadgeSettingsStore.snapshot();
       const showAddonLogo = badgeSettings.showAddonLogo === true;
       const badgePlacement = resolvePlayerSourceBadgePlacement(badgeSettings);
+      const vidaaSourceFocusAttributes = Platform.isVidaa() ? ' tabindex="-1" role="button"' : "";
       this.ensureSourcesFocus(filters, filtered);
 
       const nextMarkup = `
@@ -206,7 +208,7 @@ export function createPlayerScreenMethods63() {
                 const selected = this.sourceFilter === filter;
                 const focused = this.sourcesFocus.zone === "filter" && this.sourcesFocus.index === index;
                 return `
-                <div class="player-sources-filter focusable${selected ? " selected" : ""}${focused ? " focused" : ""}" data-sources-zone="filter" data-sources-index="${index}">
+                <div class="player-sources-filter focusable${selected ? " selected" : ""}${focused ? " focused" : ""}" data-sources-zone="filter" data-sources-index="${index}"${vidaaSourceFocusAttributes}>
                   ${escapeHtml(filter === "all" ? t("subtitle_all", {}, "All") : filter)}
                 </div>
               `;
@@ -249,7 +251,7 @@ export function createPlayerScreenMethods63() {
                     </div>`
                         : "";
                       return `
-                  <article class="player-source-card${sourceSide ? "" : " no-side"} focusable${focused ? " focused" : ""}${isCurrent ? " selected" : ""}" data-sources-zone="list" data-sources-index="${index}">
+                  <article class="player-source-card${sourceSide ? "" : " no-side"} focusable${focused ? " focused" : ""}${isCurrent ? " selected" : ""}" data-sources-zone="list" data-sources-index="${index}"${vidaaSourceFocusAttributes}>
                     <div class="player-source-main">
                       ${topBadges}
                       ${mainTitle}
@@ -275,9 +277,13 @@ export function createPlayerScreenMethods63() {
         this.renderedSourcesMarkup = nextMarkup;
       }
 
-      const focusedCard = panel.querySelector(".player-source-card.focused");
-      if (focusedCard) {
-        this.scrollSourcesCardIntoView(focusedCard);
+      if (Platform.isVidaa()) {
+        this.syncSourcesFocusDom();
+      } else {
+        const focusedCard = panel.querySelector(".player-source-card.focused");
+        if (focusedCard) {
+          this.scrollSourcesCardIntoView(focusedCard);
+        }
       }
     },
     syncSourcesFocusDom() {
@@ -303,6 +309,13 @@ export function createPlayerScreenMethods63() {
         }
       });
       focusedNode.classList.add("focused");
+      if (Platform.isVidaa() && document.activeElement !== focusedNode) {
+        try {
+          focusedNode.focus({ preventScroll: true });
+        } catch (_) {
+          focusedNode.focus?.();
+        }
+      }
       if (focusedNode.classList.contains("player-source-card")) {
         this.scrollSourcesCardIntoView(focusedNode);
       }
