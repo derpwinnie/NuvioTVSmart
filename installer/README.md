@@ -1,39 +1,37 @@
-# Nuvio TV - VIDAA OS Installer
+# VIDAA helpers
 
-One-click installer for Nuvio TV on Hisense VIDAA Smart TVs (such as the Hisense U7Q) and VIDAA OS projectors.
+Two ways to get Nuvio onto a Hisense VIDAA TV. The first one is the one you want.
 
-## How to Install on Hisense U7Q (VIDAA OS)
+## 1. Bookmark it in the TV browser
 
-### Option 1: Bookmark in TV Browser (Easiest — Works Everywhere)
+1. Serve the app from your computer (`npm run serve:vidaa`, see the main README) or from wherever you host it.
+2. On the TV, open the browser and go to that address, e.g. `http://<your-pc-ip>:4173/?wrapper=vidaa`.
+3. Add it to your bookmarks.
 
-1. On your Hisense TV, open the **Internet Browser** (Home > Apps > Browser / Globe icon).
-2. Go to your Nuvio host URL (e.g. `http://<your-pc-ip>:4173` or your hosted URL).
-3. Press the remote Options/Menu button and select **Add to Bookmarks** (or favorite).
-4. That's it! Nuvio caches all assets locally via the included Service Worker (`sw.js`) and launches immediately.
+That's it. The address has to stay reachable. The service worker only uses its cache when the TV is offline.
 
-### Option 2: Add Permanent Launcher Icon to TV Home Screen
+## 2. Home screen icon (experimental, often doesn't work)
 
-This adds a native app tile to your TV Home Screen using the built-in `Hisense_installApp` API.
+`server.py` tries to add a Nuvio tile to the TV's home screen using Hisense's `Hisense_installApp` function. To reach that function it pretends to be `vidaahub.com`: it runs a small DNS server and an HTTPS server with a self-signed certificate on your computer.
 
-1. On a computer on the same local Wi-Fi / Ethernet network:
+Before you bother:
+
+- On newer firmware (roughly VIDAA U6 and later) the TV usually ignores the request without telling you.
+- The tile is just a link to a URL. After you switch the DNS back, that URL still has to be served by something, or the tile opens nothing.
+- It needs root on your computer, because it uses ports 53 and 443.
+
+If you still want to try:
+
+1. On a computer on the same network, run:
    ```bash
    sudo python3 installer/server.py
    ```
-   Note the local IP displayed by the server (e.g., `192.168.1.100`).
-2. On your **Hisense TV**:
-   - Go to **Settings > Network > Network Configuration > DNS**.
-   - Change DNS from Automatic to Manual, and enter the PC's IP address.
-3. Open the **Internet Browser** on your TV and navigate to:
-   ```
-   https://vidaahub.com
-   ```
-4. Click **Install to TV Launcher**.
-5. Once complete, change your TV DNS back to **Automatic** and fully restart the TV.
-6. The **Nuvio TV** icon will now appear on your TV Home Screen!
+   It prints your computer's local IP (e.g. `192.168.1.100`). On Windows you can use `start-windows.bat`, on macOS/Linux `start-mac-linux.sh`.
+2. On the TV, go to **Settings > Network > Network Configuration > DNS**, switch to manual and enter that IP.
+3. Open the TV browser and go to `https://vidaahub.com`.
+4. Press **Install to TV Launcher**.
+5. Set the TV's DNS back to automatic and restart the TV.
+6. If it worked, the Nuvio tile is on the home screen.
 
 > [!WARNING]
-> **Compatibility & Brick Risk Warning for Option 2:**
->
-> - On modern VIDAA firmware versions (VIDAA U6, U7, U8, U9+), Hisense has locked down system storage: `fileWrite` calls to `websdk/Appinfo.json` fail with `client request permission check error`, and unsigned launcher registrations are silently dropped.
-> - **Do not attempt low-level file writing or service menu exploits (`1969`):** Security researchers have noted multiple ways to permanently brick VIDAA TVs (boot-loops) when corrupting system JSON/launcher files, with no public recovery tool.
-> - **Use Option 1 (Browser Bookmark / Speed-Dial Pin):** This is completely safe, zero-risk, update-proof, and provides the exact same hardware-accelerated streaming performance with full remote D-pad navigation!
+> Don't try to force it by writing launcher files yourself or by using the `1969` service menu. People have boot-looped their TVs that way, and there's no public way to recover them.
