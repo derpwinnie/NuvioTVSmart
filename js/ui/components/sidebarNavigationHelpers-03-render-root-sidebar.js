@@ -27,16 +27,17 @@ function renderVidaaSidebarMenuTrigger(expanded = false) {
   if (!Platform.isVidaa()) {
     return "";
   }
+  const label = t("sidebar.expandSidebar", {}, "Menu");
   return `
     <button class="vidaa-sidebar-menu-trigger"
             type="button"
             data-action="toggleSidebar"
-            aria-label="${t("sidebar.expandSidebar", {}, "Menu")}"
+            aria-label="${label}"
             aria-expanded="${expanded ? "true" : "false"}">
       <span class="vidaa-sidebar-menu-glyph" aria-hidden="true">
         <span></span><span></span><span></span>
       </span>
-      <span class="vidaa-sidebar-menu-label">Menu</span>
+      <span class="vidaa-sidebar-menu-label">${label}</span>
     </button>
   `;
 }

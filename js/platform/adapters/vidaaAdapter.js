@@ -128,8 +128,11 @@ function installVidaaKeyboardFix() {
 
   // Layer 1: Override HTMLInputElement.prototype.value setter
   // The VIDAA on-screen keyboard writes directly to input.value without firing DOM events.
+  // index.html may already have patched it before the bundle loaded.
   try {
-    const inputProto = globalRef.HTMLInputElement?.prototype;
+    const inputProto = globalRef.__NUVIO_VIDAA_VALUE_SETTER_PATCHED__
+      ? null
+      : globalRef.HTMLInputElement?.prototype;
     const desc = inputProto ? Object.getOwnPropertyDescriptor(inputProto, "value") : null;
     if (desc && desc.set) {
       const origSet = desc.set;
@@ -151,6 +154,7 @@ function installVidaaKeyboardFix() {
         },
         configurable: true
       });
+      globalRef.__NUVIO_VIDAA_VALUE_SETTER_PATCHED__ = true;
     }
   } catch (_) {}
 

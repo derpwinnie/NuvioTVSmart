@@ -195,18 +195,6 @@ export const FocusEngine = {
       }
     }
 
-    if (isArrowKey) {
-      const targetTag = String(event?.target?.tagName || "").toUpperCase();
-      const isEditable =
-        Boolean(event?.target?.isContentEditable) ||
-        targetTag === "INPUT" ||
-        targetTag === "TEXTAREA" ||
-        targetTag === "SELECT";
-      if (!isEditable) {
-        normalizedEvent.preventDefault();
-      }
-    }
-
     const currentScreen = Router.getCurrentScreen();
 
     if (currentScreen?.onKeyDown) {

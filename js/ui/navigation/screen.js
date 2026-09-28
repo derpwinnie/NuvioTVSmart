@@ -270,6 +270,9 @@ export const ScreenUtils = {
     current.classList.remove("focused");
     target.classList.add("focused");
     focusWithoutDocumentScroll(target);
+    if (!isVidaaViewportLocked()) {
+      return;
+    }
     try {
       if (typeof target.scrollIntoView === "function") {
         target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "auto" });

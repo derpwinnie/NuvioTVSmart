@@ -80,7 +80,9 @@
         );
         if (document.documentElement) document.documentElement.classList.add("vidaa-tv");
 
-        // Suppress F-key fullscreen crash on VIDAA browser
+        // Suppress F-key fullscreen crash on VIDAA browser. The flag stops the
+        // VIDAA adapter from installing a second copy after the bundle loads.
+        root.__NUVIO_FKEY_SUPPRESSOR_INSTALLED__ = true;
         window.addEventListener(
           "keydown",
           function (e) {
@@ -117,14 +119,37 @@
               },
               configurable: true
             });
+            // Tell the VIDAA adapter the setter is already patched; wrapping it
+            // twice would fire every input/change event twice.
+            root.__NUVIO_VIDAA_VALUE_SETTER_PATCHED__ = true;
           }
         } catch (_) {}
       })();
     </script>
     <script>
+      // The service worker only exists for the hosted VIDAA build. Other
+      // platforms never register it, and any copy left over from an earlier
+      // build on this origin is removed so it cannot serve stale files.
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", function () {
-          navigator.serviceWorker.register("sw.js").catch(function () {});
+          if (window.__NUVIO_PLATFORM__ === "vidaa") {
+            navigator.serviceWorker.register("sw.js").catch(function () {});
+            return;
+          }
+          if (navigator.serviceWorker.getRegistrations) {
+            navigator.serviceWorker
+              .getRegistrations()
+              .then(function (registrations) {
+                registrations.forEach(function (registration) {
+                  var worker =
+                    registration.active || registration.waiting || registration.installing;
+                  if (worker && /\/sw\.js(\?|$)/.test(worker.scriptURL)) {
+                    registration.unregister();
+                  }
+                });
+              })
+              .catch(function () {});
+          }
         });
       }
     </script>

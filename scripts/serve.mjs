@@ -71,6 +71,26 @@ function resolveDistPathForRootFile(rootFilePath) {
   return path.join(distDir, relativePath);
 }
 
+// The server listens on every interface so a TV on the LAN can reach it, which
+// also exposes the repo root. Keep git data, dotfiles, local config and
+// dependencies off the network.
+function isPrivatePath(urlPathname) {
+  let pathname = "";
+  try {
+    pathname = decodeURIComponent(String(urlPathname || "/"));
+  } catch (_) {
+    return true;
+  }
+  const segments = pathname.split(/[/\\]+/).filter(Boolean);
+  return segments.some(
+    (segment) =>
+      segment.startsWith(".") ||
+      segment === "node_modules" ||
+      segment === "local.properties" ||
+      segment === "local.example.properties"
+  );
+}
+
 async function resolveRequestFile(pathname) {
   const rootPath = resolveRequestPath(pathname);
   const rootStat = await stat(rootPath).catch(() => null);
@@ -207,6 +227,12 @@ const server = http.createServer(async (request, response) => {
         response,
         `${requestUrl.pathname}${requestUrl.search || ""}`
       );
+      return;
+    }
+
+    if (isPrivatePath(requestUrl.pathname)) {
+      response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      response.end("Not found");
       return;
     }
 

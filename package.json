@@ -27,7 +27,7 @@
     "sync": "node ./scripts/sync-wrapper.mjs",
     "sync:tizen": "node ./scripts/sync-wrapper.mjs --tizen",
     "sync:webos": "node ./scripts/sync-wrapper.mjs --webos",
-    "test:vidaa": "node ./tests/test-vidaa-platform.mjs"
+    "test:vidaa": "npm run package:vidaa && node ./tests/test-vidaa-platform.mjs"
   },
   "devDependencies": {
     "@csstools/postcss-global-data": "^4.0.0",
