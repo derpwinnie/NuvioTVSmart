@@ -126,7 +126,8 @@ npm run serve:vidaa  # Start local VIDAA development server
 
 ## Acknowledgements
 
-Special thanks to **[@loggie86](https://github.com/loggie86)** for testing this VIDAA port on real Hisense TV hardware and providing crucial insights on navigation, launcher installation, and backend setup.
+- Special thanks to **[@loggie86](https://github.com/loggie86)** for testing this VIDAA port on real Hisense TV hardware and providing crucial insights on navigation, launcher installation, and backend setup.
+- Special thanks to **[@Empi9245](https://github.com/Empi9245)** for contributing crucial VIDAA 9 viewport scaling, remote control key stabilization, sidebar navigation, and player input improvements.
 
 ## License
 
