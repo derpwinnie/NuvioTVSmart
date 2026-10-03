@@ -12,6 +12,8 @@ export function createPlayerScreenMethods73() {
         this.playerRouteActive = false;
         this.playbackRecoveryActive = false;
         this.playbackRecoveryAttempts = 0;
+        this.webOsAddonSubtitleRestoreRequestId = Number(this.webOsAddonSubtitleRestoreRequestId || 0) + 1;
+        this.pendingWebOsAddonSubtitleRestore = null;
         this.playerMountToken = Number(this.playerMountToken || 0) + 1;
         if (this.tizenAvPlayConnectionRetryTimer) {
           clearTimeout(this.tizenAvPlayConnectionRetryTimer);
@@ -34,9 +36,9 @@ export function createPlayerScreenMethods73() {
         this.clearPostPlayLongPressTimer();
         this.clearPostPlaySynopsisScrollAnimation();
         this.postPlayLongPressTriggered = false;
-        this.cancelPostPlayNativeSurfaceAnimation();
-        this.postPlayNativeSurfaceStateKey = "";
-        this.postPlayNativeSurfaceRect = null;
+        this.cancelPostPlayPlayerSurfaceAnimation();
+        this.postPlayPlayerSurfaceStateKey = "";
+        this.postPlayPlayerSurfaceRect = null;
         if (this.postPlayDescriptionMeasureFrame) {
           cancelAnimationFrame(this.postPlayDescriptionMeasureFrame);
           this.postPlayDescriptionMeasureFrame = null;

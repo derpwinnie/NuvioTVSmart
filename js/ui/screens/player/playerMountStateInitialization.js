@@ -53,6 +53,8 @@ export function initializePlayerMountState(params, initialStreamUrl) {
   this.selectedSubtitleTrackIndex = -1;
   this.selectedEmbeddedSubtitleTrackIndex = -1;
   this.selectedAddonSubtitleId = null;
+  this.webOsAddonSubtitleRestoreRequestId = 0;
+  this.pendingWebOsAddonSubtitleRestore = null;
   this.startupSubtitlePreferenceApplied = false;
   this.startupSubtitlePreferenceApplying = false;
   this.startupAudioPreferenceApplied = false;
@@ -210,10 +212,10 @@ export function initializePlayerMountState(params, initialStreamUrl) {
   this.postPlaySummaryTransitionTimer = null;
   this.postPlayTrailerActionTransitionFrame = null;
   this.postPlayTrailerLabelTimer = null;
-  this.postPlayNativeSurfaceStateKey = "";
-  this.postPlayNativeSurfaceAnimationFrame = null;
-  this.postPlayNativeSurfaceAnimationUsesRaf = false;
-  this.postPlayNativeSurfaceRect = null;
+  this.postPlayPlayerSurfaceStateKey = "";
+  this.postPlayPlayerSurfaceAnimationFrame = null;
+  this.postPlayPlayerSurfaceAnimationUsesRaf = false;
+  this.postPlayPlayerSurfaceRect = null;
   this.postPlayTrailerMedia = null;
   this.postPlayTrailerMessageHandler = null;
   this.postPlayTrailerGeneration = 0;
