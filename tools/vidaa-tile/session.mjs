@@ -53,7 +53,21 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // one, the TV's self-signed certificate is trusted on first use and pinned —
 // `expectedFingerprint` (from the stored record) must then match, so a later
 // impostor on the same address is rejected.
+// Open a connection and enforce the pinned certificate (when we are not
+// verifying against a CA). Checking here, after connect resolves, keeps the
+// end/throw out of the client's own event handler.
+async function openVerified(args) {
+  const conn = await connect(args);
+  const { secrets, expectedFingerprint } = args;
+  if (!secrets.caPem && expectedFingerprint && conn.fingerprint !== expectedFingerprint) {
+    await conn.stop();
+    throw new CertificateError("the TV certificate changed since pairing (possible impostor)");
+  }
+  return conn;
+}
+
 function connect({ host, port, creds, secrets, expectedFingerprint = null }) {
+  void expectedFingerprint;
   const opts = {
     host,
     port,
@@ -96,14 +110,6 @@ function connect({ host, port, creds, secrets, expectedFingerprint = null }) {
         fingerprint = socket?.getPeerCertificate?.()?.fingerprint256;
       } catch {
         /* ignore */
-      }
-      // Pinned-certificate check (only when we are not verifying against a CA).
-      if (!secrets.caPem && expectedFingerprint && fingerprint !== expectedFingerprint) {
-        settled = true;
-        client.end(true);
-        return reject(
-          new CertificateError("the TV certificate changed since pairing (possible impostor)")
-        );
       }
       resolve({
         client,
@@ -179,7 +185,15 @@ export async function pair({
     constants: secrets.constants
   });
   const t = protocol.tvTopics(creds.clientId);
-  const conn = await connect({ host, port, creds, secrets });
+  // Re-pairing a TV we already know: verify its pinned certificate so a MITM
+  // cannot hijack the re-pair. First-ever pairing has nothing to compare (TOFU).
+  const conn = await openVerified({
+    host,
+    port,
+    creds,
+    secrets,
+    expectedFingerprint: prev?.serverFingerprint
+  });
   try {
     await conn.subscribe([t.authReply, t.authCodeReply, t.tokenReply]);
     await conn.publish(t.ui + "actions/vidaa_app_connect", protocol.connectPayload());
@@ -232,7 +246,7 @@ export async function refresh(record, { secrets, getTimestamp } = {}) {
     constants: secrets.constants
   });
   const t = protocol.tvTopics(creds.clientId);
-  const conn = await connect({
+  const conn = await openVerified({
     host: record.host,
     port: record.port,
     creds,
@@ -274,7 +288,7 @@ export async function withSession(record, op, { secrets, getTimestamp } = {}) {
     const t = protocol.tvTopics(creds.clientId);
     let conn;
     try {
-      conn = await connect({
+      conn = await openVerified({
         host: current.host,
         port: current.port,
         creds,

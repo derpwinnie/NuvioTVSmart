@@ -60,6 +60,10 @@ tv.setBehavior("ok");
 // Pin-on-first-use: without a CA, the TV cert is trusted on first pairing and
 // pinned; a changed fingerprint afterwards is rejected.
 {
+  // Fresh state: both fake TVs share 127.0.0.1, so drop the earlier record to
+  // model a genuine first-time pairing (TOFU) here.
+  const store0 = await import("../tools/vidaa-tile/store.mjs");
+  store0.writeState({ tvs: {}, settings: {} });
   const tv2 = await startFakeTv({ constants, pin: "1111", behavior: "ok" });
   const noCa = { pfx: tv2.clientPfx, passphrase: tv2.clientPass, constants };
   const b2 = {
@@ -76,6 +80,16 @@ tv.setBehavior("ok");
   const tampered = { ...rec2, serverFingerprint: "AA:BB" };
   await assert.rejects(
     session.listTiles(tampered, { secrets: noCa, getTimestamp: async () => tv2.timestamp }),
+    (e) => e.name === "CertificateError"
+  );
+
+  // Re-pairing a known TV also verifies the pinned fingerprint (no MITM hijack).
+  const store = await import("../tools/vidaa-tile/store.mjs");
+  const st = store.readState();
+  st.tvs[tv2.host] = { ...rec2, serverFingerprint: "DE:AD" };
+  store.writeState(st);
+  await assert.rejects(
+    session.pair({ ...b2, pinProvider: async () => "1111" }),
     (e) => e.name === "CertificateError"
   );
   await tv2.stop();

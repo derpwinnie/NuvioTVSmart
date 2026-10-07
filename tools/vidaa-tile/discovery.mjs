@@ -113,19 +113,27 @@ function httpGet(host, port, path) {
   });
 }
 
-export async function fetchDescriptor(host, location) {
-  const tries = [];
+// Decide which HTTP target(s) to fetch the descriptor from. The Location in an
+// SSDP reply is attacker-controllable on the LAN, so we only trust its path and
+// port — never let it redirect us to a different host (SSRF guard). A Location
+// pointing elsewhere is ignored and we fall back to the replying host's ports.
+export function _descriptorTargets(host, location) {
   if (location) {
-    const u = new URL(location);
-    if (u.protocol !== "http:" || u.username || u.password) {
-      throw new Error("refusing non-http or credentialed descriptor URL");
+    let u;
+    try {
+      u = new URL(location);
+    } catch {
+      u = null;
     }
-    tries.push({ host: u.hostname, port: Number(u.port) || 80, path: u.pathname + u.search });
-  } else {
-    for (const p of UPNP_PORTS) {
-      tries.push({ host, port: p, path: "/MediaServer/rendererdevicedesc.xml" });
+    if (u && u.protocol === "http:" && !u.username && !u.password && u.hostname === host) {
+      return [{ host, port: Number(u.port) || 80, path: u.pathname + u.search }];
     }
   }
+  return UPNP_PORTS.map((p) => ({ host, port: p, path: "/MediaServer/rendererdevicedesc.xml" }));
+}
+
+export async function fetchDescriptor(host, location) {
+  const tries = _descriptorTargets(host, location);
   let lastErr;
   for (const t of tries) {
     try {
