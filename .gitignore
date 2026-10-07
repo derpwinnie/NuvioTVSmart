@@ -17,6 +17,9 @@ tests/*
 !tests/test-vidaa-image-hydration.mjs
 !tests/test-vidaa-collections.mjs
 !tests/test-vidaa-discover-loading.mjs
+!tests/test-vidaa-tile-*.mjs
+!tests/fake-vidaa-tv/
+!tests/fake-vidaa-tv/**
 *.ipk
 *.wgt
 dist/
