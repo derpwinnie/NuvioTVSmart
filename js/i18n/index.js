@@ -380,6 +380,7 @@ const KEY_ALIASES = {
   "auth.qr.continueWithoutAccount": "auth_qr_continue_without_account",
   "auth.qr.configureServer": "auth_qr_configure_server",
   "auth.qr.expired": "qr_login_expired",
+  "auth.qr.expires": "auth_qr_expires",
   "auth.qr.leftDescriptionSignedIn": "auth_qr_connected",
   "auth.qr.leftDescriptionSignedOut": "auth_qr_phone_hint",
   "auth.qr.manualInstruction": "auth_qr_manual_instruction",
