@@ -215,9 +215,10 @@ console.log("=== Running Nuvio TV VIDAA Platform Tests ===");
     path.join(vidaaDistDir, "app.bundle.js"),
     path.join(vidaaDistDir, "core-js.bundle.js"),
     path.join(vidaaDistDir, "boot-guard.js"),
-    path.join(vidaaDistDir, "installer", "server.py"),
-    path.join(vidaaDistDir, "installer", "index.html"),
-    path.join(vidaaDistDir, "installer", "README.md")
+    path.join(vidaaDistDir, "installer", "README.md"),
+    path.join(vidaaDistDir, "installer", "legacy", "server.py"),
+    path.join(vidaaDistDir, "installer", "legacy", "index.html"),
+    path.join(vidaaDistDir, "installer", "legacy", "README.md")
   ];
 
   for (const filePath of requiredFiles) {

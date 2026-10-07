@@ -74,13 +74,11 @@ The page only works while your computer is running the server. The server doesn'
 
 ### Home screen tile
 
-**Sidee (newer firmware).** [Sidee](https://github.com/Empi9245/Sidee) by @Empi9245 pairs with the TV over your network (you type a PIN shown on the TV) and adds a launcher tile that opens a web address. Tested on VIDAA U09.60. Things to know:
+**This fork's tile tool (recommended).** `npm run vidaa:tile` opens a small local dashboard that finds your TV, pairs with it (you type the PIN shown on the TV) and adds a launcher tile pointing at **any address you host**, so you run your own build, not someone else's. It works on Linux, macOS and Windows. Full setup, self-hosting options and a real-TV checklist are in [docs/vidaa-tile.md](./docs/vidaa-tile.md).
 
-- Its Nuvio preset is hard-wired to `https://nuviotvsmart.vercel.app/vidaa.html`, which is his hosted copy, not this fork. To use your own host you have to change the `url` in Sidee's `core/presets.py`.
-- It talks to the TV with the protocol of Hisense's remote-control app and ships a client certificate taken from that app. Hisense could block it at any time.
-- While it runs, its dashboard is reachable from your whole network (protected only by a key in the URL). Close it when you're done.
+It uses the same TV mechanism as [Sidee](https://github.com/Empi9245/Sidee) by @Empi9245 (the protocol reference, credited there and in the source), but adds Linux support, your own tile address, tile listing and removal, a verified/pinned TV connection, and a dashboard that stays on `127.0.0.1` by default. It ships **no** Hisense key material: you point it once at your own copy of the VIDAA app to extract the two keystore files, and supply the keystore passphrase and protocol constants yourself.
 
-**Old DNS trick (older firmware).** [`installer/`](./installer) has a script that redirects the TV's DNS to your computer and asks the TV browser to install a tile. It needs root, it often fails on newer firmware, and the tile is only a link, so the URL still has to be served afterwards. Read [installer/README.md](./installer/README.md) first.
+**Old DNS trick (legacy).** [`installer/legacy/`](./installer/legacy) still has the old script that redirects the TV's DNS to your computer and asks the TV browser to install a tile. It needs root and often fails on newer firmware. Prefer the tile tool above.
 
 Don't mess with launcher files or the `1969` service menu; people have bricked TVs that way.
 
