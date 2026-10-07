@@ -19,6 +19,10 @@ concurrency:
 
 jobs:
   build:
+    # Forks usually have Pages off; deploying there just fails. Run only in
+    # the original repo, or in a fork whose owner set the repository
+    # variable ENABLE_PAGES=true (after turning on Pages via GitHub Actions).
+    if: github.repository_owner == 'derpwinnie' || vars.ENABLE_PAGES == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -1,12 +1,19 @@
 # Build the VIDAA tile tool as one double-clickable program per OS.
-# Manual run: the programs appear under the run's "Artifacts".
-# Tag `vidaa-tile-vX.Y.Z`: they are also attached to a GitHub release.
+# Push to main that touches the tool: build and publish a release
+#   (tag vidaa-tile-v1.0.<run number>, created by the workflow).
+# Tag `vidaa-tile-vX.Y.Z` pushed by hand: release under that name.
+# Manual run / pull request: build only; programs are under "Artifacts".
 name: VIDAA tile tool
 
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     tags: ["vidaa-tile-v*"]
+    paths:
+      - "tools/vidaa-tile/**"
+      - "scripts/build-vidaa-tile.mjs"
+      - ".github/workflows/vidaa-tile-release.yml"
   pull_request:
     paths:
       - "tools/vidaa-tile/**"
@@ -61,7 +68,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/vidaa-tile-v')
+    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/vidaa-tile-v') || github.ref == 'refs/heads/main')
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -74,7 +81,14 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" out/* \
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="vidaa-tile-v1.0.${GITHUB_RUN_NUMBER}"
+          fi
+          gh release create "$tag" out/* \
             --repo "${GITHUB_REPOSITORY}" \
-            --title "VIDAA tile tool ${GITHUB_REF_NAME#vidaa-tile-}" \
+            --target "${GITHUB_SHA}" \
+            --latest \
+            --title "VIDAA tile tool ${tag#vidaa-tile-}" \
             --notes "Download the file for your computer and double-click it. The dashboard opens in your browser. Windows: nuvio-vidaa-tile-windows-x64.exe. Mac: arm64 for M-series, x64 for Intel (first launch: System Settings → Privacy & Security → Open Anyway). Linux: chmod +x, then run it."
