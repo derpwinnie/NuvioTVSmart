@@ -12,12 +12,13 @@ import { dirname, join, normalize } from "node:path";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { discover } from "../discovery.mjs";
 import { extractKeystores } from "../cert.mjs";
+import { importFromSidee } from "../sidee-import.mjs";
 import { loadSecrets, requireComplete } from "../secrets.mjs";
 import { readState, writeFileAtomic, secretsPath } from "../store.mjs";
 import { DEFAULT_TILE_URL, validateTileUrl, withVidaaWrapper } from "../urls.mjs";
 import * as session from "../session.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const here = globalThis.__VIDAA_TILE_ASSETS__ ? "" : dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(here, "public");
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 
@@ -47,6 +48,24 @@ function recordFor(host) {
   return rec;
 }
 
+// Open the dashboard in the default browser, like Sidee does. Best effort:
+// if it fails, the link is printed anyway.
+export function openBrowser(link) {
+  const cmd =
+    process.platform === "win32"
+      ? ["cmd", ["/c", "start", "", link]]
+      : process.platform === "darwin"
+        ? ["open", [link]]
+        : ["xdg-open", [link]];
+  import("node:child_process")
+    .then(({ spawn }) => {
+      const child = spawn(cmd[0], cmd[1], { stdio: "ignore", detached: true });
+      child.on("error", () => {});
+      child.unref();
+    })
+    .catch(() => {});
+}
+
 export async function startDashboard({ lan = false, port = 0 } = {}) {
   const host = lan ? "0.0.0.0" : "127.0.0.1";
   const key = lan ? randomBytes(16).toString("hex") : null;
@@ -65,6 +84,9 @@ export async function startDashboard({ lan = false, port = 0 } = {}) {
     async "GET /api/status"() {
       const state = readState();
       return { secrets: requireComplete(), tvs: Object.keys(state.tvs) };
+    },
+    async "POST /api/import-sidee"() {
+      return importFromSidee();
     },
     async "POST /api/import-apk"(body) {
       const out = extractKeystores(body.apkPath);
@@ -209,15 +231,26 @@ export async function startDashboard({ lan = false, port = 0 } = {}) {
   return { server, port: actual, link, close: () => new Promise((r) => server.close(r)) };
 }
 
+// The standalone build embeds the dashboard files (no folder next to the
+// executable); from source they are read from web/public.
+const EMBEDDED = globalThis.__VIDAA_TILE_ASSETS__ || null;
+
 function serveStatic(pathname, res) {
   const rel = pathname === "/" ? "/index.html" : pathname;
-  const file = normalize(join(PUBLIC, rel));
-  if (!file.startsWith(PUBLIC)) return send(res, 403, { error: "forbidden" });
   let body;
-  try {
-    body = readFileSync(file);
-  } catch {
-    return send(res, 404, { error: "not found" });
+  if (EMBEDDED) {
+    if (!Object.prototype.hasOwnProperty.call(EMBEDDED, rel)) {
+      return send(res, 404, { error: "not found" });
+    }
+    body = EMBEDDED[rel];
+  } else {
+    const file = normalize(join(PUBLIC, rel));
+    if (!file.startsWith(PUBLIC)) return send(res, 403, { error: "forbidden" });
+    try {
+      body = readFileSync(file);
+    } catch {
+      return send(res, 404, { error: "not found" });
+    }
   }
   const ext = rel.slice(rel.lastIndexOf("."));
   res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });

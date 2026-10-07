@@ -11,37 +11,54 @@ its tests here, but the final pairing step can only be verified on a real TV.
 > Protocol reference and credit: [Sidee](https://github.com/Empi9245/Sidee) by
 > @Empi9245. This tool is an independent, self-hostable implementation.
 
-## What you need once
+## Quick start (no setup, no Node.js)
 
-This repo ships **no** Hisense material. The tool needs three things from your
-own copy of the official VIDAA app, set up once per computer:
+1. Download the program for your computer from the
+   [VIDAA tile tool releases](../../../releases)
+   (`nuvio-vidaa-tile-windows-x64.exe`, `-macos-arm64` for M-series Macs,
+   `-macos-x64` for Intel Macs, `-linux-x64`).
+2. Double-click it (Linux: `chmod +x` it first). The dashboard opens in your
+   browser. Keep the program's window open while you use it.
+3. Click **Set up with one click**, then **Find TV**, enter the PIN your TV
+   shows, and **Install tile**. Done.
 
-1. **The two keystore files.** Point the tool at an `.apk` of the official
-   "VIDAA Smart TV" app (package `com.universal.remote.multi`). It extracts
-   `res/raw/client_mobile_android.p12` and `res/raw/remoteca.bks` — pure unzip,
-   nothing is cracked.
-2. **The keystore passphrase.** The `.p12` is password-protected. The tool does
-   not recover the password; you provide it.
-3. **The protocol constants** (`PATTERN`, `VALUE_SUFFIX`, `XOR_MASK`, `BRAND`,
-   `OPERATION`). These live in the app and are decoded in public projects such
-   as Sidee's `core/protocol.py`.
+macOS: the program is not notarized. On first launch go to System Settings →
+Privacy & Security → **Open Anyway**. Windows SmartScreen may ask the same
+("More info" → "Run anyway"). If Windows asks about network access, allow it
+on private networks so the TV can be found.
 
-These are stored under your user config (`~/.config/nuvio-vidaa/` on Linux),
-readable only by you, and never committed.
+## One-time setup: where the certificate comes from
 
-## Use it
+The TV only accepts its official remote app, so the tool needs that app's
+client certificate and five protocol constants. This repo still ships **no**
+Hisense material. You choose one of two ways:
+
+- **One click (recommended).** The dashboard button, or `import-sidee` on the
+  CLI, downloads two files from one *pinned* commit of
+  [Sidee](https://github.com/Empi9245/Sidee) (MIT), checks their SHA-256 and
+  decodes them on your computer. No passphrase needed. If Sidee's files ever
+  change, the hash check fails and nothing is used; update this tool or use
+  the APK route.
+- **Your own app copy.** Point the tool at an `.apk` of the official "VIDAA
+  Smart TV" app (package `com.universal.remote.multi`); it extracts
+  `res/raw/client_mobile_android.p12` and `res/raw/remoteca.bks` (pure unzip).
+  You then supply the keystore passphrase and the constants (`PATTERN`,
+  `VALUE_SUFFIX`, `XOR_MASK`, `BRAND`, `OPERATION`) yourself.
+
+Either way the result is stored under your user config
+(`~/.config/nuvio-vidaa/` on Linux, `~/Library/Application Support/nuvio-vidaa/`
+on macOS, `%APPDATA%\nuvio-vidaa\` on Windows), readable only by you.
+
+## From source
 
 ```bash
 npm run vidaa:tile            # opens the local dashboard in your browser
 ```
 
-The dashboard walks through: one-time setup → find TV → enter PIN → install.
-
 Or use the CLI:
 
 ```bash
-npm run vidaa:tile -- import-apk /path/to/vidaa.apk
-npm run vidaa:tile -- set-secret --passphrase 'THE_PASSPHRASE' --constants constants.json
+npm run vidaa:tile -- import-sidee                # one-click setup
 npm run vidaa:tile -- discover
 npm run vidaa:tile -- pair 192.168.1.50          # enter the PIN the TV shows
 npm run vidaa:tile -- install 192.168.1.50        # uses the free hosted build
@@ -50,14 +67,27 @@ npm run vidaa:tile -- list 192.168.1.50
 npm run vidaa:tile -- remove 192.168.1.50 nuvio
 ```
 
+APK route instead of `import-sidee`:
+
+```bash
+npm run vidaa:tile -- import-apk /path/to/vidaa.apk
+npm run vidaa:tile -- set-secret --passphrase 'THE_PASSPHRASE' --constants constants.json
+```
+
 `constants.json` is `{ "PATTERN": "...", "VALUE_SUFFIX": "...", "XOR_MASK":
 "<decimal>", "BRAND": "his", "OPERATION": "vidaacommon_001" }`.
+
+To build the single-file program yourself: `npm run vidaa:tile:build` (puts it
+in `dist/vidaa-tile/`, for the OS you run it on). CI builds all four via
+`.github/workflows/vidaa-tile-release.yml`; push a tag `vidaa-tile-vX.Y.Z` to
+publish a release.
 
 ### Linux / Fedora notes
 
 - Discovery listens for the TV's reply. If `firewalld` blocks it, allow the
   discovery port and retry; the tool never changes your firewall itself.
-- To drive the dashboard from your phone, start it with `-- dashboard --lan`.
+- To drive the dashboard from your phone, start it with `--lan`
+  (`npm run vidaa:tile -- --lan`, or the program with `--lan`).
   It then binds your LAN and prints a one-time link with an access key; open
   that link once to authorize the browser. The key is kept in a cookie, never
   in the address bar.
@@ -88,6 +118,8 @@ Only if you want your own copy:
 
 ## Security
 
+- The one-click setup only accepts files whose SHA-256 matches the pinned
+  Sidee commit, so a compromised or changed upstream cannot slip in.
 - The connection to the TV is over TLS. With `remoteca.bks` converted to a CA
   PEM (set `caPem` in `secrets.json`) it is fully verified. Without one, the
   TV's self-signed certificate is trusted on first pairing and **pinned**: a

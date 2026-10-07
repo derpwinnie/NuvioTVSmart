@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { discover } from "./discovery.mjs";
 import { extractKeystores } from "./cert.mjs";
+import { importFromSidee, SIDEE_COMMIT } from "./sidee-import.mjs";
 import { loadSecrets, requireComplete } from "./secrets.mjs";
 import { readState } from "./store.mjs";
 import { writeFileAtomic, secretsPath } from "./store.mjs";
@@ -20,7 +21,9 @@ Usage:
 
 Commands:
   discover                               find VIDAA TVs on the network
-  import-apk <path.apk>                  extract the keystore files from your VIDAA app
+  import-sidee                           one-click setup: fetch the TV certificate and
+                                         constants from a pinned Sidee release (verified)
+  import-apk <path.apk>                  or: extract the keystore files from your VIDAA app
   set-secret [--passphrase P] [--constants file.json] [--ca ca.pem]
   status                                 show what setup is still missing
   pair <host>                            pair with a TV (enter the PIN it shows)
@@ -30,15 +33,20 @@ Commands:
   launch <host> <appId> [--url U] [--name N]
   remove <host> <appId>
 
-Secrets (keystore passphrase and protocol constants) live in your user config
-and never ship with this repo. See docs/vidaa-tile.md.`;
+Secrets (certificate and protocol constants) live in your user config and never
+ship with this repo. See docs/vidaa-tile.md.`;
+
+// Switches take no value; every other --flag takes the next argument.
+const SWITCHES = new Set(["lan", "json", "no-open", "help"]);
 
 function parseFlags(args) {
   const flags = {};
   const rest = [];
   for (let i = 0; i < args.length; i++) {
-    if (args[i].startsWith("--")) flags[args[i].slice(2)] = args[++i];
-    else rest.push(args[i]);
+    if (args[i].startsWith("--")) {
+      const name = args[i].slice(2);
+      flags[name] = SWITCHES.has(name) ? true : args[++i];
+    } else rest.push(args[i]);
   }
   return { flags, rest };
 }
@@ -55,12 +63,23 @@ function recordFor(host) {
 }
 
 async function main() {
-  const [cmd, ...args] = process.argv.slice(2);
-  const { flags, rest } = parseFlags(args);
+  const argv = process.argv.slice(2);
+  // Allow bare switches without a command, e.g. `vidaa-tile --lan`.
+  if (argv[0] === "-h") argv[0] = "--help";
+  const cmd = argv[0] && !argv[0].startsWith("--") ? argv[0] : undefined;
+  const { flags, rest } = parseFlags(cmd ? argv.slice(1) : argv);
+
+  if (flags.help) {
+    console.log(USAGE);
+    return;
+  }
 
   if (!cmd || cmd === "dashboard") {
-    const { startDashboard } = await import("./web/server.mjs");
-    await startDashboard({ lan: cmd === "dashboard" && flags.lan != null });
+    const { startDashboard, openBrowser } = await import("./web/server.mjs");
+    const lan = flags.lan === true;
+    const { link } = await startDashboard({ lan });
+    if (!lan && flags["no-open"] == null && !process.env.CI) openBrowser(link);
+    console.log("Keep this window open while you use the dashboard. Ctrl+C quits.");
     return;
   }
 
@@ -71,6 +90,12 @@ async function main() {
 
   if (cmd === "status") {
     console.log(JSON.stringify(requireComplete(), null, 2));
+    return;
+  }
+
+  if (cmd === "import-sidee") {
+    await importFromSidee();
+    console.log(`setup complete (certificate and constants from Sidee ${SIDEE_COMMIT.slice(0, 7)})`);
     return;
   }
 

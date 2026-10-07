@@ -23,15 +23,29 @@ let selectedHost = null;
 async function refreshStatus() {
   const s = await api("GET", "/api/status");
   const need = s.secrets;
-  const bits = [];
-  if (need.needApk) bits.push("import the APK");
-  if (need.needPassphrase) bits.push("enter the passphrase");
-  if (need.needConstants) bits.push("enter the constants");
-  $("secrets-status").textContent = bits.length
-    ? "Still needed: " + bits.join(", ")
-    : "Setup complete.";
+  const ready = need.ready ?? !(need.needApk || need.needPassphrase || need.needConstants);
+  $("setup-steps").hidden = ready;
+  $("secrets-status").textContent = ready
+    ? "✓ Setup complete" + (need.source === "sidee" ? " (certificate from Sidee)." : ".")
+    : "Not set up yet.";
+  // Already paired TVs can go straight to installing.
+  if (ready && s.tvs && s.tvs.length && !selectedHost) {
+    selectedHost = s.tvs[0];
+    $("sec-install").hidden = false;
+    $("install-host").textContent = selectedHost;
+    loadTiles();
+  }
   return need;
 }
+
+$("sidee-btn").onclick = async () => {
+  $("sidee-btn").disabled = true;
+  msg($("secrets-msg"), "Downloading and verifying…", true);
+  const r = await api("POST", "/api/import-sidee");
+  $("sidee-btn").disabled = false;
+  msg($("secrets-msg"), r.ok ? "Done. Now find your TV." : r.error, r.ok);
+  refreshStatus();
+};
 
 $("apk-btn").onclick = async () => {
   const r = await api("POST", "/api/import-apk", { apkPath: $("apk-path").value.trim() });
@@ -98,6 +112,7 @@ $("pin-submit").onclick = async () => {
   const r = await api("POST", "/api/pair/submit", { pin: $("pin").value.trim() });
   if (r.ok) {
     msg($("pair-msg"), "Paired.", true);
+    $("install-host").textContent = selectedHost;
     $("sec-install").hidden = false;
     $("sec-install").scrollIntoView({ behavior: "smooth" });
     loadTiles();

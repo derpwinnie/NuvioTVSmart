@@ -9,6 +9,7 @@
 //     "caPem": "-----BEGIN CERTIFICATE----- ..."   // optional
 //   }
 // and runs `import-apk` once to drop client.p12 / remoteca.bks next to it.
+// Or, one click: `import-sidee` writes client.pem and the constants for you.
 
 import { readFileSync, existsSync } from "node:fs";
 import { CONSTANT_KEYS } from "./protocol.mjs";
@@ -24,21 +25,35 @@ function readSecretsFile() {
 }
 
 // Report which setup pieces are still missing, for the dashboard wizard.
+// Two ways to provide the client certificate: client.pem (cert + key, from the
+// one-click Sidee import) or client.p12 + passphrase (from your own APK).
+const hasPem = () => existsSync(fileInDir("client.pem"));
+
 export function requireComplete() {
   const s = readSecretsFile();
   const missingConstants = !s.constants || CONSTANT_KEYS.some((k) => s.constants[k] == null);
+  const pem = hasPem();
+  const needApk = !pem && !existsSync(fileInDir("client.p12"));
+  const needPassphrase = !pem && !s.keystorePassphrase;
   return {
-    needApk: !existsSync(fileInDir("client.p12")),
-    needPassphrase: !s.keystorePassphrase,
-    needConstants: missingConstants
+    needApk,
+    needPassphrase,
+    needConstants: missingConstants,
+    ready: !needApk && !needPassphrase && !missingConstants,
+    source: s.source?.sidee ? "sidee" : pem || existsSync(fileInDir("client.p12")) ? "apk" : null
   };
 }
 
 export function loadSecrets() {
   const s = readSecretsFile();
   const missing = [];
-  if (!existsSync(fileInDir("client.p12"))) missing.push("client keystore (run import-apk)");
-  if (!s.keystorePassphrase) missing.push("keystorePassphrase");
+  const pem = hasPem();
+  if (!pem) {
+    if (!existsSync(fileInDir("client.p12"))) {
+      missing.push("client certificate (run import-sidee, or import-apk)");
+    }
+    if (!s.keystorePassphrase) missing.push("keystorePassphrase");
+  }
   if (!s.constants) missing.push("constants");
   else {
     for (const k of CONSTANT_KEYS) if (s.constants[k] == null) missing.push(`constants.${k}`);
@@ -46,9 +61,12 @@ export function loadSecrets() {
   if (missing.length) throw new Error(`missing: ${missing.join(", ")}`);
 
   const constants = { ...s.constants, XOR_MASK: BigInt(s.constants.XOR_MASK) };
+  const cert = pem ? readFileSync(fileInDir("client.pem"), "utf8") : null;
   return {
-    pfx: readFileSync(fileInDir("client.p12")),
-    passphrase: s.keystorePassphrase,
+    pfx: pem ? undefined : readFileSync(fileInDir("client.p12")),
+    passphrase: pem ? undefined : s.keystorePassphrase,
+    cert: cert || undefined,
+    key: cert || undefined,
     constants,
     caPem: s.caPem || undefined
   };

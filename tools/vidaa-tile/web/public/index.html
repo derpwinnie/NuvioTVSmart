@@ -40,6 +40,12 @@
         padding: 18px;
         margin: 14px 0;
       }
+      details {
+        margin-top: 14px;
+      }
+      summary {
+        cursor: pointer;
+      }
       section[hidden] {
         display: none;
       }
@@ -109,19 +115,31 @@
       <section id="sec-secrets">
         <h2>1. One-time setup</h2>
         <div id="secrets-status" class="muted"></div>
-        <label>Path to your VIDAA app APK</label>
-        <div class="row">
-          <input id="apk-path" placeholder="/path/to/vidaa.apk" style="flex: 1" />
-          <button id="apk-btn">Import</button>
+        <div id="setup-steps">
+          <p class="muted">
+            The TV only talks to its official remote app, so this tool needs that app's client
+            certificate. One click fetches it from
+            <a href="https://github.com/Empi9245/Sidee" target="_blank" rel="noopener">Sidee</a>
+            (a pinned, checksum-verified version) and stores it only on this computer.
+          </p>
+          <button id="sidee-btn">Set up with one click</button>
+          <details>
+            <summary class="muted">Or use your own copy of the VIDAA app</summary>
+            <label>Path to your VIDAA app APK</label>
+            <div class="row">
+              <input id="apk-path" placeholder="/path/to/vidaa.apk" style="flex: 1" />
+              <button id="apk-btn">Import</button>
+            </div>
+            <label>Keystore passphrase</label>
+            <input id="passphrase" type="password" />
+            <label>Protocol constants (JSON)</label>
+            <input
+              id="constants"
+              placeholder='{"PATTERN":"…","VALUE_SUFFIX":"…","XOR_MASK":"…","BRAND":"his","OPERATION":"vidaacommon_001"}'
+            />
+            <button id="secret-btn">Save setup</button>
+          </details>
         </div>
-        <label>Keystore passphrase</label>
-        <input id="passphrase" type="password" />
-        <label>Protocol constants (JSON)</label>
-        <input
-          id="constants"
-          placeholder='{"PATTERN":"…","VALUE_SUFFIX":"…","XOR_MASK":"…","BRAND":"his","OPERATION":"vidaacommon_001"}'
-        />
-        <button id="secret-btn">Save setup</button>
         <div id="secrets-msg" class="msg"></div>
       </section>
 
@@ -151,6 +169,7 @@
 
       <section id="sec-install" hidden>
         <h2>4. Install the tile</h2>
+        <p class="muted">On <b id="install-host"></b></p>
         <label>Address the tile opens</label>
         <input
           id="tile-url"

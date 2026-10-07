@@ -4,7 +4,10 @@
 // Connection outcomes are classified so the UI can tell "pair again" (the TV
 // rejected our credentials) apart from "TV unreachable" (a network failure).
 
-import mqtt from "mqtt";
+// mqtt is loaded on first connect, so setup, help and the dashboard start
+// without it (and start faster).
+let mqttLib = null;
+const loadMqtt = async () => (mqttLib ??= (await import("mqtt")).default);
 import * as protocol from "./protocol.mjs";
 import { tvTimestamp as realTvTimestamp } from "./discovery.mjs";
 import { readState, writeState } from "./store.mjs";
@@ -66,7 +69,8 @@ async function openVerified(args) {
   return conn;
 }
 
-function connect({ host, port, creds, secrets, expectedFingerprint = null }) {
+async function connect({ host, port, creds, secrets, expectedFingerprint = null }) {
+  const mqtt = await loadMqtt();
   void expectedFingerprint;
   const opts = {
     host,
@@ -76,8 +80,8 @@ function connect({ host, port, creds, secrets, expectedFingerprint = null }) {
     clientId: creds.clientId,
     username: creds.username,
     password: creds.password,
-    pfx: secrets.pfx,
-    passphrase: secrets.passphrase,
+    ...(secrets.cert ? { cert: secrets.cert, key: secrets.key } : {}),
+    ...(secrets.pfx ? { pfx: secrets.pfx, passphrase: secrets.passphrase } : {}),
     reconnectPeriod: 0,
     connectTimeout: 10000,
     pfxForceNativeStore: false

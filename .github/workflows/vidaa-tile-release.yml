@@ -1,0 +1,80 @@
+# Build the VIDAA tile tool as one double-clickable program per OS.
+# Manual run: the programs appear under the run's "Artifacts".
+# Tag `vidaa-tile-vX.Y.Z`: they are also attached to a GitHub release.
+name: VIDAA tile tool
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["vidaa-tile-v*"]
+  pull_request:
+    paths:
+      - "tools/vidaa-tile/**"
+      - "scripts/build-vidaa-tile.mjs"
+      - "tests/test-vidaa-tile-*.mjs"
+      - ".github/workflows/vidaa-tile-release.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:vidaa:tile
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+          - runner: windows-latest
+          - runner: macos-latest # Apple Silicon
+          - runner: macos-15-intel # Intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/build-vidaa-tile.mjs
+      # Smoke test: the built program starts and prints its help.
+      - name: Smoke test
+        shell: bash
+        run: |
+          exe=$(ls dist/vidaa-tile/nuvio-vidaa-tile-*)
+          "./$exe" --help | grep -q import-sidee
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vidaa-tile-${{ runner.os }}-${{ runner.arch }}
+          path: dist/vidaa-tile/nuvio-vidaa-tile-*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/vidaa-tile-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" out/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "VIDAA tile tool ${GITHUB_REF_NAME#vidaa-tile-}" \
+            --notes "Download the file for your computer and double-click it. The dashboard opens in your browser. Windows: nuvio-vidaa-tile-windows-x64.exe. Mac: arm64 for M-series, x64 for Intel (first launch: System Settings → Privacy & Security → Open Anyway). Linux: chmod +x, then run it."
