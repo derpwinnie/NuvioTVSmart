@@ -311,14 +311,6 @@ button:focus-visible {
   transform: scale(1.03);
 }
 
-.qr-login-instruction {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 20px;
-  line-height: 1.35;
-  text-align: center;
-}
-
 .qr-email-form {
   display: flex;
   flex-direction: column;
