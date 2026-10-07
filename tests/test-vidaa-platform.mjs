@@ -37,12 +37,8 @@ console.log("=== Running Nuvio TV VIDAA Platform Tests ===");
   globalThis.Hisense_GetModelName = () => "Hisense 65U7Q";
   globalThis.Hisense_GetOSVersion = () => "VIDAA U7";
 
-  let platformMessageSent = null;
-  globalThis.omi_platform = {
-    sendPlatformMessage: (jsonStr) => {
-      platformMessageSent = JSON.parse(jsonStr);
-    }
-  };
+  const insecureDomains = [];
+  globalThis.Hisense_AddInsecureDomain = (host) => insecureDomains.push(host);
 
   const { Platform } = await import("../js/platform/index.js");
   Platform.current = null; // force re-evaluation
@@ -56,7 +52,6 @@ console.log("=== Running Nuvio TV VIDAA Platform Tests ===");
   // Capabilities
   const caps = Platform.getCapabilities();
   assert.equal(caps.nativeVideo, true, "nativeVideo capability must be true");
-  assert.equal(caps.vidaaPlayer, true, "vidaaPlayer capability must be true");
 
   // Device label
   const label = Platform.getDeviceLabel();
@@ -102,28 +97,10 @@ console.log("=== Running Nuvio TV VIDAA Platform Tests ===");
   const normalizedBack = Platform.normalizeKey({ keyCode: 461 });
   assert.equal(normalizedBack.isBack, true, "Keycode 461 must normalize to isBack: true");
 
-  // Native player handoff
-  const handoffSuccess = Platform.launchNativePlayer(
-    "https://example.com/movie.mkv",
-    "Sample Movie"
-  );
-  assert.equal(handoffSuccess, true, "launchNativePlayer must succeed via omi_platform");
-  assert.equal(
-    platformMessageSent?.type,
-    "launchNativePlayer",
-    "Platform message type must be launchNativePlayer"
-  );
-  assert.equal(
-    platformMessageSent?.url,
-    "https://example.com/movie.mkv",
-    "Platform message url must match"
-  );
-  assert.equal(platformMessageSent?.title, "Sample Movie", "Platform message title must match");
-  assert.equal(
-    platformMessageSent?.mimeType,
-    "video/x-matroska",
-    "MKV mimeType must be video/x-matroska"
-  );
+  // Plain-HTTP media hosts must be allowed before playback; HTTPS needs nothing.
+  Platform.prepareMediaRequest("http://192.168.1.20:8080/movie.mkv");
+  Platform.prepareMediaRequest("https://example.com/movie.mkv");
+  assert.deepEqual(insecureDomains, ["192.168.1.20"], "Only http media hosts are registered");
 
   console.log("✓ Platform detection and adapter methods passed");
 }
@@ -173,36 +150,52 @@ console.log("=== Running Nuvio TV VIDAA Platform Tests ===");
 {
   console.log("\n[Test 5] VIDAA Virtual Keyboard Input Bug Fix");
 
-  // Create a mock HTMLInputElement prototype
-  class MockInput {
-    constructor() {
-      this._val = "";
-      this.events = [];
-    }
-    get value() {
-      return this._val;
-    }
-    set value(v) {
-      this._val = v;
-    }
+  const listeners = {};
+  const intervals = [];
+  const root = {
+    document: {
+      hidden: false,
+      activeElement: null,
+      addEventListener: (name, fn) => (listeners[name] ||= []).push(fn)
+    },
+    Event: class {
+      constructor(type) {
+        this.type = type;
+      }
+    },
+    setInterval: (fn) => intervals.push(fn) - 1,
+    clearInterval: () => {},
+    addEventListener: () => {}
+  };
+  const fire = (name, target) => (listeners[name] || []).forEach((fn) => fn({ target }));
+  const field = {
+    tagName: "INPUT",
+    type: "search",
+    value: "",
+    events: [],
     dispatchEvent(ev) {
       this.events.push(ev.type);
+      fire(ev.type, this);
     }
-  }
-  globalThis.HTMLInputElement = MockInput;
+  };
 
-  // Run the keyboard fix installer
-  const { vidaaAdapter } = await import("../js/platform/adapters/vidaaAdapter.js");
-  globalThis.__NUVIO_VIDAA_KEYBOARD_FIX_INSTALLED__ = false; // reset for test
-  vidaaAdapter.init();
+  const { installVidaaKeyboardFix } = await import("../js/platform/vidaa/vidaaKeyboard.js");
+  installVidaaKeyboardFix(root);
+  fire("focusin", field);
+  assert.equal(intervals.length, 1, "Only the focused text field is polled");
 
-  const testInput = new MockInput();
-  // Simulate the VIDAA OS keyboard assigning value directly
-  testInput.value = "Avatar";
+  // The VIDAA keyboard writes the value without firing DOM events.
+  field.value = "Avatar";
+  intervals[0]();
+  assert.deepEqual(field.events, ["input", "change"], "Synthetic input/change once per change");
+  intervals[0]();
+  assert.deepEqual(field.events, ["input", "change"], "No duplicate events without a new value");
 
-  assert.equal(testInput.value, "Avatar", "Input value must update to 'Avatar'");
-  assert.ok(testInput.events.includes("input"), "Synthetic 'input' event must be dispatched");
-  assert.ok(testInput.events.includes("change"), "Synthetic 'change' event must be dispatched");
+  // App code that sets the value and fires its own input must not be echoed.
+  field.value = "Avatar 2";
+  fire("input", field);
+  intervals[0]();
+  assert.deepEqual(field.events, ["input", "change"], "Own input events are not repeated");
 
   console.log("✓ Virtual keyboard bug fix verified");
 }
@@ -216,6 +209,7 @@ console.log("=== Running Nuvio TV VIDAA Platform Tests ===");
 
   const requiredFiles = [
     path.join(vidaaDistDir, "index.html"),
+    path.join(vidaaDistDir, "vidaa.html"),
     path.join(vidaaDistDir, "sw.js"),
     path.join(vidaaDistDir, "manifest.json"),
     path.join(vidaaDistDir, "app.bundle.js"),
@@ -244,7 +238,30 @@ console.log("=== Running Nuvio TV VIDAA Platform Tests ===");
     "index.html must include configureVidaaLaunch"
   );
   assert.ok(indexContent.includes("sw.js"), "index.html must register sw.js");
-  assert.ok(indexContent.includes("manifest.json"), "index.html must link manifest.json");
+  assert.ok(
+    !indexContent.includes('<link rel="manifest"'),
+    "manifest.json is only linked at runtime on VIDAA, never statically"
+  );
+
+  // Each build gets its own asset names and offline cache so the TV cannot
+  // combine an old cached shell with new code.
+  const buildId = indexContent.match(/app\.bundle\.([0-9a-f]{16})\.js/)?.[1];
+  assert.ok(buildId, "index.html must reference a hashed app bundle");
+  const worker = await fs.readFile(path.join(vidaaDistDir, "sw.js"), "utf8");
+  assert.ok(
+    worker.includes(`var CACHE_NAME = "nuvio-vidaa-${buildId}";`),
+    "sw.js cache name must match the build id"
+  );
+  assert.ok(worker.includes(`./app.bundle.${buildId}.js`), "sw.js must precache hashed assets");
+  const entry = await fs.readFile(path.join(vidaaDistDir, "vidaa.html"), "utf8");
+  assert.ok(
+    entry.includes('window.__NUVIO_PLATFORM__ = "vidaa"'),
+    "vidaa.html must force VIDAA mode"
+  );
+
+  // The shared dist feeds the Tizen and webOS packages and must stay SW-free.
+  const sharedWorker = await fs.stat(path.join(rootDir, "dist", "sw.js")).catch(() => null);
+  assert.equal(sharedWorker, null, "dist/sw.js must not exist outside dist/vidaa");
 
   console.log(
     `✓ Packaging verified: nuvio-vidaa.zip is ${(zipStat.size / (1024 * 1024)).toFixed(2)} MB`

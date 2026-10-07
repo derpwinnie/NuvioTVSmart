@@ -121,7 +121,8 @@ function discoverOwner(container, scroller) {
     container,
     layoutPrefs: { modernSidebar: true },
     getContentScroller: () => scroller,
-    shouldAutoLoadMore: () => false
+    shouldAutoLoadMore: () => false,
+    maybeExpandRenderedItems: () => false
   };
 }
 

@@ -255,7 +255,7 @@ const methods19 = createHomeScreenMethods19();
 {
   const track = {
     ...scroller(),
-    dataset: { trackPadLeft: "104" },
+    dataset: { trackPadAlignLeft: "104" },
     getBoundingClientRect: () => ({ left: 20 })
   };
   const target = { closest: () => track, getBoundingClientRect: () => ({ left: 524 }) };

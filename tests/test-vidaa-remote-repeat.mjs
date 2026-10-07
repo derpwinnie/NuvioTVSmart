@@ -30,6 +30,7 @@ function engine() {
   return {
     ...FocusEngine,
     activeKeyDownStartedAt: new Map(),
+    vidaaLastKeyDownAt: new Map(),
     activeBackKeyIdentities: new Set()
   };
 }
@@ -162,6 +163,23 @@ for (const name of ["tizen", "webos", "browser"]) {
   focus.handleKey(remoteEvent(13));
   focus.handleKey(remoteEvent(13));
   assert.equal(downs.length, beforeEnter + 2, `${name} retains existing Enter routing`);
+}
+
+// A keyup lost to an overlay or app switch must not turn later presses into repeats.
+platform("vidaa");
+for (const code of [40, 13]) {
+  const focus = engine();
+  now = 5000;
+  focus.handleKey(remoteEvent(code));
+  assert.equal(downs.at(-1).repeat, false);
+  now = 9000;
+  const before = downs.length;
+  focus.handleKey(remoteEvent(code));
+  assert.equal(downs.length, before + 1, `${code} after a lost keyup must reach the screen`);
+  assert.equal(downs.at(-1).repeat, false, `${code} after a lost keyup must be a fresh press`);
+  now = 9300;
+  focus.handleKeyUp(remoteEvent(code));
+  assert.equal(ups.at(-1).keyDownDurationMs, 300, "Hold timing restarts with the fresh press");
 }
 
 console.log(

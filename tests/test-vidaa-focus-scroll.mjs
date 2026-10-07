@@ -211,8 +211,8 @@ for (const platform of ["vidaa", "tizen", "webos", "browser"]) {
     `${platform}: focus chooses the same right neighbor`
   );
   assert.ok(
-    nodes.every((node) => node.reads === (platform === "vidaa" ? 1 : 2)),
-    `${platform}: geometry optimization is VIDAA-only`
+    nodes.every((node) => node.reads === 1),
+    `${platform}: each candidate is measured once per key press`
   );
   frames.clear();
 }

@@ -1,7 +1,6 @@
 /* eslint-disable no-unused-vars */
 import { Platform } from "../../../platform/index.js";
 import * as internals from "./playerScreenContext.js";
-import { Platform } from "../../../platform/index.js";
 
 export function createPlayerScreenMethods62() {
   const {
