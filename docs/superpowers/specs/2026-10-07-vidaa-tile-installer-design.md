@@ -37,18 +37,18 @@ Criterion 1 can only be confirmed on a real TV. Until then the tool is labelled 
 
 New folder `tools/vidaa-tile/`, Node.js ESM, same Node version as the rest of the repo. One runtime dependency: `mqtt` (MQTT.js). Everything else uses the Node standard library.
 
-| Module         | Responsibility                                                                                                                                                                            | Depends on            |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| `discovery.js` | SSDP search on all IPv4 interfaces, fetch the device descriptor, decide whether it is a VIDAA TV, read the TV clock from the HTTP `Date` header. Manual IP is supported.                  | `node:dgram`, `os`    |
-| `protocol.js`  | Pure functions: client id, username, passwords, topic names, message payloads. No I/O.                                                                                                    | `secrets.js`          |
-| `secrets.js`   | Loads the user-local client certificate, key and protocol constants. Never bundled.                                                                                                       | `store.js`            |
-| `session.js`   | One TLS MQTT connection to one TV: pair, refresh, install, list, launch, remove. Request/response with timeouts, waits for the matching reply topic.                                      | `mqtt`, `protocol.js` |
-| `store.js`     | Per-TV records (device id, tokens, expiry, pinned certificate fingerprint) in `~/.config/nuvio-vidaa/` (platform equivalent on macOS/Windows). Directory 0700, files 0600, atomic writes. | `node:fs`             |
-| `cert.js`      | Takes the user's copy of the official Hisense remote app (`.apk`), extracts certificate, key and constants, validates them and saves them through `store.js`.                             | `node:zlib`           |
-| `urls.js`      | Validates tile URLs: `https`, or `http` on private LAN ranges and Tailscale (`100.64.0.0/10`). Rejects loopback and credentials in URLs. Adds `wrapper=vidaa` for Nuvio.                  | –                     |
-| `web/`         | Local dashboard (server plus static page). Server binds `127.0.0.1` by default.                                                                                                           | all of the above      |
-| `cli.js`       | Same functions without UI: `discover`, `pair`, `list`, `install`, `launch`, `remove`, `import-cert`.                                                                                      | all of the above      |
-| `i18n/en.json` | All user-facing strings. Other languages can be added as files later.                                                                                                                     | –                     |
+| Module         | Responsibility                                                                                                                                                                       | Depends on            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------- |
+| `discovery.js` | SSDP search on all IPv4 interfaces, fetch the device descriptor, decide whether it is a VIDAA TV, read the TV clock from the HTTP `Date` header. Manual IP is supported.             | `node:dgram`, `os`    |
+| `protocol.js`  | Pure functions: client id, username, passwords, topic names, message payloads. No I/O.                                                                                               | `secrets.js`          |
+| `secrets.js`   | Loads the user-local client keystore, CA keystore, keystore password and protocol constants. Never bundled.                                                                          | `store.js`            |
+| `session.js`   | One TLS MQTT connection to one TV: pair, refresh, install, list, launch, remove. Request/response with timeouts, waits for the matching reply topic. Verifies the TV against the CA. | `mqtt`, `protocol.js` |
+| `store.js`     | Per-TV records (device id, tokens, expiry) and local secrets in `~/.config/nuvio-vidaa/` (platform equivalent on macOS/Windows). Directory 0700, files 0600, atomic writes.          | `node:fs`             |
+| `cert.js`      | Unzips the two keystore files (`client_mobile_android.p12`, `remoteca.bks`) from a user-supplied APK and saves them through `store.js`. Does not recover the keystore password.      | `node:zlib`           |
+| `urls.js`      | Validates tile URLs: `https`, or `http` on private LAN ranges and Tailscale (`100.64.0.0/10`). Rejects loopback and credentials in URLs. Adds `wrapper=vidaa` for Nuvio.             | –                     |
+| `web/`         | Local dashboard (server plus static page). Server binds `127.0.0.1` by default.                                                                                                      | all of the above      |
+| `cli.js`       | Same functions without UI: `discover`, `pair`, `list`, `install`, `launch`, `remove`, `import-cert`.                                                                                 | all of the above      |
+| `i18n/en.json` | All user-facing strings. Other languages can be added as files later.                                                                                                                | –                     |
 
 Entry point: `npm run vidaa:tile` (dashboard) and `npm run vidaa:tile -- <command>` (CLI).
 
@@ -58,9 +58,16 @@ The old DNS-spoofing installer moves to `installer/legacy/` with a deprecation n
 
 The TV only accepts MQTT clients that present the client certificate of the official remote app (subject `CN=VidaaAppAndroidV01`). Sidee bundles that certificate and private key, plus protocol constants taken from the same app. That material belongs to Hisense; it cannot be put under this repo's licence, and a shared key can be revoked for everyone at once.
 
-Decision: this repo ships no Hisense key material and no constants derived from the app. `cert.js` extracts both from an APK the user supplies, once per machine. The dashboard explains where to get the APK.
+The two keystore files are password-protected (verified on the real app: `client_mobile_android.p12` fails to open without a password; `remoteca.bks` is a BouncyCastle keystore). The password and the protocol constants live inside the app's native code.
 
-If implementation shows that the constants cannot be extracted from the APK automatically, work stops at that point and the decision goes back to the maintainer. The tool will not fall back to embedding them.
+Decision: this repo ships no Hisense material. The tool never recovers the keystore password and never reverse-engineers the native libraries — that is deliberately out of scope and was blocked for good reason during research.
+
+Split of work, once per machine:
+
+- **Automated:** `cert.js` unzips the two keystore files from an APK the user points it at (`res/raw/client_mobile_android.p12`, `res/raw/remoteca.bks`). Pure extraction, no cracking.
+- **User-supplied:** the keystore password and the protocol constants (`PATTERN`, `VALUE_SUFFIX`, `XOR_MASK`, `BRAND`, `OPERATION`) are entered once into a local secrets file. Users obtain them however they like; the docs point at public sources (e.g. the Sidee source decodes the constants). The tool reads them from the secrets file, never from the binaries.
+
+A real advantage over Sidee: because `remoteca.bks` is available, the TLS connection to the TV is verified against Hisense's `RemoteCA` instead of disabling verification.
 
 ## Protocol (reference: Sidee `core/client.py`, `core/protocol.py`)
 
@@ -80,7 +87,7 @@ If implementation shows that the constants cannot be extracted from the APK auto
 1. Dashboard opens in the browser on `127.0.0.1`.
 2. No certificate yet: ask for the APK, run `cert.js`, save.
 3. Find TV: 4 s search, list results with names; manual IP field.
-4. Pair: TV shows a PIN, user enters it. Save tokens, device id and the TV certificate fingerprint.
+4. Pair: TV shows a PIN, user enters it. The TLS connection is verified against `remoteca.bks`. Save tokens and device id.
 5. Add tile: URL (default from settings, e.g. the user's GitHub Pages URL), name, optional icon. Install, then confirm via `applist` before showing success.
 
 **Later runs:** paired TVs are listed. Tiles can be listed, re-installed with new data, launched, or removed (experimental).
@@ -91,16 +98,16 @@ If implementation shows that the constants cannot be extracted from the APK auto
 
 ## Errors
 
-| Case                           | Detection                               | Message / action                                                                        |
-| ------------------------------ | --------------------------------------- | --------------------------------------------------------------------------------------- |
-| No TV found                    | discovery returns nothing               | Same network? On Fedora: firewalld command to allow the reply port. Manual IP field.    |
-| TV off or unreachable          | TCP/TLS connect fails or times out      | "TV not reachable." Pairing is kept.                                                    |
-| Wrong or expired PIN           | `authenticationcode` result is not 1    | "PIN not accepted", button for a new PIN.                                               |
-| Pairing expired or revoked     | MQTT CONNACK 4/5 with refresh token     | "Pair again."                                                                           |
-| TV certificate changed         | fingerprint differs from the pinned one | Abort: "A different device answers at this address." Re-pairing is a deliberate action. |
-| No confirmation after install  | tile not in `applist` within 15 s       | "No confirmation from the TV. Check the launcher."                                      |
-| Certificate missing or invalid | `secrets.js` load or validation fails   | Back to the certificate step with an explanation.                                       |
-| Invalid URL                    | `urls.js`                               | Explain which URLs are allowed, before anything is sent.                                |
+| Case                           | Detection                                | Message / action                                                                     |
+| ------------------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------ |
+| No TV found                    | discovery returns nothing                | Same network? On Fedora: firewalld command to allow the reply port. Manual IP field. |
+| TV off or unreachable          | TCP/TLS connect fails or times out       | "TV not reachable." Pairing is kept.                                                 |
+| Wrong or expired PIN           | `authenticationcode` result is not 1     | "PIN not accepted", button for a new PIN.                                            |
+| Pairing expired or revoked     | MQTT CONNACK 4/5 with refresh token      | "Pair again."                                                                        |
+| TV fails CA verification       | TLS handshake rejected by `remoteca.bks` | Abort: "This device is not a genuine VIDAA TV, or is being impersonated."            |
+| No confirmation after install  | tile not in `applist` within 15 s        | "No confirmation from the TV. Check the launcher."                                   |
+| Certificate missing or invalid | `secrets.js` load or validation fails    | Back to the certificate step with an explanation.                                    |
+| Invalid URL                    | `urls.js`                                | Explain which URLs are allowed, before anything is sent.                             |
 
 The tool never changes firewall or system settings itself. Internal errors are logged locally; the dashboard shows the message, not stack traces.
 
