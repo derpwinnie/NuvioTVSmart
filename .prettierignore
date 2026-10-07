@@ -11,3 +11,6 @@ services/**/runtime
 .claude
 .opencode
 .orchestration
+
+.playwright-mcp/
+*.png

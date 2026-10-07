@@ -213,13 +213,15 @@ function serveStatic(pathname, res) {
   const rel = pathname === "/" ? "/index.html" : pathname;
   const file = normalize(join(PUBLIC, rel));
   if (!file.startsWith(PUBLIC)) return send(res, 403, { error: "forbidden" });
+  let body;
   try {
-    const ext = rel.slice(rel.lastIndexOf("."));
-    res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
-    res.end(readFileSync(file));
+    body = readFileSync(file);
   } catch {
-    send(res, 404, { error: "not found" });
+    return send(res, 404, { error: "not found" });
   }
+  const ext = rel.slice(rel.lastIndexOf("."));
+  res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
+  res.end(body);
 }
 
 function classify(e) {

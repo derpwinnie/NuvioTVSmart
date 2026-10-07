@@ -1,0 +1,13 @@
+# Keep secrets, local state, VCS history and bulky artifacts out of the build
+# context so they can never end up in the image.
+.git
+node_modules
+dist
+.claude
+.playwright-mcp
+*.png
+*.log
+**/secrets.json
+local.properties
+**/local.properties
+.env
