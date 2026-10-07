@@ -394,7 +394,11 @@ button:focus-visible {
 }
 
 .qr-terms-link.focused {
-  color: var(--focus-color);
+  border-radius: 6px;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 0 0 4px #fff;
+  text-decoration: none;
 }
 
 .qr-connected-identity {
