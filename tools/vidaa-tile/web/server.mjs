@@ -146,8 +146,35 @@ export async function startDashboard({ lan = false, port = 0 } = {}) {
     }
   };
 
+  const allowedHosts = new Set(["127.0.0.1", "localhost"]);
+  if (lan) allowedHosts.add(localAddress());
+
+  // Reject requests whose Host header is not one we bound to. This blocks DNS
+  // rebinding, where a malicious page resolves its own domain to 127.0.0.1 and
+  // POSTs to the dashboard: such requests carry the attacker's Host, not ours.
+  const hostAllowed = (req) => {
+    const h = (req.headers.host || "").split(":")[0];
+    return allowedHosts.has(h);
+  };
+
+  // State-changing requests must be same-origin. A cross-site page can send a
+  // simple POST, but its Origin header will not match ours.
+  const originAllowed = (req) => {
+    const origin = req.headers.origin;
+    if (!origin) return true; // same-origin navigations / curl have no Origin
+    try {
+      return (new URL(origin).host || "") === (req.headers.host || "");
+    } catch {
+      return false;
+    }
+  };
+
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
+    if (!hostAllowed(req)) return send(res, 403, { error: "forbidden host" });
+    if (req.method !== "GET" && !originAllowed(req)) {
+      return send(res, 403, { error: "cross-origin request refused" });
+    }
     // LAN login: accept the key once, set the cookie.
     if (key && url.pathname === "/login" && url.searchParams.get("key")) {
       const ok = url.searchParams.get("key") === key;
@@ -199,6 +226,8 @@ function classify(e) {
   if (e.name === "UnreachableError") return "TV not reachable.";
   if (e.name === "PinError") return "PIN incorrect or expired.";
   if (e.name === "AuthError") return "Please pair again.";
+  if (e.name === "CertificateError")
+    return "The TV certificate changed — a different device may be answering.";
   return e.message || "error";
 }
 

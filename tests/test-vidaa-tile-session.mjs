@@ -57,6 +57,30 @@ await assert.rejects(
 );
 tv.setBehavior("ok");
 
+// Pin-on-first-use: without a CA, the TV cert is trusted on first pairing and
+// pinned; a changed fingerprint afterwards is rejected.
+{
+  const tv2 = await startFakeTv({ constants, pin: "1111", behavior: "ok" });
+  const noCa = { pfx: tv2.clientPfx, passphrase: tv2.clientPass, constants };
+  const b2 = {
+    host: tv2.host,
+    port: tv2.port,
+    secrets: noCa,
+    getTimestamp: async () => tv2.timestamp
+  };
+  const rec2 = await session.pair({ ...b2, pinProvider: async () => "1111" });
+  assert.ok(rec2.serverFingerprint, "TOFU pinned a fingerprint");
+  // Same cert still works.
+  await session.listTiles(rec2, { secrets: noCa, getTimestamp: async () => tv2.timestamp });
+  // Tamper the pinned fingerprint -> CertificateError.
+  const tampered = { ...rec2, serverFingerprint: "AA:BB" };
+  await assert.rejects(
+    session.listTiles(tampered, { secrets: noCa, getTimestamp: async () => tv2.timestamp }),
+    (e) => e.name === "CertificateError"
+  );
+  await tv2.stop();
+}
+
 // Rejected tokens (CONNACK 5) -> AuthError("rejected"), i.e. "pair again".
 tv.setBehavior("expiredRefresh");
 await assert.rejects(

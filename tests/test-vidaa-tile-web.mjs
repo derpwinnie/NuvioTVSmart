@@ -1,3 +1,4 @@
+import http from "node:http";
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -25,6 +26,31 @@ assert.deepEqual(status.tvs, []);
 // Static page is served.
 const page = await fetch(`http://127.0.0.1:${dash.port}/`).then((r) => r.text());
 assert.match(page, /VIDAA tile installer/);
+
+// Raw request helper — fetch silently drops Host/Origin (forbidden headers).
+const raw = (method, path, headers) =>
+  new Promise((resolve) => {
+    const req = http.request(
+      { host: "127.0.0.1", port: dash.port, method, path, headers },
+      (res) => {
+        res.resume();
+        resolve(res.statusCode);
+      }
+    );
+    req.end();
+  });
+
+// DNS-rebinding guard: a foreign Host header is refused.
+assert.equal(await raw("GET", "/api/status", { Host: "evil.example" }), 403);
+
+// CSRF guard: a cross-origin state-changing request is refused.
+assert.equal(
+  await raw("POST", "/api/discover", {
+    Host: `127.0.0.1:${dash.port}`,
+    Origin: "http://evil.example"
+  }),
+  403
+);
 
 // Full pair + install over the API, against the fake TV (needs openssl).
 if (haveOpenssl()) {

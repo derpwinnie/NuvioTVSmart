@@ -37,12 +37,23 @@ export class TimeoutError extends Error {
     this.name = "TimeoutError";
   }
 }
+export class CertificateError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "CertificateError";
+  }
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Open a verified TLS MQTT connection. Resolves a small wrapper with a message
 // log and a waitFor(topic) helper; rejects with a classified error.
-function connect({ host, port, creds, secrets }) {
+//
+// Verification: with a CA (secrets.caPem) the chain is checked normally. Without
+// one, the TV's self-signed certificate is trusted on first use and pinned —
+// `expectedFingerprint` (from the stored record) must then match, so a later
+// impostor on the same address is rejected.
+function connect({ host, port, creds, secrets, expectedFingerprint = null }) {
   const opts = {
     host,
     port,
@@ -85,6 +96,14 @@ function connect({ host, port, creds, secrets }) {
         fingerprint = socket?.getPeerCertificate?.()?.fingerprint256;
       } catch {
         /* ignore */
+      }
+      // Pinned-certificate check (only when we are not verifying against a CA).
+      if (!secrets.caPem && expectedFingerprint && fingerprint !== expectedFingerprint) {
+        settled = true;
+        client.end(true);
+        return reject(
+          new CertificateError("the TV certificate changed since pairing (possible impostor)")
+        );
       }
       resolve({
         client,
@@ -213,7 +232,13 @@ export async function refresh(record, { secrets, getTimestamp } = {}) {
     constants: secrets.constants
   });
   const t = protocol.tvTopics(creds.clientId);
-  const conn = await connect({ host: record.host, port: record.port, creds, secrets });
+  const conn = await connect({
+    host: record.host,
+    port: record.port,
+    creds,
+    secrets,
+    expectedFingerprint: record.serverFingerprint
+  });
   try {
     await conn.subscribe([t.tokenReply]);
     await conn.publish(
@@ -249,7 +274,13 @@ export async function withSession(record, op, { secrets, getTimestamp } = {}) {
     const t = protocol.tvTopics(creds.clientId);
     let conn;
     try {
-      conn = await connect({ host: current.host, port: current.port, creds, secrets });
+      conn = await connect({
+        host: current.host,
+        port: current.port,
+        creds,
+        secrets,
+        expectedFingerprint: current.serverFingerprint
+      });
     } catch (e) {
       if (e instanceof AuthError && attempt === 0) {
         current = await refresh(current, { secrets, getTimestamp });
