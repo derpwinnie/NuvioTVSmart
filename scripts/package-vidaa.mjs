@@ -1,5 +1,6 @@
 import { access, cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
@@ -56,6 +57,60 @@ async function packageVidaa() {
     await cp(srcPath, destPath, { recursive: true });
   }
 
+  // Give each VIDAA app shell its own asset URLs and offline cache. Keep the
+  // shared dist unchanged for the Tizen and webOS packagers.
+  const workerSource = await readFile(path.join(rootDir, "sw.js"), "utf8");
+  const shellFiles = [
+    "index.html",
+    "app.bundle.js",
+    "core-js.bundle.js",
+    "css/bundle.css",
+    "nuvio.env.js",
+    "boot-guard.js",
+    "assets/runtime/legacy-features.js"
+  ];
+  const shellHash = createHash("sha256").update(workerSource);
+  for (const file of shellFiles) {
+    shellHash.update(file).update(await readFile(path.join(vidaaDistDir, file)));
+  }
+  const buildId = shellHash.digest("hex").slice(0, 16);
+  const indexPath = path.join(vidaaDistDir, "index.html");
+  const indexSource = await readFile(indexPath, "utf8");
+  const assetAliases = new Map();
+  const versionedIndex = indexSource.replace(
+    /((?:src|href)=")([^"?#]+\.(?:js|css))(?:\?[^"#]*)?("|#[^"]*")/g,
+    (match, prefix, asset, suffix) => {
+      if (/^(?:[a-z]+:|\/\/)/i.test(asset)) return match;
+      const extension = path.posix.extname(asset);
+      const versionedAsset = `${asset.slice(0, -extension.length)}.${buildId}${extension}`;
+      assetAliases.set(asset, versionedAsset);
+      return `${prefix}${versionedAsset}${suffix}`;
+    }
+  );
+  let versionedWorker = workerSource.replace(
+    /^var CACHE_NAME = "[^"]+";/m,
+    `var CACHE_NAME = "nuvio-vidaa-${buildId}";`
+  );
+  for (const [asset, alias] of assetAliases) {
+    versionedWorker = versionedWorker.replaceAll(
+      JSON.stringify(`./${asset}`),
+      JSON.stringify(`./${alias}`)
+    );
+  }
+  const vidaaEntry = versionedIndex.replace(
+    "<head>",
+    `<head>\n    <meta name="nuvio-build" content="${buildId}" />\n    <script>window.__NUVIO_PLATFORM__ = "vidaa";</script>`
+  );
+  await Promise.all([
+    writeFile(indexPath, versionedIndex),
+    writeFile(path.join(vidaaDistDir, "vidaa.html"), vidaaEntry),
+    writeFile(path.join(vidaaDistDir, "sw.js"), versionedWorker),
+    cp(path.join(rootDir, "manifest.json"), path.join(vidaaDistDir, "manifest.json")),
+    ...Array.from(assetAliases, ([asset, alias]) =>
+      cp(path.join(vidaaDistDir, asset), path.join(vidaaDistDir, alias))
+    )
+  ]);
+
   // Copy installer directory
   try {
     await cp(installerSourceDir, path.join(vidaaDistDir, "installer"), { recursive: true });
@@ -77,23 +132,13 @@ async function packageVidaa() {
   const zipStats = await stat(zipOutputPath);
 
   console.log("\n=======================================================");
-  console.log("  Nuvio TV VIDAA OS Package Created Successfully!");
+  console.log("  Nuvio TV VIDAA web archive created");
   console.log("=======================================================");
   console.log(`  Package directory : ${vidaaDistDir}`);
   console.log(
     `  Release archive   : ${zipOutputPath} (${(zipStats.size / (1024 * 1024)).toFixed(2)} MB)`
   );
   console.log(`  Application ID    : space.nuvio.tv`);
-  console.log(`  Target Platforms  : Hisense VIDAA U5/U6/U7/U8+ TVs & Projectors`);
-  console.log("-------------------------------------------------------");
-  console.log("  How to install on Hisense U7Q:");
-  console.log("   1. Method 1 (Universal Web / PWA):");
-  console.log("      Host this directory or use 'npm run serve:vidaa'");
-  console.log("      Open the URL in the TV browser and bookmark it.");
-  console.log("   2. Method 2 (Home Screen Launcher Icon):");
-  console.log("      Run 'sudo python3 installer/server.py'");
-  console.log("      Set TV DNS to your PC IP, go to https://vidaahub.com on TV,");
-  console.log("      and click 'Install to TV Launcher'.");
   console.log("=======================================================\n");
 }
 

@@ -17,10 +17,12 @@
 
 ## Get Nuvio TV
 
-Nuvio TV supports **Samsung Tizen TVs from 2018 onward (Tizen 4+)** and **LG webOS TVs from 2020 onward (webOS 5+)**.
-The startup compatibility baseline is Samsung Tizen 4.0 / Chromium 56 and LG webOS 5.0 / Chromium 68 when the platform reports those versions.
+Nuvio TV supports **Samsung Tizen TVs from 2018 onward (Tizen 4+)**, **LG webOS TVs from 2020 onward (webOS 5+)**, and **Hisense VIDAA OS (Experimental Port)**.
+The startup compatibility baseline is Samsung Tizen 4.0 / Chromium 56, LG webOS 5.0 / Chromium 68, and Hisense VIDAA OS (Chromium / WebKit runtime).
 
 Platform capabilities are intentionally version-dependent:
+
+- **Hisense VIDAA OS (Experimental Port)** — TV remote navigation, a fixed TV canvas, and playback through the TV runtime's HTML video backend, with native HLS preferred when supported. Audio and subtitle availability depends on the TV firmware.
 
 - **Samsung Tizen 4.x** — the app and direct playback are supported, but torrent/P2P playback is unavailable by design. Some advanced audio and subtitle features may also be limited.
 - **Samsung Tizen 5.x, including 5.5** — torrent/P2P playback is supported through the bundled local EngineFS service only. The PluginService, plugin execution, and remote plugin pull/push synchronization are disabled; the Plugins screen is not available.
@@ -31,6 +33,7 @@ Platform capabilities are intentionally version-dependent:
 
 On Tizen 5+ and LG webOS, torrent/P2P uses only the bundled local companion service; no external torrent streaming server is configured or required.
 
+- [Hisense VIDAA (experimental)](#hisense-vidaa-experimental): run or host the web build, see below
 - [Nuvio TV Installer](https://github.com/NuvioMedia/NuvioTVSmart/releases/latest) for Windows, macOS, and Linux
 - [Samsung Tizen WGT](https://github.com/NuvioMedia/NuvioTVSmart/releases/latest) for manual installation
 - [LG webOS Homebrew repository](https://raw.githubusercontent.com/NuvioMedia/NuvioTVWebOS/main/webosbrew/apps.json)
@@ -38,12 +41,12 @@ On Tizen 5+ and LG webOS, torrent/P2P uses only the bundled local companion serv
 
 ## Hisense VIDAA (experimental)
 
-VIDAA is the TV OS on Hisense TVs (and some Toshiba, Sharp and other brands). There's no Nuvio app for it, so this fork makes the regular web build usable in the TV's own browser: the remote's arrows, OK and Back work, and the layout is fixed at 1920×1080 so it isn't zoomed in or cut off.
+VIDAA is the TV OS on Hisense TVs (and some Toshiba, Sharp and other brands). There's no Nuvio app for it, so this fork makes the regular web build usable in the TV's own browser: the remote's arrows, OK and Back work, and the layout is fixed at 1920×1080 so it isn't zoomed in or cut off. Navigation is remote-only (no mouse pointer).
 
 Things to know before you try it:
 
 - It's a web page in the TV browser, not an installed app. Something has to serve it (your computer, or a host you set up).
-- It has only been tested by hand on a few TVs, mostly VIDAA 9. Other versions may behave differently.
+- The VIDAA code now builds on [@Empi9245](https://github.com/Empi9245)'s version of this port, which was tested on a real TV (firmware U09.60). Other versions may behave differently.
 - Playback uses the browser's video player, so which files play (MKV, AC-3, DTS, HEVC…) depends on your TV.
 - Most of this port was written with AI help.
 
@@ -67,11 +70,19 @@ The page only works while your computer is running the server. The server doesn'
 
 ### Hosting it somewhere
 
-`npm run package:vidaa` puts a static build in `dist/vidaa/` (plus `dist/nuvio-vidaa.zip`). Upload that to any static host (there's a `vercel.json` for Vercel) and bookmark that URL on the TV instead. The zip is not something you can install on the TV.
+`npm run package:vidaa` puts a static build in `dist/vidaa/` (plus `dist/nuvio-vidaa.zip`). Upload that to any static host (there's a `vercel.json` for Vercel) and open `https://<your-host>/vidaa.html` on the TV. `vidaa.html` always starts in VIDAA mode, and each build gets new file names so the TV doesn't keep old code. The zip is not something you can install on the TV.
 
-### Home screen icon (don't expect much)
+### Home screen tile
 
-[`installer/`](./installer) has a script that tries to put a Nuvio tile on the TV's home screen. It redirects the TV's DNS to your computer to do it. It needs root, it often fails on newer firmware, and the tile is only a link, so the URL still has to be served afterwards. Read [installer/README.md](./installer/README.md) first. Don't mess with launcher files or the `1969` service menu; people have bricked TVs that way.
+**Sidee (newer firmware).** [Sidee](https://github.com/Empi9245/Sidee) by @Empi9245 pairs with the TV over your network (you type a PIN shown on the TV) and adds a launcher tile that opens a web address. Tested on VIDAA U09.60. Things to know:
+
+- Its Nuvio preset is hard-wired to `https://nuviotvsmart.vercel.app/vidaa.html`, which is his hosted copy, not this fork. To use your own host you have to change the `url` in Sidee's `core/presets.py`.
+- It talks to the TV with the protocol of Hisense's remote-control app and ships a client certificate taken from that app. Hisense could block it at any time.
+- While it runs, its dashboard is reachable from your whole network (protected only by a key in the URL). Close it when you're done.
+
+**Old DNS trick (older firmware).** [`installer/`](./installer) has a script that redirects the TV's DNS to your computer and asks the TV browser to install a tile. It needs root, it often fails on newer firmware, and the tile is only a link, so the URL still has to be served afterwards. Read [installer/README.md](./installer/README.md) first.
+
+Don't mess with launcher files or the `1969` service menu; people have bricked TVs that way.
 
 ### Problems
 
@@ -115,7 +126,7 @@ npm run package:vidaa
 ## Thanks
 
 - [@loggie86](https://github.com/loggie86) for testing on a real Hisense TV and figuring out a lot of the launcher and backend details.
-- [@Empi9245](https://github.com/Empi9245) for the VIDAA 9 fixes: screen scaling, remote keys, the sidebar and the player's Sources panel.
+- [@Empi9245](https://github.com/Empi9245) for the VIDAA 9 fixes and the real-TV tested rework this fork now builds on (smooth remote navigation, lazy image loading, keyboard, playback and packaging), plus [Sidee](https://github.com/Empi9245/Sidee).
 
 ## License
 

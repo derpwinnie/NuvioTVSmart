@@ -1,18 +1,8 @@
-// Service worker for the hosted VIDAA build only (index.html never registers
-// it on other platforms).
-//
-// Strategy: network first, cache as offline fallback. The TV is online
-// whenever Nuvio is useful, so serving cached app code first only meant every
-// update showed up one launch late, and a cached index.html could pair with a
-// newer app.bundle.js (or the other way round).
-var CACHE_NAME = "nuvio-vidaa-v3";
-
-// Dist builds ship css/bundle.css; dev serving (npm run serve:vidaa) ships the
-// split stylesheets. Each file is cached on its own so a path that does not
-// exist in one of the two layouts cannot fail the whole precache.
+var CACHE_NAME = "nuvio-vidaa-v4";
 var ASSETS = [
   "./",
   "./index.html",
+  "./vidaa.html",
   "./manifest.json",
   "./boot-guard.js",
   "./core-js.bundle.js",
@@ -25,12 +15,7 @@ var ASSETS = [
   "./assets/libs/ass.min.js",
   "./assets/libs/hls.min.js",
   "./assets/libs/dash.all.min.js",
-  "./css/bundle.css",
-  "./css/base.css",
-  "./css/layout.css",
-  "./css/components.css",
-  "./css/themes.css",
-  "./res/icon.png"
+  "./css/bundle.css"
 ];
 
 self.addEventListener("install", function (e) {
@@ -38,6 +23,8 @@ self.addEventListener("install", function (e) {
     caches
       .open(CACHE_NAME)
       .then(function (cache) {
+        // Cache each file on its own: dev serving (npm run serve:vidaa) has no
+        // css/bundle.css, and one missing file must not fail the whole install.
         return Promise.all(
           ASSETS.map(function (asset) {
             return cache.add(new Request(asset, { cache: "reload" })).catch(function () {});
@@ -46,6 +33,9 @@ self.addEventListener("install", function (e) {
       })
       .then(function () {
         return self.skipWaiting();
+      })
+      .catch(function (err) {
+        console.warn("[SW] Cache install warning:", err);
       })
   );
 });
@@ -58,7 +48,7 @@ self.addEventListener("activate", function (e) {
         return Promise.all(
           names
             .filter(function (n) {
-              return n !== CACHE_NAME;
+              return n.indexOf("nuvio-vidaa-") === 0 && n !== CACHE_NAME;
             })
             .map(function (n) {
               return caches.delete(n);
@@ -80,32 +70,69 @@ self.addEventListener("fetch", function (e) {
   if (req.headers && req.headers.get("range")) return;
   if (/\.(mkv|mp4|m4v|webm|m3u8|ts|mpd|mov)(\?|$)/i.test(req.url)) return;
 
-  // Cache entries are stored without the ?v= cache-buster so the offline
-  // fallback still finds the last good copy after a version bump.
-  var cacheKey = req.url;
-  if (cacheKey.indexOf("?") !== -1) {
-    var url = new URL(cacheKey);
+  var normalizedRequest = req;
+  if (req.url.indexOf("?") !== -1) {
+    var url = new URL(req.url);
     url.search = "";
-    cacheKey = url.toString();
+    normalizedRequest = new Request(url.toString());
+  }
+
+  function updateCacheFromNetwork() {
+    return fetch(req, { cache: "no-store" }).then(function (response) {
+      if (!response || !response.ok) {
+        throw new Error("App resource unavailable");
+      }
+      if (response && response.status === 200) {
+        var clone = response.clone();
+        return caches
+          .open(CACHE_NAME)
+          .then(function (cache) {
+            return cache.put(normalizedRequest, clone);
+          })
+          .then(function () {
+            return response;
+          })
+          .catch(function () {
+            return response;
+          });
+      }
+      return response;
+    });
+  }
+
+  var isAppShellRequest =
+    req.mode === "navigate" ||
+    req.destination === "document" ||
+    req.destination === "script" ||
+    req.destination === "worker" ||
+    req.destination === "style" ||
+    req.destination === "font" ||
+    req.destination === "image" ||
+    /\.(html|js|css|wasm)(\?|$)/i.test(req.url);
+
+  if (isAppShellRequest) {
+    e.respondWith(
+      // Check the network at app launch; reuse this build's cache when offline.
+      updateCacheFromNetwork().catch(function (error) {
+        return caches.open(CACHE_NAME).then(function (cache) {
+          return cache.match(normalizedRequest).then(function (cached) {
+            if (cached) return cached;
+            if (req.mode === "navigate" || req.destination === "document") {
+              return cache.match("./index.html");
+            }
+            throw error;
+          });
+        });
+      })
+    );
+    return;
   }
 
   e.respondWith(
-    fetch(req)
-      .then(function (response) {
-        if (response && response.status === 200 && response.type === "basic") {
-          var clone = response.clone();
-          caches.open(CACHE_NAME).then(function (cache) {
-            cache.put(cacheKey, clone);
-          });
-        }
-        return response;
-      })
-      .catch(function () {
-        return caches.match(cacheKey).then(function (cached) {
-          if (cached) return cached;
-          if (req.mode === "navigate") return caches.match("./index.html");
-          return Response.error();
-        });
-      })
+    caches.open(CACHE_NAME).then(function (cache) {
+      return cache.match(normalizedRequest).then(function (response) {
+        return response || fetch(req);
+      });
+    })
   );
 });

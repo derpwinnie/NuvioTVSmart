@@ -1,5 +1,6 @@
 import { Router } from "./routerState.js";
 import { Platform } from "../../platform/index.js";
+import { noteVidaaNavigationKeyDown, noteVidaaNavigationKeyUp } from "./vidaaNavigationActivity.js";
 
 function buildNormalizedEvent(event) {
   const normalizedKey = Platform.normalizeKey(event);
@@ -47,6 +48,8 @@ function hasActiveModal() {
 
 const BACK_DEBOUNCE_MS = 250;
 const VIDAA_SELECT_KEY_CODE = 13;
+// Remotes start auto-repeat after roughly 300-500 ms, then repeat faster.
+const VIDAA_HELD_KEY_MAX_GAP_MS = 700;
 
 export const FocusEngine = {
   lastBackHandledAt: 0,
@@ -54,6 +57,7 @@ export const FocusEngine = {
   pointerMoveFrame: null,
   pendingPointerMoveEvent: null,
   activeKeyDownStartedAt: new Map(),
+  vidaaLastKeyDownAt: new Map(),
   activeBackKeyIdentities: new Set(),
 
   init() {
@@ -125,18 +129,31 @@ export const FocusEngine = {
     }
 
     const normalizedEvent = buildNormalizedEvent(event);
+    noteVidaaNavigationKeyDown(normalizedEvent.keyCode);
     const keyIdentity = this.getKeyIdentity(normalizedEvent);
-    const isVidaaSelectKey =
-      Platform.isVidaa() && normalizedEvent.keyCode === VIDAA_SELECT_KEY_CODE;
+    const isVidaa = Platform.isVidaa();
+    const isArrowKey = normalizedEvent.keyCode >= 37 && normalizedEvent.keyCode <= 40;
+    const isVidaaSelectKey = isVidaa && normalizedEvent.keyCode === VIDAA_SELECT_KEY_CODE;
     if (keyIdentity) {
-      if (isVidaaSelectKey) {
-        // Some VIDAA browser builds emit repeated OK keydown events without
-        // setting KeyboardEvent.repeat. Treat every additional keydown before
-        // the matching keyup as repeat so one physical hold stays one action.
-        if (this.activeKeyDownStartedAt.has(keyIdentity)) {
+      if (isVidaaSelectKey || (isVidaa && isArrowKey)) {
+        // A lost keyup (overlay, app switch) would otherwise turn the next
+        // single press into a repeat, so only count it as held while keydowns
+        // keep arriving at auto-repeat pace.
+        const now = Date.now();
+        const lastKeyDownAt = Number(this.vidaaLastKeyDownAt.get(keyIdentity) || 0);
+        const keyIsHeld =
+          this.activeKeyDownStartedAt.has(keyIdentity) &&
+          now - lastKeyDownAt < VIDAA_HELD_KEY_MAX_GAP_MS;
+        this.vidaaLastKeyDownAt.set(keyIdentity, now);
+        if (isArrowKey) {
+          // Use the remote's key cycle when firmware omits KeyboardEvent.repeat.
+          // Home can then apply its cadence while the scroll animation follows.
+          normalizedEvent.repeat = keyIsHeld;
+        } else if (keyIsHeld) {
           normalizedEvent.repeat = true;
-        } else {
-          this.activeKeyDownStartedAt.set(keyIdentity, Date.now());
+        }
+        if (!keyIsHeld) {
+          this.activeKeyDownStartedAt.set(keyIdentity, now);
         }
       } else if (!normalizedEvent.repeat || !this.activeKeyDownStartedAt.has(keyIdentity)) {
         this.activeKeyDownStartedAt.set(keyIdentity, Date.now());
@@ -175,21 +192,11 @@ export const FocusEngine = {
       return;
     }
 
-    const isArrowKey =
-      normalizedEvent.isArrow || (normalizedEvent.keyCode >= 37 && normalizedEvent.keyCode <= 40);
-
-    if (Platform.isVidaa() && (isArrowKey || normalizedEvent.keyCode === VIDAA_SELECT_KEY_CODE)) {
-      // VIDAA's WebApp guide explicitly requires app-owned spatial navigation
-      // to prevent the browser default. Stop the event at capture phase too,
-      // so the browser/DOM cannot perform a second navigation or synthetic OK.
+    if (isVidaa && (isArrowKey || normalizedEvent.keyCode === VIDAA_SELECT_KEY_CODE)) {
       normalizedEvent.preventDefault();
       normalizedEvent.stopPropagation();
       normalizedEvent.stopImmediatePropagation();
       this.lastPointerFocusTarget = null;
-
-      // Arrow repeat remains useful for fast TV navigation. OK repeat must not
-      // become multiple activations; existing screen hold timers still run
-      // from the first keydown and keyup keeps the true hold duration.
       if (normalizedEvent.keyCode === VIDAA_SELECT_KEY_CODE && normalizedEvent.repeat) {
         return;
       }
@@ -206,6 +213,7 @@ export const FocusEngine = {
 
   handleKeyUp(event) {
     const normalizedEvent = buildNormalizedEvent(event);
+    noteVidaaNavigationKeyUp(normalizedEvent.keyCode);
     const keyIdentity = this.getKeyIdentity(normalizedEvent);
     if (
       Platform.isBackEvent({
@@ -219,27 +227,29 @@ export const FocusEngine = {
     ) {
       this.activeBackKeyIdentities.delete(keyIdentity || "back");
     }
+    const isVidaa = Platform.isVidaa();
+    if (event?.target && !document.contains(event.target) && !isVidaa) return;
+    if (hasActiveModal()) {
+      if (keyIdentity) {
+        this.activeKeyDownStartedAt.delete(keyIdentity);
+        this.vidaaLastKeyDownAt.delete(keyIdentity);
+      }
+      return;
+    }
+
     if (keyIdentity) {
       const startedAt = Number(this.activeKeyDownStartedAt.get(keyIdentity) || 0);
       normalizedEvent.keyDownDurationMs = startedAt > 0 ? Math.max(0, Date.now() - startedAt) : 0;
       this.activeKeyDownStartedAt.delete(keyIdentity);
+      this.vidaaLastKeyDownAt.delete(keyIdentity);
     }
 
-    const isArrowKey =
-      normalizedEvent.isArrow || (normalizedEvent.keyCode >= 37 && normalizedEvent.keyCode <= 40);
-    if (Platform.isVidaa() && (isArrowKey || normalizedEvent.keyCode === VIDAA_SELECT_KEY_CODE)) {
+    const isArrowKey = normalizedEvent.keyCode >= 37 && normalizedEvent.keyCode <= 40;
+    if (isVidaa && (isArrowKey || normalizedEvent.keyCode === VIDAA_SELECT_KEY_CODE)) {
       normalizedEvent.preventDefault();
       normalizedEvent.stopPropagation();
       normalizedEvent.stopImmediatePropagation();
       this.lastPointerFocusTarget = null;
-    }
-
-    // Always release the internal key state first. VIDAA long-press actions can
-    // rerender their focused node before keyup arrives, so a detached original
-    // target must not leave OK permanently marked as held.
-    if (event?.target && !document.contains(event.target) && !Platform.isVidaa()) return;
-    if (hasActiveModal()) {
-      return;
     }
 
     const currentScreen = Router.getCurrentScreen();

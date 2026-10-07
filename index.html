@@ -80,81 +80,53 @@
         );
         if (document.documentElement) document.documentElement.classList.add("vidaa-tv");
 
-        // Suppress F-key fullscreen crash on VIDAA browser. The flag stops the
-        // VIDAA adapter from installing a second copy after the bundle loads.
-        root.__NUVIO_FKEY_SUPPRESSOR_INSTALLED__ = true;
-        window.addEventListener(
-          "keydown",
-          function (e) {
-            if (e.keyCode === 70 || e.key === "f" || e.key === "F") {
-              var tag = (e.target && e.target.tagName ? e.target.tagName : "").toLowerCase();
-              if (tag === "input" || tag === "textarea") return;
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          },
-          true
-        );
+        // The platform adapter installs the focused-field keyboard fallback.
 
-        // Early VIDAA virtual keyboard input fix
+        // PWA/offline support is VIDAA-only. Do not register a service worker
+        // or manifest on Tizen, webOS, or normal browser launches.
         try {
-          var desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
-          if (desc && desc.set) {
-            var origSet = desc.set;
-            var origGet = desc.get;
-            var guard = false;
-            Object.defineProperty(HTMLInputElement.prototype, "value", {
-              get: origGet,
-              set: function (v) {
-                var old = origGet.call(this);
-                origSet.call(this, v);
-                if (v !== old && !guard) {
-                  guard = true;
-                  try {
-                    this.dispatchEvent(new Event("input", { bubbles: true }));
-                    this.dispatchEvent(new Event("change", { bubbles: true }));
-                  } catch (_) {}
-                  guard = false;
-                }
-              },
-              configurable: true
-            });
-            // Tell the VIDAA adapter the setter is already patched; wrapping it
-            // twice would fire every input/change event twice.
-            root.__NUVIO_VIDAA_VALUE_SETTER_PATCHED__ = true;
+          var manifestLink = document.querySelector("link[data-nuvio-vidaa-manifest]");
+          if (!manifestLink) {
+            manifestLink = document.createElement("link");
+            manifestLink.rel = "manifest";
+            manifestLink.href = "manifest.json";
+            manifestLink.setAttribute("data-nuvio-vidaa-manifest", "true");
+            document.head.appendChild(manifestLink);
           }
         } catch (_) {}
+        if ("serviceWorker" in navigator) {
+          window.addEventListener("load", function () {
+            navigator.serviceWorker.register("sw.js").catch(function () {});
+          });
+        }
       })();
     </script>
     <script>
-      // The service worker only exists for the hosted VIDAA build. Other
-      // platforms never register it, and any copy left over from an earlier
-      // build on this origin is removed so it cannot serve stale files.
-      if ("serviceWorker" in navigator) {
+      // The service worker only exists for the hosted VIDAA build (registered
+      // above). Remove any copy left over from an earlier build on this origin
+      // so it cannot serve stale files to other platforms.
+      if ("serviceWorker" in navigator && window.__NUVIO_PLATFORM__ !== "vidaa") {
         window.addEventListener("load", function () {
-          if (window.__NUVIO_PLATFORM__ === "vidaa") {
-            navigator.serviceWorker.register("sw.js").catch(function () {});
-            return;
-          }
-          if (navigator.serviceWorker.getRegistrations) {
-            navigator.serviceWorker
-              .getRegistrations()
-              .then(function (registrations) {
-                registrations.forEach(function (registration) {
-                  var worker =
-                    registration.active || registration.waiting || registration.installing;
-                  if (worker && /\/sw\.js(\?|$)/.test(worker.scriptURL)) {
-                    registration.unregister();
-                  }
-                });
-              })
-              .catch(function () {});
-          }
+          if (!navigator.serviceWorker.getRegistrations) return;
+          navigator.serviceWorker
+            .getRegistrations()
+            .then(function (registrations) {
+              registrations.forEach(function (registration) {
+                var worker = registration.active || registration.waiting || registration.installing;
+                if (worker && /\/sw\.js(\?|$)/.test(worker.scriptURL)) {
+                  registration.unregister();
+                }
+              });
+            })
+            .catch(function () {});
         });
       }
     </script>
-    <link rel="manifest" href="manifest.json" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Nuvio" />
+    <meta name="theme-color" content="#0a0a14" />
+    <link rel="icon" type="image/png" sizes="512x512" href="assets/images/nuviotv.png" />
+    <link rel="apple-touch-icon" href="assets/images/nuviotv.png" />
     <title>Nuvio TV</title>
 
     <link rel="stylesheet" href="css/base.css?v=20260925vidaa-viewportfit2" />

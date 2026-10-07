@@ -2,6 +2,8 @@
 
 Two ways to get Nuvio onto a Hisense VIDAA TV. The first one is the one you want.
 
+For a home screen tile on newer firmware, also look at [Sidee](https://github.com/Empi9245/Sidee) (see the notes in the [main README](../README.md#home-screen-tile)).
+
 ## 1. Bookmark it in the TV browser
 
 1. Serve the app from your computer (`npm run serve:vidaa`, see the main README) or from wherever you host it.

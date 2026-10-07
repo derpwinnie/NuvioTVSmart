@@ -1,6 +1,7 @@
 /* eslint-disable no-unused-vars */
 import { Platform } from "../../../platform/index.js";
 import * as internals from "./playerScreenContext.js";
+import { Platform } from "../../../platform/index.js";
 
 export function createPlayerScreenMethods63() {
   const {
@@ -44,6 +45,9 @@ export function createPlayerScreenMethods63() {
       this.sourcesError = "";
       this.renderSourcesPanel();
       this.updateModalBackdrop();
+      if (Platform.isVidaa() && this.controlsVisible) {
+        this.syncControlFocusDom();
+      }
       this.resetControlsAutoHide();
     },
     async reloadSources({ forceRefresh = false } = {}) {
