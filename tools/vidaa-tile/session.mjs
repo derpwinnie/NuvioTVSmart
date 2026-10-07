@@ -144,6 +144,7 @@ export async function pair({
   host,
   port = DEFAULT_PORT,
   pinProvider,
+  onPinReady,
   store = { readState, writeState },
   secrets,
   getTimestamp
@@ -166,6 +167,7 @@ export async function pair({
     if ((await conn.waitFor(t.authReply, 15000)) === null) {
       throw new TimeoutError("the TV did not start pairing");
     }
+    if (onPinReady) await onPinReady();
     const pin = await pinProvider();
     if (!pin) throw new PinError("no PIN entered");
     const since = conn.messages.length;

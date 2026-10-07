@@ -24,10 +24,12 @@
     "format:check": "prettier --check .",
     "serve": "node ./scripts/serve.mjs",
     "serve:vidaa": "node ./scripts/serve.mjs --vidaa",
+    "vidaa:tile": "node ./tools/vidaa-tile/cli.mjs",
+    "test:vidaa:tile": "node ./tests/test-vidaa-tile-protocol.mjs && node ./tests/test-vidaa-tile-discovery.mjs && node ./tests/test-vidaa-tile-urls.mjs && node ./tests/test-vidaa-tile-store.mjs && node ./tests/test-vidaa-tile-cert.mjs && node ./tests/test-vidaa-tile-secrets.mjs && node ./tests/test-vidaa-tile-session.mjs && node ./tests/test-vidaa-tile-discovery-e2e.mjs && node ./tests/test-vidaa-tile-cli.mjs && node ./tests/test-vidaa-tile-web.mjs",
     "sync": "node ./scripts/sync-wrapper.mjs",
     "sync:tizen": "node ./scripts/sync-wrapper.mjs --tizen",
     "sync:webos": "node ./scripts/sync-wrapper.mjs --webos",
-    "test:vidaa": "npm run test:vidaa:unit && npm run package:vidaa && node ./tests/test-vidaa-platform.mjs",
+    "test:vidaa": "npm run test:vidaa:unit && npm run test:vidaa:tile && npm run package:vidaa && node ./tests/test-vidaa-platform.mjs",
     "test:vidaa:unit": "node ./tests/test-vidaa-remote-repeat.mjs && node ./tests/test-vidaa-focus-scroll.mjs && node ./tests/test-vidaa-sidebar.mjs && node ./tests/test-vidaa-home-navigation.mjs && node ./tests/test-vidaa-home-loading.mjs && node ./tests/test-vidaa-image-hydration.mjs && node ./tests/test-vidaa-grid-scroll.mjs && node ./tests/test-vidaa-discover-loading.mjs && node ./tests/test-vidaa-collections.mjs"
   },
   "devDependencies": {
