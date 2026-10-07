@@ -25,10 +25,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build
+      # package:vidaa builds the static VIDAA bundle into dist/vidaa
+      # (vidaa.html, sw.js, hashed file names).
+      - run: npm run package:vidaa
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: dist/vidaa
 
   deploy:
     needs: build
