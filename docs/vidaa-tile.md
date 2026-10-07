@@ -44,7 +44,8 @@ npm run vidaa:tile -- import-apk /path/to/vidaa.apk
 npm run vidaa:tile -- set-secret --passphrase 'THE_PASSPHRASE' --constants constants.json
 npm run vidaa:tile -- discover
 npm run vidaa:tile -- pair 192.168.1.50          # enter the PIN the TV shows
-npm run vidaa:tile -- install 192.168.1.50 https://your-host.example/
+npm run vidaa:tile -- install 192.168.1.50        # uses the free hosted build
+npm run vidaa:tile -- install 192.168.1.50 https://your-host.example/   # or your own
 npm run vidaa:tile -- list 192.168.1.50
 npm run vidaa:tile -- remove 192.168.1.50 nuvio
 ```
@@ -61,13 +62,24 @@ npm run vidaa:tile -- remove 192.168.1.50 nuvio
   that link once to authorize the browser. The key is kept in a cookie, never
   in the address bar.
 
-## Where to host your build
+## Where the tile points
 
 The tile opens a URL that must stay reachable even when your PC is off.
 
-- **GitHub Pages** — `.github/workflows/pages.yml` builds and publishes the
-  VIDAA build. It is manual-trigger only (Actions → "Publish VIDAA build to
-  Pages" → Run), because enabling Pages creates a public site.
+**You don't have to host anything.** This fork publishes its VIDAA build for
+free on GitHub Pages:
+
+    https://derpwinnie.github.io/NuvioTVSmart/vidaa.html
+
+The dashboard and `install` use this address by default. It is rebuilt
+automatically on every push to `main`, so the tile always opens the latest
+version. Your PC is only needed once, to pair the TV and add the tile.
+
+Only if you want your own copy:
+
+- **Your own GitHub Pages** — fork the repo, enable Pages (Settings → Pages →
+  Source: GitHub Actions); `.github/workflows/pages.yml` then publishes it to
+  `https://<you>.github.io/<repo>/vidaa.html`. Free for public repos.
 - **Docker** — `docker build -f Dockerfile.vidaa -t nuvio-vidaa .` then
   `docker run --rm -p 8080:8080 nuvio-vidaa`, and put https in front for public
   access. Runs as a non-root user and serves only the built `dist/`.

@@ -4,6 +4,9 @@
 // http is only sensible on a trusted private network. Public sites must use
 // https. Credentials in the URL are rejected.
 
+// Free hosted build of this fork (GitHub Pages), so nobody has to self-host.
+export const DEFAULT_TILE_URL = "https://derpwinnie.github.io/NuvioTVSmart/vidaa.html";
+
 const PRIVATE = [
   /^10\./,
   /^192\.168\./,

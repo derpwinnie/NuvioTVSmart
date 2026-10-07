@@ -14,7 +14,7 @@ import { discover } from "../discovery.mjs";
 import { extractKeystores } from "../cert.mjs";
 import { loadSecrets, requireComplete } from "../secrets.mjs";
 import { readState, writeFileAtomic, secretsPath } from "../store.mjs";
-import { validateTileUrl, withVidaaWrapper } from "../urls.mjs";
+import { DEFAULT_TILE_URL, validateTileUrl, withVidaaWrapper } from "../urls.mjs";
 import * as session from "../session.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -116,7 +116,7 @@ export async function startDashboard({ lan = false, port = 0 } = {}) {
     },
     async "POST /api/tiles"(body) {
       const secrets = loadSecrets();
-      const v = validateTileUrl(body.url);
+      const v = validateTileUrl(body.url || DEFAULT_TILE_URL);
       if (!v.ok) return { ok: false, error: v.reason };
       const tiles = await session.addTile(
         recordFor(body.host),

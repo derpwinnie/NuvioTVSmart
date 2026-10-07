@@ -9,7 +9,7 @@ import { extractKeystores } from "./cert.mjs";
 import { loadSecrets, requireComplete } from "./secrets.mjs";
 import { readState } from "./store.mjs";
 import { writeFileAtomic, secretsPath } from "./store.mjs";
-import { validateTileUrl, withVidaaWrapper } from "./urls.mjs";
+import { DEFAULT_TILE_URL, validateTileUrl, withVidaaWrapper } from "./urls.mjs";
 import * as session from "./session.mjs";
 
 const USAGE = `nuvio vidaa-tile — put Nuvio on a Hisense VIDAA TV as a launcher tile
@@ -25,7 +25,8 @@ Commands:
   status                                 show what setup is still missing
   pair <host>                            pair with a TV (enter the PIN it shows)
   list <host>                            list launcher tiles
-  install <host> <url> [--name N] [--app-id ID] [--image URL]
+  install <host> [url] [--name N] [--app-id ID] [--image URL]
+                                         (url defaults to the free hosted build)
   launch <host> <appId> [--url U] [--name N]
   remove <host> <appId>
 
@@ -120,7 +121,7 @@ async function main() {
     return;
   }
   if (cmd === "install") {
-    const [host, rawUrl] = rest;
+    const [host, rawUrl = DEFAULT_TILE_URL] = rest;
     const v = validateTileUrl(rawUrl);
     if (!v.ok) throw new Error(`invalid URL: ${v.reason}`);
     const url = withVidaaWrapper(v.url);

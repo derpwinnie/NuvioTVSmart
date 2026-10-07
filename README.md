@@ -70,11 +70,13 @@ The page only works while your computer is running the server. The server doesn'
 
 ### Hosting it somewhere
 
-`npm run package:vidaa` puts a static build in `dist/vidaa/` (plus `dist/nuvio-vidaa.zip`). Upload that to any static host (there's a `vercel.json` for Vercel) and open `https://<your-host>/vidaa.html` on the TV. `vidaa.html` always starts in VIDAA mode, and each build gets new file names so the TV doesn't keep old code. The zip is not something you can install on the TV.
+**No hosting needed:** this fork's VIDAA build is published for free on GitHub Pages at <https://derpwinnie.github.io/NuvioTVSmart/vidaa.html> and updated on every push. Open that on the TV or point a tile at it.
+
+To host your own copy instead, `npm run package:vidaa` puts a static build in `dist/vidaa/` (plus `dist/nuvio-vidaa.zip`). Upload that to any static host (there's a `vercel.json` for Vercel) and open `https://<your-host>/vidaa.html` on the TV. `vidaa.html` always starts in VIDAA mode, and each build gets new file names so the TV doesn't keep old code. The zip is not something you can install on the TV.
 
 ### Home screen tile
 
-**This fork's tile tool (recommended).** `npm run vidaa:tile` opens a small local dashboard that finds your TV, pairs with it (you type the PIN shown on the TV) and adds a launcher tile pointing at **any address you host**, so you run your own build, not someone else's. It works on Linux, macOS and Windows. Full setup, self-hosting options and a real-TV checklist are in [docs/vidaa-tile.md](./docs/vidaa-tile.md).
+**This fork's tile tool (recommended).** `npm run vidaa:tile` opens a small local dashboard that finds your TV, pairs with it (you type the PIN shown on the TV) and adds a launcher tile. By default the tile opens the free hosted build above, so you don't need to host anything; you can point it at your own copy instead. It works on Linux, macOS and Windows. Full setup, hosting options and a real-TV checklist are in [docs/vidaa-tile.md](./docs/vidaa-tile.md).
 
 It uses the same TV mechanism as [Sidee](https://github.com/Empi9245/Sidee) by @Empi9245 (the protocol reference, credited there and in the source), but adds Linux support, your own tile address, tile listing and removal, a verified/pinned TV connection, and a dashboard that stays on `127.0.0.1` by default. It ships **no** Hisense key material: you point it once at your own copy of the VIDAA app to extract the two keystore files, and supply the keystore passphrase and protocol constants yourself.
 
