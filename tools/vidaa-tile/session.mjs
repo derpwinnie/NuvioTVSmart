@@ -14,6 +14,10 @@ import { readState, writeState } from "./store.mjs";
 
 const DEFAULT_PORT = 36669;
 const REFRESH_MARGIN_MS = 12 * 3600 * 1000;
+// After this many consecutive failed pairings with the stored device UUID, the
+// next pairing uses a fresh UUID (the TV may hold a broken state for the old
+// one). Reusing the UUID otherwise avoids filling the TV's paired-device list.
+const PAIR_FAILURES_BEFORE_NEW_UUID = 2;
 
 export class AuthError extends Error {
   constructor(reason, message) {
@@ -29,9 +33,10 @@ export class UnreachableError extends Error {
   }
 }
 export class PinError extends Error {
-  constructor(message) {
+  constructor(message, { cancelled = false } = {}) {
     super(message);
     this.name = "PinError";
+    this.cancelled = cancelled; // the user gave up; not the TV's fault
   }
 }
 export class TimeoutError extends Error {
@@ -181,8 +186,39 @@ export async function pair({
   void store;
   const ts = await (getTimestamp ? getTimestamp() : realTvTimestamp(host));
   const prev = readState().tvs[host];
-  const deviceId =
-    prev && prev.deviceId && (prev.pairFailures || 0) < 2 ? prev.deviceId : protocol.newDeviceId();
+  const reused = Boolean(prev?.deviceId) && !pairFailuresExceeded(prev);
+  const deviceId = reused ? prev.deviceId : protocol.newDeviceId();
+  try {
+    return await pairWith({ host, port, pinProvider, onPinReady, secrets, ts, prev, deviceId });
+  } catch (e) {
+    if (countsAsPairFailure(e)) registerPairFailure(host, reused);
+    throw e;
+  }
+}
+
+export function pairFailuresExceeded(record) {
+  return (record?.pairFailures || 0) >= PAIR_FAILURES_BEFORE_NEW_UUID;
+}
+
+// A cancelled PIN prompt, an unreachable TV or a certificate mismatch says
+// nothing about the TV's state for our UUID, so they do not count.
+function countsAsPairFailure(e) {
+  if (e instanceof PinError) return !e.cancelled;
+  return e instanceof AuthError || e instanceof TimeoutError;
+}
+
+// Only a failure with the reused UUID counts against it; failures with a
+// fresh UUID leave the stored record untouched (as in Sidee).
+function registerPairFailure(host, reused) {
+  if (!reused) return;
+  const state = readState();
+  const rec = state.tvs[host];
+  if (!rec) return;
+  state.tvs[host] = { ...rec, pairFailures: (rec.pairFailures || 0) + 1 };
+  writeState(state);
+}
+
+async function pairWith({ host, port, pinProvider, onPinReady, secrets, ts, prev, deviceId }) {
   const creds = protocol.sessionCredentials({
     deviceId,
     tvTimestamp: ts,
@@ -205,8 +241,13 @@ export async function pair({
       throw new TimeoutError("the TV did not start pairing");
     }
     if (onPinReady) await onPinReady();
-    const pin = await pinProvider();
-    if (!pin) throw new PinError("no PIN entered");
+    let pin;
+    try {
+      pin = await pinProvider();
+    } catch (e) {
+      throw new PinError(e?.message || "no PIN entered", { cancelled: true });
+    }
+    if (!pin) throw new PinError("no PIN entered", { cancelled: true });
     const since = conn.messages.length;
     await conn.publish(t.ui + "actions/authenticationcode", protocol.pinPayload(pin));
     const reply = await conn.waitFor(t.authCodeReply, 15000, since);

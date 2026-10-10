@@ -38,6 +38,50 @@ await assert.rejects(
 );
 tv.setBehavior("ok");
 
+// Failed pairings with the reused UUID are counted; a cancelled PIN prompt is
+// not. After two failures the next pairing switches to a fresh UUID.
+{
+  const store = await import("../tools/vidaa-tile/store.mjs");
+  const stored = () => store.readState().tvs[tv.host];
+  assert.equal(stored().pairFailures, 1, "wrong PIN counted once");
+  assert.equal(stored().deviceId, rec.deviceId);
+
+  await assert.rejects(
+    session.pair({ ...base, pinProvider: async () => "" }),
+    (e) => e.name === "PinError" && e.cancelled === true
+  );
+  await assert.rejects(
+    session.pair({
+      ...base,
+      pinProvider: async () => {
+        throw new Error("cancelled by user");
+      }
+    }),
+    (e) => e.name === "PinError" && e.cancelled === true
+  );
+  assert.equal(stored().pairFailures, 1, "cancel does not count");
+
+  tv.setBehavior("wrongPin");
+  await assert.rejects(session.pair({ ...base, pinProvider: async () => "0000" }));
+  tv.setBehavior("ok");
+  assert.equal(stored().pairFailures, 2);
+  assert.equal(session.pairFailuresExceeded(stored()), true);
+
+  // Now a fresh UUID is used; failing with it leaves the old record alone.
+  tv.setBehavior("wrongPin");
+  await assert.rejects(session.pair({ ...base, pinProvider: async () => "0000" }));
+  tv.setBehavior("ok");
+  assert.equal(stored().pairFailures, 2, "failure with a fresh UUID not counted");
+
+  const fresh = await session.pair({ ...base, pinProvider: async () => "4321" });
+  assert.notEqual(fresh.deviceId, rec.deviceId, "new UUID after two failures");
+  assert.equal(stored().pairFailures, 0, "success resets the counter");
+  // Reset to the original record so the tests below use `rec`.
+  const st = store.readState();
+  st.tvs[tv.host] = rec;
+  store.writeState(st);
+}
+
 // Install a tile, confirmed via the app list.
 const tile = { appId: "nuvio", name: "Nuvio", url: "https://nuvio.example/?wrapper=vidaa" };
 const apps = await session.addTile(rec, tile, { secrets, getTimestamp });
