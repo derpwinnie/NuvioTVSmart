@@ -366,7 +366,17 @@ export function tileMatches(tile, appId, url) {
   return urls.length > 0 && urls.every((u) => u === url);
 }
 
+// Pauses the real launcher needs (taken from Sidee, which was tested on a TV).
+// Tests pass `opts.delays` to shrink them.
+export const DEFAULT_DELAYS = {
+  afterInstallMs: 8000, // the launcher registers the tile before it lists it
+  installRetryMs: 2000, // second applist query if the first missed the tile
+  afterLaunchMs: 4000 // keep the connection open while the TV starts the app
+};
+const delaysFrom = (opts) => ({ ...DEFAULT_DELAYS, ...(opts?.delays || {}) });
+
 export async function addTile(record, { appId, name, url, image = "" }, opts) {
+  const delays = delaysFrom(opts);
   return withSession(
     record,
     async (conn, t) => {
@@ -375,13 +385,14 @@ export async function addTile(record, { appId, name, url, image = "" }, opts) {
         t.ui + "actions/uievent",
         protocol.installPayload({ appId, name, url, image })
       );
+      await sleep(delays.afterInstallMs);
       for (let attempt = 0; attempt < 2; attempt++) {
         const since = conn.messages.length;
         await conn.publish(t.ui + "actions/applist", "0");
         const raw = await conn.waitFor(t.applistReply, 8000, since);
         const apps = raw ? protocol.parseAppList(raw) : null;
         if (apps && apps.some((a) => tileMatches(a, appId, url))) return apps;
-        if (attempt === 0) await sleep(1500);
+        if (attempt === 0) await sleep(delays.installRetryMs);
       }
       throw new TimeoutError("the TV did not confirm the tile");
     },

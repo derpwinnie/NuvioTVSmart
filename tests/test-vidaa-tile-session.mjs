@@ -84,8 +84,34 @@ tv.setBehavior("ok");
 
 // Install a tile, confirmed via the app list.
 const tile = { appId: "nuvio", name: "Nuvio", url: "https://nuvio.example/?wrapper=vidaa" };
-const apps = await session.addTile(rec, tile, { secrets, getTimestamp });
+// The real launcher pauses (8 s / 2 s / 4 s) are shrunk for the tests.
+const fast = { afterInstallMs: 0, installRetryMs: 0, afterLaunchMs: 0 };
+const tileOpts = (delays = fast) => ({ secrets, getTimestamp, delays });
+assert.deepEqual(session.DEFAULT_DELAYS, {
+  afterInstallMs: 8000,
+  installRetryMs: 2000,
+  afterLaunchMs: 4000
+});
+const apps = await session.addTile(rec, tile, tileOpts());
 assert.ok(apps.some((a) => session.tileMatches(a, tile.appId, tile.url)));
+
+// The launcher registers a tile with a lag: the pause after install covers it.
+tv.setInstallDelay(150);
+{
+  const t0 = Date.now();
+  const tile2 = { ...tile, appId: "slow1" };
+  const got = await session.addTile(rec, tile2, tileOpts({ ...fast, afterInstallMs: 300 }));
+  assert.ok(Date.now() - t0 >= 300, "waited after install before querying the app list");
+  assert.ok(got.some((a) => session.tileMatches(a, "slow1", tile.url)));
+  // ...and a missed first query is retried after installRetryMs.
+  const tile3 = { ...tile, appId: "slow2" };
+  const got3 = await session.addTile(rec, tile3, tileOpts({ ...fast, installRetryMs: 300 }));
+  assert.ok(got3.some((a) => session.tileMatches(a, "slow2", tile.url)));
+  // Without either pause the lagging tile is not confirmed.
+  const tile4 = { ...tile, appId: "slow3" };
+  await assert.rejects(session.addTile(rec, tile4, tileOpts()), (e) => e.name === "TimeoutError");
+}
+tv.setInstallDelay(0);
 
 // List shows it, remove drops it.
 const listed = await session.listTiles(rec, { secrets, getTimestamp });
@@ -95,10 +121,7 @@ assert.equal(removed, true);
 
 // Install with no confirmation -> TimeoutError.
 tv.setBehavior("installNoConfirm");
-await assert.rejects(
-  session.addTile(rec, tile, { secrets, getTimestamp }),
-  (e) => e.name === "TimeoutError"
-);
+await assert.rejects(session.addTile(rec, tile, tileOpts()), (e) => e.name === "TimeoutError");
 tv.setBehavior("ok");
 
 // Pin-on-first-use: without a CA, the TV cert is trusted on first pairing and
