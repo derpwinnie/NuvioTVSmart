@@ -812,6 +812,11 @@
     <string name="layout_section_home_desc">Choose structure and hero source.</string>
     <string name="layout_landscape_posters">Landscape Posters</string>
     <string name="layout_landscape_posters_sub">Switch between portrait and landscape cards for Modern view.</string>
+    <string name="layout_animations_effects">Animations &amp; effects</string>
+    <string name="layout_animations_effects_sub">Reduce visual effects if the TV feels slow.</string>
+    <string name="layout_perf_auto">Automatic</string>
+    <string name="layout_perf_reduced">Reduced effects</string>
+    <string name="layout_perf_full">Full effects</string>
     <string name="layout_preview_row">Show Preview Row</string>
     <string name="layout_preview_row_sub">Show a partial preview of the row below in Modern Home layout.</string>
     <string name="layout_hero_catalogs">Hero Catalogs</string>
@@ -1759,6 +1764,8 @@
     <string name="server_options_connect_custom">Connect to custom server</string>
     <string name="server_options_change_custom">Connect to another server</string>
     <string name="server_options_use_official">Use official server</string>
+    <string name="server_options_login_with_qr">Sign in with QR</string>
+    <string name="server_options_login_with_email">Sign in with email</string>
     <string name="custom_server_title">Connect to custom server</string>
     <string name="custom_server_description">Enter the Backend URL provided by your server administrator.</string>
     <string name="custom_server_url_placeholder">https://backend.example.com</string>

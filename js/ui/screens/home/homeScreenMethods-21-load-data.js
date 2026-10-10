@@ -5,6 +5,7 @@ export function createHomeScreenMethods21() {
   const {
     Router,
     addonRepository,
+    catalogRepository,
     watchProgressRepository,
     watchedItemsRepository,
     LayoutPreferences,
@@ -36,6 +37,7 @@ export function createHomeScreenMethods21() {
     async loadData({ background = false, preserveReturnState = false, refreshManifests = true } = {}) {
       const loadStart = HOME_PERF_DEBUG ? homePerfNow() : 0;
       const token = this.homeLoadToken;
+      this.loadedHomeRouteInputSignature = "";
       const preserveHomeReturnState = Boolean(background && preserveReturnState);
       const preservedHeroItem = preserveHomeReturnState ? this.heroItem : null;
       const preservedHeroIdentity = preserveHomeReturnState ? buildHeroIdentity(this.heroItem) : "";
@@ -144,13 +146,14 @@ export function createHomeScreenMethods21() {
       HomeCatalogStore.ensureOrderKeys(
         uniqueCatalogDescriptors.map((catalog) => buildCatalogOrderKey(catalog.addonId, catalog.type, catalog.catalogId))
       );
+      const routeInputSignature = this.buildHomeRouteInputSignature(addons);
 
       const initialCatalogLoad = this.getInitialCatalogLoadCount();
       const initialDescriptors = uniqueCatalogDescriptors.slice(0, initialCatalogLoad);
       const deferredDescriptors = uniqueCatalogDescriptors.slice(initialCatalogLoad);
 
       const progressiveInitialRows = new Map();
-      const initialRows = await this.fetchCatalogRows(initialDescriptors, {
+      const initialRowsPromise = this.fetchCatalogRows(initialDescriptors, {
         allowLoading: true,
         onRow: (row) => {
           if (token !== this.homeLoadToken || Router.getCurrent() !== "home") {
@@ -174,6 +177,32 @@ export function createHomeScreenMethods21() {
           this.maybeStartPendingHomeBackgroundRefresh();
         }
       });
+      // Start the visible rows first. Overlap one deferred batch only on a
+      // foreground load where the runtime can afford the extra requests.
+      // Keep the actual promises: the repository caches completed results only,
+      // so a second request while prefetch is pending would duplicate the work.
+      const prefetchedResults = new Map();
+      if (!background && !this.isPerformanceConstrained() && !this.isLegacyTvRuntime()) {
+        const prefetchCount = Math.min(8, Math.max(0, this.getDeferredCatalogBatchSize()));
+        deferredDescriptors.slice(0, prefetchCount).forEach((catalog) => {
+          prefetchedResults.set(
+            catalog,
+            catalogRepository.getCatalog({
+              addonBaseUrl: catalog.addonBaseUrl,
+              addonId: catalog.addonId,
+              addonName: catalog.addonName,
+              catalogId: catalog.catalogId,
+              catalogName: catalog.catalogName,
+              type: catalog.type,
+              skip: 0,
+              skipStep: catalog.skipStep,
+              supportsSkip: catalog.supportsSkip !== false
+            })
+          );
+        });
+        void Promise.allSettled(prefetchedResults.values());
+      }
+      const initialRows = await initialRowsPromise;
       if (token !== this.homeLoadToken) {
         return;
       }
@@ -238,6 +267,9 @@ export function createHomeScreenMethods21() {
       this.loadedWatchProgressSourceKey = watchProgressRepository.getContinueWatchingSourceKey();
       this.releaseInitialHomeLoading();
       this.hasLoadedOnce = true;
+      if (!deferredDescriptors.length) {
+        this.loadedHomeRouteInputSignature = routeInputSignature;
+      }
       this.render();
       this.maybeStartPendingHomeBackgroundRefresh();
       logHomePerf("loadData", {
@@ -263,6 +295,7 @@ export function createHomeScreenMethods21() {
       if (deferredDescriptors.length) {
         this.fetchCatalogRows(deferredDescriptors, {
           allowLoading: true,
+          prefetchedResults,
           batchSize: this.getDeferredCatalogBatchSize(),
           // Publish completed rows independently; requestBackgroundRender keeps
           // the legacy-TV render delay and navigation deferral in effect.
@@ -285,6 +318,7 @@ export function createHomeScreenMethods21() {
             if (token !== this.homeLoadToken || Router.getCurrent() !== "home") {
               return;
             }
+            this.loadedHomeRouteInputSignature = routeInputSignature;
             const combinedByKey = new Map();
             [...this.rows, ...extraRows].forEach((row) => {
               combinedByKey.set(row.homeCatalogKey, row);
