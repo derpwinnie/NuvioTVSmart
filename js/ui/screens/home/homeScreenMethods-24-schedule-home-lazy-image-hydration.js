@@ -1,9 +1,225 @@
 import * as internals from "./homeScreenContext.js";
 import { Platform } from "../../../platform/index.js";
 import { isVidaaNavigationBusy, VIDAA_NAVIGATION_SETTLE_MS } from "../../navigation/vidaaNavigationActivity.js";
+import { releaseDistantVidaaHomeImages } from "./vidaaHomeImageWindow.js";
+import { observeVidaaPosterReady, prefetchVidaaPosterSource, reconcileVidaaHomePosterPrefetches } from "./vidaaHomePosterPrefetch.js";
 
 function isVidaaHomeHydrationBusy(screen) {
   return screen.isVidaaHomeLoadingBusy?.() ?? isVidaaNavigationBusy();
+}
+
+const VIDAA_POSTER_SELECTOR = ".content-poster, .home-continue-bg";
+const VIDAA_PENDING_POSTER_SELECTOR = ".content-poster[data-src], .home-continue-bg[data-src]";
+const VIDAA_HORIZONTAL_REPEAT_FLOOR_MS = 80;
+const VIDAA_VERTICAL_REPEAT_FLOOR_MS = 112;
+const VIDAA_DEFAULT_POSTER_READY_MS = 650;
+const VIDAA_PREFETCH_SAFETY_MS = 160;
+const VIDAA_HORIZONTAL_MIN_AHEAD = 5;
+const VIDAA_HORIZONTAL_MAX_AHEAD = 12;
+const VIDAA_VERTICAL_MIN_ROWS_AHEAD = 2;
+const VIDAA_VERTICAL_MAX_ROWS_AHEAD = 8;
+const VIDAA_VERTICAL_PREFETCH_BUDGET = 18;
+const VIDAA_IMAGE_COMMIT_BUDGET_MS = 4;
+const VIDAA_IMAGE_COMMIT_MAX_SCANNED = 8;
+
+function createVidaaImageCommitElapsedTime() {
+  const readPerformanceTime = () => {
+    try {
+      const value = globalThis.performance?.now?.();
+      return Number.isFinite(value) ? value : null;
+    } catch (_) {
+      return null;
+    }
+  };
+  let previousPerformanceTime = readPerformanceTime();
+  let previousWallTime = Date.now();
+  let elapsed = 0;
+  return () => {
+    const performanceTime = readPerformanceTime();
+    const wallTime = Date.now();
+    const performanceDelta = performanceTime != null && previousPerformanceTime != null ? performanceTime - previousPerformanceTime : -1;
+    // Keep elapsed monotonic when a TV clock is missing, throws or moves back.
+    const delta = performanceDelta >= 0 ? performanceDelta : wallTime - previousWallTime;
+    if (Number.isFinite(delta)) elapsed += Math.max(0, delta);
+    previousPerformanceTime = performanceTime;
+    previousWallTime = wallTime;
+    return elapsed;
+  };
+}
+
+function clampNumber(value, min, max) {
+  return Math.max(min, Math.min(max, Number(value || 0)));
+}
+
+function hydrateVidaaPriorityPoster(screen, image, priority = "auto") {
+  if (!(image instanceof HTMLImageElement) || !image.isConnected || !image.dataset.src) return false;
+  const src = String(image.dataset.src || "").trim();
+  image.loading = "eager";
+  image.decoding = "async";
+  try {
+    image.fetchPriority = priority;
+  } catch (_) {}
+  observeVidaaPosterReady(screen, image);
+  image.removeAttribute("data-src");
+  if (src) image.src = src;
+  return Boolean(src);
+}
+
+function getVidaaPosterSource(screen, node) {
+  if (!node) return "";
+  const direct = String(node.dataset?.posterSrc || "").trim();
+  if (direct) return direct;
+
+  const liveImage = node.querySelector?.(VIDAA_POSTER_SELECTOR);
+  const liveSource = String(liveImage?.dataset?.src || liveImage?.getAttribute?.("src") || "").trim();
+  if (liveSource) return liveSource;
+  return "";
+}
+
+function warmVidaaPosterNode(screen, node, priority = "low") {
+  if (!node) return false;
+  const livePending = node.querySelector?.(VIDAA_PENDING_POSTER_SELECTOR);
+  if (livePending) {
+    return hydrateVidaaPriorityPoster(screen, livePending, priority);
+  }
+  const livePoster = node.querySelector?.(VIDAA_POSTER_SELECTOR);
+  if (livePoster?.getAttribute?.("src") || livePoster?.src) {
+    return true;
+  }
+  return prefetchVidaaPosterSource(screen, getVidaaPosterSource(screen, node));
+}
+
+function getVidaaNavigationIntervalMs(
+  screen,
+  direction,
+  { horizontalFloorMs = VIDAA_HORIZONTAL_REPEAT_FLOOR_MS, verticalFloorMs = VIDAA_VERTICAL_REPEAT_FLOOR_MS } = {}
+) {
+  const horizontal = direction === "left" || direction === "right";
+  const vertical = direction === "up" || direction === "down";
+  if (!horizontal && !vertical) return 0;
+
+  const floorMs = horizontal ? horizontalFloorMs : verticalFloorMs;
+  const now = Date.now();
+  const state = screen.homeVidaaPrefetchMotion || (screen.homeVidaaPrefetchMotion = {});
+  const sameDirection = state.direction === direction;
+  const elapsed = sameDirection ? now - Number(state.lastAt || 0) : 0;
+  let intervalMs = Number(state.intervalMs || floorMs);
+
+  if (sameDirection && elapsed >= floorMs * 0.75 && elapsed <= 650) {
+    intervalMs = intervalMs * 0.65 + elapsed * 0.35;
+  } else if (!sameDirection || elapsed > 650) {
+    // A new run starts from the fastest accepted VIDAA repeat cadence. This
+    // prevents the first held presses from outrunning a conservative buffer.
+    intervalMs = floorMs;
+  }
+
+  state.direction = direction;
+  state.lastAt = now;
+  state.intervalMs = clampNumber(intervalMs, floorMs, 360);
+  return state.intervalMs;
+}
+
+function getVidaaPrefetchPlan(screen, anchor, direction, throttle = {}) {
+  const intervalMs = getVidaaNavigationIntervalMs(screen, direction, throttle);
+  if (!intervalMs) {
+    return {
+      horizontalAhead: 0,
+      verticalRowsAhead: 0,
+      verticalVisibleCount: 0,
+      verticalBudget: 0
+    };
+  }
+
+  const posterReadyMs = clampNumber(Number(screen.homeVidaaPosterReadyEwmaMs || VIDAA_DEFAULT_POSTER_READY_MS), 280, 1200);
+  const readyWindowMs = clampNumber(posterReadyMs + VIDAA_PREFETCH_SAFETY_MS, 480, 1250);
+  const horizontal = direction === "left" || direction === "right";
+
+  if (horizontal) {
+    return {
+      horizontalAhead: clampNumber(Math.ceil(readyWindowMs / intervalMs), VIDAA_HORIZONTAL_MIN_AHEAD, VIDAA_HORIZONTAL_MAX_AHEAD),
+      verticalRowsAhead: 0,
+      verticalVisibleCount: 0,
+      verticalBudget: 0
+    };
+  }
+
+  const landscape = Boolean(anchor?.classList?.contains?.("is-landscape"));
+  return {
+    horizontalAhead: 0,
+    verticalRowsAhead: clampNumber(Math.ceil(readyWindowMs / intervalMs), VIDAA_VERTICAL_MIN_ROWS_AHEAD, VIDAA_VERTICAL_MAX_ROWS_AHEAD),
+    verticalVisibleCount: landscape ? 5 : 7,
+    verticalBudget: VIDAA_VERTICAL_PREFETCH_BUDGET
+  };
+}
+
+function getVidaaRowNeighborhoodNodes(screen, anchor, count = 1, rowOffset = 0) {
+  if (!anchor || !Array.isArray(screen.navModel?.rows)) return [];
+  const rowIndex = Number(anchor.dataset?.navRow);
+  const colIndex = Number(anchor.dataset?.navCol);
+  if (!Number.isInteger(rowIndex) || !Number.isInteger(colIndex)) return [];
+
+  const row = screen.navModel.rows[rowIndex + rowOffset] || [];
+  if (!row.length) return [];
+  const preferred = rowOffset ? screen.resolvePreferredNodeForRow?.(row) : null;
+  const preferredCol = Number(preferred?.dataset?.navCol);
+  const center = Number.isInteger(preferredCol) ? preferredCol : Math.min(row.length - 1, colIndex);
+
+  const offsets = [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6];
+  const nodes = [];
+  for (const offset of offsets) {
+    const node = row[center + offset] || null;
+    if (node && !nodes.includes(node)) nodes.push(node);
+    if (nodes.length >= count) break;
+  }
+  return nodes;
+}
+
+function getVidaaHorizontalPrefetchNodes(screen, anchor, direction, count) {
+  if (!anchor || !Array.isArray(screen.navModel?.rows)) return [];
+  const rowIndex = Number(anchor.dataset?.navRow);
+  const colIndex = Number(anchor.dataset?.navCol);
+  if (!Number.isInteger(rowIndex) || !Number.isInteger(colIndex)) return [];
+
+  const row = screen.navModel.rows[rowIndex] || [];
+  const step = direction === "right" ? 1 : -1;
+  const nodes = [];
+  for (let distance = 1; distance <= count; distance += 1) {
+    const node = row[colIndex + step * distance] || null;
+    if (node) nodes.push(node);
+  }
+  return nodes;
+}
+
+function allocateVidaaVerticalPrefetchCounts(rowsAhead, visibleCount, totalBudget) {
+  const rows = Math.max(0, Math.floor(Number(rowsAhead || 0)));
+  if (!rows) return [];
+  const counts = Array(rows).fill(1);
+  let remaining = Math.max(0, Math.floor(Number(totalBudget || 0)) - rows);
+  const caps = counts.map((_, index) => Math.max(1, Math.min(visibleCount, visibleCount - Math.floor(index * 0.9))));
+
+  while (remaining > 0) {
+    let changed = false;
+    for (let index = 0; index < counts.length && remaining > 0; index += 1) {
+      if (counts[index] >= caps[index]) continue;
+      counts[index] += 1;
+      remaining -= 1;
+      changed = true;
+    }
+    if (!changed) break;
+  }
+  return counts;
+}
+
+function getVidaaVerticalPrefetchNodes(screen, anchor, direction, plan) {
+  if (direction !== "up" && direction !== "down") return [];
+  const step = direction === "down" ? 1 : -1;
+  const counts = allocateVidaaVerticalPrefetchCounts(plan.verticalRowsAhead, plan.verticalVisibleCount, plan.verticalBudget);
+  const groups = [];
+  counts.forEach((count, index) => {
+    const nodes = getVidaaRowNeighborhoodNodes(screen, anchor, count, step * (index + 1));
+    if (nodes.length) groups.push(...nodes);
+  });
+  return groups;
 }
 
 export function createHomeScreenMethods24() {
@@ -34,11 +250,12 @@ export function createHomeScreenMethods24() {
         deferUntilVerticalSettle = false,
         focusedRowOnly = false,
         includeNeighborRows = false,
-        viewportChanged = false
+        viewportChanged = false,
+        navigationDirection = null
       } = {}
     ) {
       if (Platform.isVidaa()) {
-        this.scheduleVidaaHomeLazyImageHydration(anchorNode, { refreshIndex });
+        this.scheduleVidaaHomeLazyImageHydration(anchorNode, { refreshIndex, navigationDirection });
         return;
       }
       const anchorRow = anchorNode instanceof HTMLElement ? anchorNode.closest(HOME_LAZY_IMAGE_ROW_SELECTOR) : null;
@@ -139,20 +356,46 @@ export function createHomeScreenMethods24() {
         });
       });
     },
-    scheduleVidaaHomeLazyImageHydration(anchorNode = null, { refreshIndex = false } = {}) {
+    scheduleVidaaHomeLazyImageHydration(anchorNode = null, { refreshIndex = false, navigationDirection = null } = {}) {
       if (!this.container || this.container.isConnected === false) return;
       const anchor = anchorNode || this.getCurrentFocusedNode();
       this.pendingHomeLazyImageAnchor = anchor;
       this.homeLazyImageHydrationNeedsIndexRefresh ||= refreshIndex;
-      // Keep the selected card recognizable without scanning other rows while
-      // the remote is moving. Logos and neighboring artwork wait for idle.
-      const focusedPoster = anchor?.querySelector?.(".content-poster[data-src], .home-continue-bg[data-src]");
-      if (focusedPoster instanceof HTMLImageElement && focusedPoster.isConnected && focusedPoster.dataset.src) {
-        const src = String(focusedPoster.dataset.src).trim();
-        focusedPoster.loading = "eager";
-        focusedPoster.removeAttribute("data-src");
-        if (src) focusedPoster.src = src;
+      const focusedPoster = anchor?.querySelector?.(VIDAA_PENDING_POSTER_SELECTOR);
+      hydrateVidaaPriorityPoster(this, focusedPoster, "high");
+
+      const prefetchPlan = getVidaaPrefetchPlan(this, anchor, navigationDirection, {
+        horizontalFloorMs: MODERN_HOME_CONSTANTS.keyRepeatThrottleMs,
+        verticalFloorMs: MODERN_HOME_CONSTANTS.verticalKeyRepeatThrottleMs
+      });
+      const horizontalNavigation = navigationDirection === "left" || navigationDirection === "right";
+      const verticalNavigation = navigationDirection === "up" || navigationDirection === "down";
+
+      const enteredNodes = verticalNavigation ? getVidaaRowNeighborhoodNodes(this, anchor, prefetchPlan.verticalVisibleCount) : [];
+      const predictedNodes = horizontalNavigation
+        ? getVidaaHorizontalPrefetchNodes(this, anchor, navigationDirection, prefetchPlan.horizontalAhead)
+        : getVidaaVerticalPrefetchNodes(this, anchor, navigationDirection, prefetchPlan);
+
+      if (horizontalNavigation || verticalNavigation) {
+        reconcileVidaaHomePosterPrefetches(
+          this,
+          [anchor, ...enteredNodes, ...predictedNodes].map((node) => getVidaaPosterSource(this, node))
+        );
       }
+      if (verticalNavigation) {
+        // The row being entered is already visible while its 140 ms camera move
+        // is running. Hydrate its visible neighborhood immediately; future rows
+        // are prefetched below and become cache hits as they approach.
+        enteredNodes.forEach((node) => {
+          if (node !== anchor) warmVidaaPosterNode(this, node, "auto");
+        });
+      }
+
+      predictedNodes.forEach((node) => {
+        // Cards ahead of the focus get their real img source when it is still
+        // deferred; otherwise a detached Image request warms the HTTP cache.
+        warmVidaaPosterNode(this, node, "low");
+      });
       if (this.homeLazyImageHydrationSettleTimer) clearTimeout(this.homeLazyImageHydrationSettleTimer);
       if (this.homeLazyImageHydrationRaf) {
         cancelAnimationFrame(this.homeLazyImageHydrationRaf);
@@ -162,8 +405,6 @@ export function createHomeScreenMethods24() {
         cancelAnimationFrame(this.homeLazyImageCommitRaf);
         this.homeLazyImageCommitRaf = 0;
       }
-      // Queued secondary images from a previous viewport must not load after
-      // rapid navigation has already moved the focus somewhere else.
       if (this.homeLazyImageCommitQueue) this.homeLazyImageCommitQueue.length = 0;
       const hydrateWhenSettled = () => {
         this.homeLazyImageHydrationSettleTimer = null;
@@ -223,6 +464,14 @@ export function createHomeScreenMethods24() {
         return;
       }
       this.lastHomeLazyImageHydrationAnchorRow = anchorRow;
+      const viewport =
+        this.container.querySelector(".home-modern-rows-viewport") || this.container.querySelector(".home-main") || this.container;
+      const viewportRect = viewport.getBoundingClientRect();
+      if (Platform.isVidaa() && releaseDistantVidaaHomeImages(this.container, viewportRect, anchorNode)) {
+        // Released posters re-enter the deferred index. Expanded assets have
+        // their own focus loader and aren't part of this index.
+        refreshIndex = true;
+      }
       const imageRows =
         refreshIndex || !Array.isArray(this.homeLazyImageHydrationIndex)
           ? this.buildHomeLazyImageHydrationIndex()
@@ -230,9 +479,6 @@ export function createHomeScreenMethods24() {
       if (!imageRows.length) {
         return;
       }
-      const viewport =
-        this.container.querySelector(".home-modern-rows-viewport") || this.container.querySelector(".home-main") || this.container;
-      const viewportRect = viewport.getBoundingClientRect();
       const constrained = this.isPerformanceConstrained();
       // Android prefetches the visible window plus a small row/card neighborhood.
       // Keep the browser's DOM-mounted rows from turning every vertical focus
@@ -359,8 +605,17 @@ export function createHomeScreenMethods24() {
           return;
         }
         let assigned = 0;
-        const maxPerFrame = Platform.isVidaa() ? 4 : HOME_LEGACY_LAZY_HYDRATION_MAX_PER_FRAME;
+        let scanned = 0;
+        const isVidaa = Platform.isVidaa();
+        const maxPerFrame = isVidaa ? 4 : HOME_LEGACY_LAZY_HYDRATION_MAX_PER_FRAME;
+        const elapsedTime = isVidaa ? createVidaaImageCommitElapsedTime() : null;
         while (pending.length && assigned < maxPerFrame) {
+          // Process at least one entry. Stale/disconnected entries also consume
+          // the budget so a long invalid queue cannot monopolize one TV frame.
+          if (isVidaa && scanned > 0 && (scanned >= VIDAA_IMAGE_COMMIT_MAX_SCANNED || elapsedTime() >= VIDAA_IMAGE_COMMIT_BUDGET_MS)) {
+            break;
+          }
+          scanned += 1;
           const { image, src } = pending.shift();
           if (!(image instanceof HTMLImageElement) || !image.isConnected) {
             continue;

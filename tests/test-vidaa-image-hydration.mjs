@@ -7,6 +7,8 @@ const { noteVidaaNavigationKeyDown, noteVidaaNavigationKeyUp, resetVidaaNavigati
   await import("../js/ui/navigation/vidaaNavigationActivity.js");
 const { createHomeScreenMethods03 } =
   await import("../js/ui/screens/home/homeScreenMethods-03-is-scroll-animation-active.js");
+const { createHomeScreenMethods05 } =
+  await import("../js/ui/screens/home/homeScreenMethods-05-apply-hero-to-dom.js");
 const { createHomeScreenMethods24 } =
   await import("../js/ui/screens/home/homeScreenMethods-24-schedule-home-lazy-image-hydration.js");
 const { createHomeScreenMethods29 } =
@@ -84,6 +86,10 @@ function homeSurface() {
       const image = Object.assign(new HTMLImageElement(), {
         isConnected: true,
         dataset: { src: `poster-${rowIndex}-${index}` },
+        classList: { contains: () => false },
+        getAttribute(name) {
+          return name === "src" ? this.src || null : null;
+        },
         removeAttribute(name) {
           if (name === "data-src") delete this.dataset.src;
         },
@@ -117,9 +123,12 @@ function homeSurface() {
   };
   const container = {
     isConnected: true,
+    contains: () => true,
     querySelector: () => viewport,
-    querySelectorAll() {
+    querySelectorAll(selector) {
       globalScans += 1;
+      if (selector.includes(".home-content-card")) return [];
+      if (!selector.includes("[data-src]")) return images.filter((image) => image.src);
       return images.filter((image) => image.dataset.src);
     }
   };
@@ -142,6 +151,131 @@ function homeSurface() {
       focused = card;
     }
   };
+}
+
+platform("vidaa");
+{
+  const { owner, images, cards } = homeSurface();
+  owner.navModel = {
+    rows: [cards.slice(0, 10), cards.slice(10, 20), cards.slice(20, 30)]
+  };
+  owner.navModel.rows.forEach((rowNodes, rowIndex) =>
+    rowNodes.forEach((card, colIndex) => {
+      card.dataset = { navRow: String(rowIndex), navCol: String(colIndex) };
+    })
+  );
+
+  const previousImage = globalThis.Image;
+  const prefetched = [];
+  globalThis.Image = class {
+    set src(value) {
+      this._src = value;
+      prefetched.push(value);
+    }
+    get src() {
+      return this._src;
+    }
+  };
+  cards[9].dataset.posterSrc = "parked-poster-0-9";
+  cards[9].querySelector = () => null;
+
+  owner.scheduleHomeLazyImageHydration(cards[0], { navigationDirection: "right" });
+  assert.equal(images[0].src, "poster-0-0", "Focused poster must start immediately");
+  for (let index = 1; index <= 8; index += 1) {
+    assert.equal(
+      images[index].src,
+      `poster-0-${index}`,
+      `Maximum-speed horizontal runway should warm poster ${index}`
+    );
+    assert.equal(images[index].fetchPriority, "low");
+  }
+  assert.ok(
+    prefetched.includes("parked-poster-0-9"),
+    "Cards without a live poster image still warm the network cache"
+  );
+  assert.equal(images[0].fetchPriority, "high");
+  globalThis.Image = previousImage;
+}
+
+platform("vidaa");
+{
+  const { owner, images, cards } = homeSurface();
+  owner.navModel = {
+    rows: [cards.slice(0, 10), cards.slice(10, 20), cards.slice(20, 30)]
+  };
+  owner.navModel.rows.forEach((rowNodes, rowIndex) =>
+    rowNodes.forEach((card, colIndex) => {
+      card.dataset = { navRow: String(rowIndex), navCol: String(colIndex) };
+    })
+  );
+
+  // Slow navigation should not keep the maximum-speed runway. Prime the
+  // observed cadence at 300 ms and verify that it contracts automatically.
+  owner.homeVidaaPrefetchMotion = { direction: "right", lastAt: 1, intervalMs: 80 };
+  now = 301;
+  owner.scheduleHomeLazyImageHydration(cards[0], { navigationDirection: "right" });
+  for (let index = 1; index <= 6; index += 1) {
+    assert.equal(images[index].src, `poster-0-${index}`);
+  }
+  assert.equal(images[7].src, undefined, "Slow horizontal navigation should shrink the runway");
+}
+
+platform("vidaa");
+{
+  const { owner, images, cards } = homeSurface();
+  owner.navModel = {
+    rows: [cards.slice(0, 10), cards.slice(10, 20), cards.slice(20, 30)]
+  };
+  owner.navModel.rows.forEach((rowNodes, rowIndex) =>
+    rowNodes.forEach((card, colIndex) => {
+      card.dataset = { navRow: String(rowIndex), navCol: String(colIndex) };
+    })
+  );
+
+  owner.scheduleHomeLazyImageHydration(cards[4], { navigationDirection: "down" });
+  assert.equal(images[4].src, "poster-0-4");
+  for (const index of [1, 2, 3, 5, 6, 7]) {
+    assert.equal(
+      images[index].src,
+      `poster-0-${index}`,
+      "Entered row should hydrate its visible neighborhood"
+    );
+    assert.equal(images[index].fetchPriority, "auto");
+  }
+  for (const index of [14, 13, 15, 24, 23, 25]) {
+    assert.equal(images[index].src, `poster-${Math.floor(index / 10)}-${index % 10}`);
+    assert.equal(images[index].fetchPriority, "low");
+  }
+  assert.equal(images[12].src, undefined, "Future rows stay within the adaptive request budget");
+  assert.equal(images[22].src, undefined, "Farther future rows remain progressively narrower");
+
+  const upSurface = homeSurface();
+  upSurface.owner.navModel = {
+    rows: [
+      upSurface.cards.slice(0, 10),
+      upSurface.cards.slice(10, 20),
+      upSurface.cards.slice(20, 30)
+    ]
+  };
+  upSurface.owner.navModel.rows.forEach((rowNodes, rowIndex) =>
+    rowNodes.forEach((card, colIndex) => {
+      card.dataset = { navRow: String(rowIndex), navCol: String(colIndex) };
+    })
+  );
+  upSurface.owner.scheduleHomeLazyImageHydration(upSurface.cards[24], {
+    navigationDirection: "up"
+  });
+  for (const index of [21, 22, 23, 25, 26, 27]) {
+    assert.equal(upSurface.images[index].src, `poster-2-${index % 10}`);
+    assert.equal(upSurface.images[index].fetchPriority, "auto");
+  }
+  for (const index of [14, 13, 15, 4, 3, 5]) {
+    assert.equal(
+      upSurface.images[index].src,
+      `poster-${Math.floor(index / 10)}-${index % 10}`,
+      "Upward navigation should use the same adaptive runway"
+    );
+  }
 }
 
 platform("vidaa");
@@ -169,7 +303,7 @@ platform("vidaa");
   advance(599);
   assert.equal(globalScans, 0, "Wait for the quiet window after release");
   advance(649);
-  assert.equal(globalScans, 1);
+  assert.equal(globalScans, 2, "Idle passes release distant images, then build the deferred index");
   assert.equal(frames.size, 1);
   const loadedBeforeFrame = images.filter((image) => image.src).length;
   frame();
@@ -205,6 +339,29 @@ for (const name of ["tizen", "webos", "browser"]) {
     `${name}: preserve original source assignment behavior`
   );
   assert.equal(frames.size, 0);
+}
+
+// Prefetch must follow the same remembered/default column as real Up/Down.
+platform("vidaa");
+{
+  const { owner, images, cards } = homeSurface();
+  owner.navModel = { rows: [cards.slice(0, 10), cards.slice(10, 20), cards.slice(20, 30)] };
+  owner.navModel.rows.forEach((nodes, r) =>
+    nodes.forEach((card, c) => {
+      card.dataset = { navRow: String(r), navCol: String(c), navRowKey: "row-" + r };
+    })
+  );
+  owner.resolvePreferredNodeForRow = createHomeScreenMethods05().resolvePreferredNodeForRow;
+  owner.getNodeRowKey = (node) => node.dataset.navRowKey;
+  owner.lastFocusedItemIndexByRowKey = { "row-1": 8 };
+  owner.scheduleHomeLazyImageHydration(cards[4], { navigationDirection: "down" });
+  assert.equal(images[18].src, "poster-1-8", "Warm the remembered column in the next row");
+  assert.equal(images[20].src, "poster-2-0", "Unvisited rows use the navigation default column");
+  assert.equal(
+    images[14].src,
+    undefined,
+    "Don't spend bandwidth on the current row's column in another row"
+  );
 }
 
 // Track pagination must not scan cards or append catalog fragments while the

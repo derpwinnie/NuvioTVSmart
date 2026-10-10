@@ -31,7 +31,7 @@
     "sync:tizen": "node ./scripts/sync-wrapper.mjs --tizen",
     "sync:webos": "node ./scripts/sync-wrapper.mjs --webos",
     "test:vidaa": "npm run test:vidaa:unit && npm run test:vidaa:tile && npm run package:vidaa && node ./tests/test-vidaa-platform.mjs",
-    "test:vidaa:unit": "node ./tests/test-vidaa-remote-repeat.mjs && node ./tests/test-vidaa-focus-scroll.mjs && node ./tests/test-vidaa-sidebar.mjs && node ./tests/test-vidaa-home-navigation.mjs && node ./tests/test-vidaa-home-loading.mjs && node ./tests/test-vidaa-image-hydration.mjs && node ./tests/test-vidaa-grid-scroll.mjs && node ./tests/test-vidaa-discover-loading.mjs && node ./tests/test-vidaa-collections.mjs && node ./tests/test-vidaa-text-input-routing.mjs"
+    "test:vidaa:unit": "node ./tests/test-vidaa-remote-repeat.mjs && node ./tests/test-vidaa-focus-scroll.mjs && node ./tests/test-vidaa-sidebar.mjs && node ./tests/test-vidaa-home-navigation.mjs && node ./tests/test-vidaa-home-loading.mjs && node ./tests/test-vidaa-image-hydration.mjs && node ./tests/test-vidaa-grid-scroll.mjs && node ./tests/test-vidaa-discover-loading.mjs && node ./tests/test-vidaa-collections.mjs && node ./tests/test-vidaa-text-input-routing.mjs && node ./tests/test-vidaa-poster-prefetch.mjs"
   },
   "devDependencies": {
     "@csstools/postcss-global-data": "^4.0.0",

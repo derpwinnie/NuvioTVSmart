@@ -1,4 +1,5 @@
 import * as internals from "./homeScreenContext.js";
+import { cancelVidaaHomePosterPrefetches } from "./vidaaHomePosterPrefetch.js";
 
 export function createHomeScreenMethods30() {
   const { ScreenUtils, Platform } = internals;
@@ -88,6 +89,10 @@ export function createHomeScreenMethods30() {
       this.homeLazyImageHydrationNeedsIndexRefresh = false;
       this.homeLazyImageHydrationIndex = null;
       this.lastHomeLazyImageHydrationAnchorRow = null;
+      cancelVidaaHomePosterPrefetches(this);
+      this.homeVidaaPosterWarmUrls?.clear?.();
+      this.homeVidaaPrefetchMotion = null;
+      this.homeVidaaPosterReadyEwmaMs = 0;
       this.lastDirectionalKeyAtByDirection = {};
       this.homeTruncationScope = null;
       if (this.boundHomeEventContainer) {
