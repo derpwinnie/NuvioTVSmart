@@ -35,11 +35,13 @@ const xor = (buf, key) => Buffer.from(buf.map((b, i) => b ^ key[i % key.length])
 for (const s of ["", "a", "ab", "abc", "abcd", "hello world!"]) {
   assert.equal(sidee.b85decode(b85encode(Buffer.from(s))).toString(), s);
 }
-assert.throws(() => sidee.b85decode("ab\"cd"), /bad base85/);
+assert.throws(() => sidee.b85decode('ab"cd'), /bad base85/);
 
 const CERT = "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----";
 const KEY = "-----BEGIN PRIVATE KEY-----\nBBBB\n-----END PRIVATE KEY-----";
-const bundleText = b85encode(xor(deflateSync(Buffer.from(CERT + "\n" + KEY + "\n")), Buffer.from("k3")));
+const bundleText = b85encode(
+  xor(deflateSync(Buffer.from(CERT + "\n" + KEY + "\n")), Buffer.from("k3"))
+);
 
 const decoded = sidee.decodeBundle(bundleText);
 assert.equal(decoded.cert, CERT + "\n");
@@ -107,6 +109,9 @@ const s = loadSecrets();
 assert.equal(s.pfx, undefined);
 assert.ok(s.cert.includes("BEGIN CERTIFICATE") && s.key.includes("PRIVATE KEY"));
 assert.equal(s.constants.XOR_MASK, 0x010203n);
-assert.equal(JSON.parse(readFileSync(join(home, "secrets.json"), "utf8")).source.sidee, sidee.SIDEE_COMMIT);
+assert.equal(
+  JSON.parse(readFileSync(join(home, "secrets.json"), "utf8")).source.sidee,
+  sidee.SIDEE_COMMIT
+);
 
 console.log("vidaa-tile sidee import: ok");

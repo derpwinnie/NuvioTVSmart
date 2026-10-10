@@ -34,7 +34,7 @@ client certificate and five protocol constants. This repo still ships **no**
 Hisense material. You choose one of two ways:
 
 - **One click (recommended).** The dashboard button, or `import-sidee` on the
-  CLI, downloads two files from one *pinned* commit of
+  CLI, downloads two files from one _pinned_ commit of
   [Sidee](https://github.com/Empi9245/Sidee) (MIT), checks their SHA-256 and
   decodes them on your computer. No passphrase needed. If Sidee's files ever
   change, the hash check fails and nothing is used; update this tool or use

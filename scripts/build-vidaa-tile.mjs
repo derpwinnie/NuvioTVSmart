@@ -12,7 +12,15 @@
 
 import { build } from "esbuild";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+  chmodSync
+} from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,7 +29,8 @@ const tool = join(root, "tools", "vidaa-tile");
 const out = join(root, "dist", "vidaa-tile");
 const bundleOnly = process.argv.includes("--bundle-only");
 
-const OS = { win32: "windows", darwin: "macos", linux: "linux" }[process.platform] || process.platform;
+const OS =
+  { win32: "windows", darwin: "macos", linux: "linux" }[process.platform] || process.platform;
 const exeName = `nuvio-vidaa-tile-${OS}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`;
 
 rmSync(out, { recursive: true, force: true });
@@ -79,7 +88,8 @@ const exe = join(out, exeName);
 copyFileSync(process.execPath, exe);
 chmodSync(exe, 0o755);
 
-const run = (cmd, args) => execFileSync(cmd, args, { stdio: "inherit", shell: process.platform === "win32" });
+const run = (cmd, args) =>
+  execFileSync(cmd, args, { stdio: "inherit", shell: process.platform === "win32" });
 if (process.platform === "darwin") run("codesign", ["--remove-signature", exe]);
 
 const npx = process.platform === "win32" ? "npx.cmd" : "npx";

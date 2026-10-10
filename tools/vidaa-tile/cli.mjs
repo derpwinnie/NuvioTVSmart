@@ -95,7 +95,9 @@ async function main() {
 
   if (cmd === "import-sidee") {
     await importFromSidee();
-    console.log(`setup complete (certificate and constants from Sidee ${SIDEE_COMMIT.slice(0, 7)})`);
+    console.log(
+      `setup complete (certificate and constants from Sidee ${SIDEE_COMMIT.slice(0, 7)})`
+    );
     return;
   }
 
