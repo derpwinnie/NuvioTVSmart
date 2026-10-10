@@ -20,6 +20,7 @@ tests/*
 !tests/test-vidaa-text-input-routing.mjs
 !tests/test-vidaa-poster-prefetch.mjs
 !tests/test-vidaa-return-focus.mjs
+!tests/test-vidaa-playback-headers.mjs
 !tests/helpers/
 tests/helpers/*
 !tests/helpers/vidaaTextInputHarness.mjs

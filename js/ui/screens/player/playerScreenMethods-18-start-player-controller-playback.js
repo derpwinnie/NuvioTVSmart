@@ -4,6 +4,7 @@ import * as internals from "./playerScreenContext.js";
 export function createPlayerScreenMethods18() {
   const {
     PlayerController,
+    Environment,
     isExpiredStreamUrl,
     LOADING_LOGO_FILL_TARGET_LERP,
     LOADING_LOGO_FILL_IDLE_STEP,
@@ -40,6 +41,19 @@ export function createPlayerScreenMethods18() {
         ...(context && typeof context === "object" ? context : {}),
         ...(Object.keys(requestHeaders).length ? { requestHeaders } : {})
       };
+      // VIDAA has no playback proxy: refuse notWebReady streams whose required
+      // headers the browser cannot send. Tizen/webOS keep their proxy paths.
+      const standaloneCompatibilityMessage = Environment.isVidaa()
+        ? this.getWebHeaderRestrictedStreamMessage(sourceCandidate, requestHeaders)
+        : "";
+      if (standaloneCompatibilityMessage) {
+        this.showStartupError(standaloneCompatibilityMessage, {
+          streamCandidate: sourceCandidate,
+          playbackUrl,
+          reason: "vidaa-standalone-incompatible"
+        });
+        return Promise.resolve();
+      }
       PlayerController.setStartupPresentationAudioMuted?.(true);
       return Promise.resolve(PlayerController.play(playbackUrl, playbackContext)).catch((error) => {
         if (!this.isActiveMountToken(mountToken) || this.isExternalFrameMode()) {

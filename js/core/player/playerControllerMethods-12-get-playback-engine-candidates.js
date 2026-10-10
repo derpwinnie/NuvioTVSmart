@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerController.js";
+import { classifyWebPlaybackHeaders, isBrowserRestrictedPlaybackHeader } from "./webPlaybackHeaders.js";
 
 export function createPlayerControllerMethods12() {
   const { Platform, nativeVideoEngine, WEBOS_MEDIA_TYPE_PROBE_TIMEOUT_MS } = internals;
@@ -256,6 +257,10 @@ export function createPlayerControllerMethods12() {
       }
     },
     shouldForwardHeaderToHls(name) {
+      if (Platform.isVidaa()) {
+        const normalized = String(name || "").trim();
+        return Boolean(normalized) && !isBrowserRestrictedPlaybackHeader(normalized);
+      }
       const lower = String(name || "")
         .trim()
         .toLowerCase();
@@ -282,6 +287,9 @@ export function createPlayerControllerMethods12() {
       return !forbidden.has(lower);
     },
     normalizePlaybackHeaders(headers) {
+      if (Platform.isVidaa()) {
+        return classifyWebPlaybackHeaders(headers).forwardableHeaders;
+      }
       if (!headers || typeof headers !== "object") {
         return {};
       }
