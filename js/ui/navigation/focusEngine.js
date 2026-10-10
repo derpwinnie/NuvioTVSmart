@@ -16,6 +16,7 @@ function buildNormalizedEvent(event) {
     shiftKey: Boolean(event?.shiftKey),
     metaKey: Boolean(event?.metaKey),
     repeat: Boolean(event?.repeat),
+    isComposing: Boolean(event?.isComposing),
     defaultPrevented: Boolean(event?.defaultPrevented),
     isArrow: Boolean(normalizedKey.isArrow),
     isEnter: Boolean(normalizedKey.isEnter),
@@ -46,6 +47,12 @@ function hasActiveModal() {
   return Boolean(globalThis?.document?.body?.classList?.contains("nuvio-modal-open"));
 }
 
+// Back aliases share one identity so a native editor's Back keyup is matched.
+function nativeTextKeyIdentity(event) {
+  const code = Number(event.keyCode || 0);
+  return [27, 461, 10009].includes(code) ? "back" : `code:${code}`;
+}
+
 const BACK_DEBOUNCE_MS = 250;
 const VIDAA_SELECT_KEY_CODE = 13;
 // Remotes start auto-repeat after roughly 300-500 ms, then repeat faster.
@@ -59,6 +66,7 @@ export const FocusEngine = {
   activeKeyDownStartedAt: new Map(),
   vidaaLastKeyDownAt: new Map(),
   activeBackKeyIdentities: new Set(),
+  nativeTextKeyIdentities: new Set(),
 
   init() {
     this.boundHandleKey = this.handleKey.bind(this);
@@ -124,11 +132,21 @@ export const FocusEngine = {
       return;
     }
 
+    const normalizedEvent = buildNormalizedEvent(event);
+    // VIDAA: while a native text field is being edited, OK/caret/Backspace keep
+    // their native default and never reach screen handlers. Returns false on
+    // other platforms and for all keys when no text field is being edited.
+    if (Platform.handleTextInputKey(normalizedEvent)) {
+      const identity = nativeTextKeyIdentity(normalizedEvent);
+      this.nativeTextKeyIdentities.add(identity);
+      this.activeKeyDownStartedAt.delete(identity);
+      return;
+    }
+
     if (hasActiveModal()) {
       return;
     }
 
-    const normalizedEvent = buildNormalizedEvent(event);
     noteVidaaNavigationKeyDown(normalizedEvent.keyCode);
     const keyIdentity = this.getKeyIdentity(normalizedEvent);
     const isVidaa = Platform.isVidaa();
@@ -213,6 +231,17 @@ export const FocusEngine = {
 
   handleKeyUp(event) {
     const normalizedEvent = buildNormalizedEvent(event);
+    const nativeIdentity = nativeTextKeyIdentity(normalizedEvent);
+    if (
+      this.nativeTextKeyIdentities.delete(nativeIdentity) ||
+      Platform.handleTextInputKey(normalizedEvent, { keyUp: true })
+    ) {
+      this.activeKeyDownStartedAt.delete(nativeIdentity);
+      this.vidaaLastKeyDownAt.delete(nativeIdentity);
+      normalizedEvent.stopPropagation();
+      normalizedEvent.stopImmediatePropagation();
+      return;
+    }
     noteVidaaNavigationKeyUp(normalizedEvent.keyCode);
     const keyIdentity = this.getKeyIdentity(normalizedEvent);
     if (
