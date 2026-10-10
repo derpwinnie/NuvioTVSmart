@@ -414,11 +414,13 @@ export async function listTiles(record, opts) {
 }
 
 export async function launchTile(record, { appId, name, url }, opts) {
+  const delays = delaysFrom(opts);
   return withSession(
     record,
     async (conn, t) => {
       await conn.publish(t.ui + "actions/launchapp", protocol.launchPayload({ appId, name, url }));
-      await sleep(500);
+      // Disconnecting right away can cut the launch short (Sidee waits 4 s).
+      await sleep(delays.afterLaunchMs);
     },
     opts
   );

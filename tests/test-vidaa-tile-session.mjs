@@ -119,6 +119,17 @@ assert.ok(listed.some((a) => a.appId === "nuvio"));
 const removed = await session.removeTile(rec, "nuvio", { secrets, getTimestamp });
 assert.equal(removed, true);
 
+// Launch keeps the connection open for afterLaunchMs before disconnecting.
+{
+  const t0 = Date.now();
+  await session.launchTile(rec, tile, tileOpts({ ...fast, afterLaunchMs: 300 }));
+  const done = Date.now();
+  assert.equal(tv.launches.length, 1);
+  assert.equal(tv.launches[0].appId, "nuvio");
+  assert.ok(done - tv.launches[0].at >= 250, "stayed connected after the launch request");
+  assert.ok(done - t0 >= 300);
+}
+
 // Install with no confirmation -> TimeoutError.
 tv.setBehavior("installNoConfirm");
 await assert.rejects(session.addTile(rec, tile, tileOpts()), (e) => e.name === "TimeoutError");
