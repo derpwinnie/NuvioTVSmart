@@ -181,21 +181,30 @@ console.log("=== Running Nuvio TV VIDAA Platform Tests ===");
 
   const { installVidaaKeyboardFix } = await import("../js/platform/vidaa/vidaaKeyboard.js");
   installVidaaKeyboardFix(root);
+  root.document.activeElement = field;
   fire("focusin", field);
   assert.equal(intervals.length, 1, "Only the focused text field is polled");
 
-  // The VIDAA keyboard writes the value without firing DOM events.
+  // The VIDAA keyboard writes the value without firing DOM events: emit
+  // input while editing and a single change when editing ends.
   field.value = "Avatar";
   intervals[0]();
-  assert.deepEqual(field.events, ["input", "change"], "Synthetic input/change once per change");
+  assert.deepEqual(field.events, ["input"], "Synthetic input once per silent value change");
   intervals[0]();
-  assert.deepEqual(field.events, ["input", "change"], "No duplicate events without a new value");
+  assert.deepEqual(field.events, ["input"], "No duplicate events without a new value");
 
   // App code that sets the value and fires its own input must not be echoed.
   field.value = "Avatar 2";
   fire("input", field);
   intervals[0]();
-  assert.deepEqual(field.events, ["input", "change"], "Own input events are not repeated");
+  assert.deepEqual(field.events, ["input"], "Own input events are not repeated");
+
+  // Closing the keyboard commits exactly one change event.
+  root.document.activeElement = null;
+  fire("focusout", field);
+  assert.deepEqual(field.events, ["input", "change"], "One change on commit");
+  fire("focusout", field);
+  assert.deepEqual(field.events, ["input", "change"], "No duplicate change on repeated focusout");
 
   console.log("✓ Virtual keyboard bug fix verified");
 }
