@@ -16,8 +16,16 @@ export { haveOpenssl };
 export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } = {}) {
   const certs = makeTestCerts();
   const timestamp = 1759800000; // fixed TV clock, mirrored in the Date header
-  const state = { behavior, pin: String(pin), appList: [], tokens: new Set() };
+  const state = {
+    behavior,
+    pin: String(pin),
+    appList: [],
+    tokens: new Set(),
+    installDelayMs: 0,
+    launches: []
+  };
   const setBehavior = (b) => (state.behavior = b);
+  const setInstallDelay = (ms) => (state.installDelayMs = ms);
 
   const expectedFor = (clientId) => {
     const deviceId = clientId.split("$")[0];
@@ -79,8 +87,20 @@ export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } =
       try {
         const info = JSON.parse(payload).app_info;
         if (state.behavior !== "installNoConfirm" && info) {
-          state.appList = state.appList.filter((a) => a.appId !== info.Id);
-          state.appList.push({ appId: info.Id, name: info.Title, url: info.URL, appUrl: info.URL });
+          // A real launcher needs a while before the new tile shows up in
+          // the app list; installDelayMs models that.
+          const register = () => {
+            state.appList = state.appList.filter((a) => a.appId !== info.Id);
+            state.appList.push({
+              appId: info.Id,
+              name: info.Title,
+              url: info.URL,
+              appUrl: info.URL,
+              image: info.Image
+            });
+          };
+          if (state.installDelayMs > 0) setTimeout(register, state.installDelayMs);
+          else register();
         }
       } catch {
         /* ignore */
@@ -90,6 +110,12 @@ export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } =
         { topic: t.applistReply, payload: JSON.stringify(state.appList), qos: 0 },
         () => {}
       );
+    } else if (topic === t.ui + "actions/launchapp") {
+      try {
+        state.launches.push({ ...JSON.parse(payload), at: Date.now() });
+      } catch {
+        /* ignore */
+      }
     } else if (topic === t.ui + "actions/removeapp") {
       let id = null;
       try {
@@ -163,6 +189,9 @@ export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } =
     clientPass: certs.clientPass,
     timestamp,
     setBehavior,
+    setInstallDelay,
+    launches: state.launches,
+    appList: () => state.appList,
     startSsdp,
     stop,
     _parseToken: parseToken

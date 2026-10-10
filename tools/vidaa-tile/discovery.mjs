@@ -147,9 +147,17 @@ export async function fetchDescriptor(host, location) {
   throw lastErr || new Error(`no descriptor from ${host}`);
 }
 
-export async function tvTimestamp(host) {
+// The TV clock from the UPnP descriptor's Date header; throws if no port
+// answers with a usable Date.
+export async function queryTvClock(host) {
   const info = await fetchDescriptor(host).catch(() => null);
-  if (info) return readDateHeader(info.headers);
+  if (info) {
+    try {
+      return readDateHeader(info.headers);
+    } catch {
+      /* try the bare header requests below */
+    }
+  }
   // No descriptor reachable: ask each port just for headers.
   for (const p of UPNP_PORTS) {
     try {
@@ -160,4 +168,16 @@ export async function tvTimestamp(host) {
     }
   }
   throw new Error("TV did not report its clock");
+}
+
+// The timestamp the session credentials are derived from. If the TV does not
+// answer the time request, fall back to local time (as Sidee's tv_timestamp
+// does): with NTP on both sides the clocks usually agree, and the TV rejecting
+// the credentials is a clearer error than aborting here.
+export async function tvTimestamp(host, { query = queryTvClock, now = Date.now } = {}) {
+  try {
+    return await query(host);
+  } catch {
+    return Math.floor(now() / 1000);
+  }
 }

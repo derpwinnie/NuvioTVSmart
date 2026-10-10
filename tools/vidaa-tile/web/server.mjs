@@ -15,7 +15,12 @@ import { extractKeystores } from "../cert.mjs";
 import { importFromSidee } from "../sidee-import.mjs";
 import { loadSecrets, requireComplete } from "../secrets.mjs";
 import { readState, writeFileAtomic, secretsPath } from "../store.mjs";
-import { DEFAULT_TILE_URL, validateTileUrl, withVidaaWrapper } from "../urls.mjs";
+import {
+  DEFAULT_TILE_IMAGE,
+  DEFAULT_TILE_URL,
+  validateTileUrl,
+  withVidaaWrapper
+} from "../urls.mjs";
 import * as session from "../session.mjs";
 
 const here = globalThis.__VIDAA_TILE_ASSETS__ ? "" : dirname(fileURLToPath(import.meta.url));
@@ -146,7 +151,7 @@ export async function startDashboard({ lan = false, port = 0 } = {}) {
           appId: body.appId || "nuvio",
           name: body.name || "Nuvio",
           url: withVidaaWrapper(v.url),
-          image: body.image || ""
+          image: body.image || DEFAULT_TILE_IMAGE
         },
         { secrets }
       );

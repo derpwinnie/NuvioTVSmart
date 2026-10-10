@@ -64,7 +64,7 @@ npm run vidaa:tile -- pair 192.168.1.50          # enter the PIN the TV shows
 npm run vidaa:tile -- install 192.168.1.50        # uses the free hosted build
 npm run vidaa:tile -- install 192.168.1.50 https://your-host.example/   # or your own
 npm run vidaa:tile -- list 192.168.1.50
-npm run vidaa:tile -- remove 192.168.1.50 nuvio
+npm run vidaa:tile -- remove 192.168.1.50 nuvio     # untested on real TVs
 ```
 
 APK route instead of `import-sidee`:
@@ -138,8 +138,36 @@ There is no TV in this project's setup, so the pairing step needs a tester.
    output — tokens and the PIN are not needed to debug discovery/pairing shape.
 4. Report TV model and VIDAA version with the result.
 
+## Coming from Sidee
+
+Sidee installs its Nuvio preset with the app id `nuviodebug`; this tool uses
+`nuvio` by default. The TV keys tiles by app id, so installing with the default
+after Sidee leaves you with **two** Nuvio tiles. To replace Sidee's tile
+instead, install with its id (CLI only; the dashboard always uses `nuvio`):
+
+```bash
+npm run vidaa:tile -- install 192.168.1.50 --app-id nuviodebug
+```
+
+`list <host>` shows the app ids of the tiles already on the TV. The default
+tile icon is the square `assets/images/tizenIcon.png` from the hosted build
+(the same image Sidee uses); pass `--image URL` for your own.
+
 ## Limitations
 
-- Tile removal is best-effort; if the TV does not confirm, remove the tile from
-  the launcher on the TV.
-- Behaviour on firmware other than what testers report is unknown.
+- The protocol comes from Sidee, which was tested on VIDAA firmware **U09.60**
+  (V0000.09.60A.Q0707) only. Behaviour on other firmware is unknown until
+  testers report it.
+- **`remove` is untested and unverified on real TVs.** It sends
+  `actions/removeapp`, which Sidee does not use, so nobody has confirmed the TV
+  honours it; it is only exercised against the fake TV in our tests. If the
+  tile stays, remove it from the launcher on the TV.
+- The tool waits about 8 s after installing (plus one retry after 2 s) before
+  it checks the TV's app list, and keeps the connection open 4 s after
+  launching a tile, as Sidee does. These pauses are deliberate.
+- If the TV does not report its clock, the tool falls back to your computer's
+  time. If the two clocks differ a lot, the TV rejects the connection; check
+  that both use automatic (network) time.
+- After two failed pairings in a row (wrong PIN, timeout, rejected), the next
+  pairing uses a new device id, in case the TV holds a broken state for the old
+  one. Cancelling the PIN prompt does not count.

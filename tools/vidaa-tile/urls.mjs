@@ -7,6 +7,11 @@
 // Free hosted build of this fork (GitHub Pages), so nobody has to self-host.
 export const DEFAULT_TILE_URL = "https://derpwinnie.github.io/NuvioTVSmart/vidaa.html";
 
+// Square 1080x1080 icon from the same Pages build (assets/ is copied into
+// dist/vidaa as is). VIDAA launcher icons are square; a wide wordmark would be
+// stretched. Users can still pass their own image.
+export const DEFAULT_TILE_IMAGE = new URL("assets/images/tizenIcon.png", DEFAULT_TILE_URL).href;
+
 const PRIVATE = [
   /^10\./,
   /^192\.168\./,

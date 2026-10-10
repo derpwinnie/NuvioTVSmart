@@ -10,7 +10,12 @@ import { importFromSidee, SIDEE_COMMIT } from "./sidee-import.mjs";
 import { loadSecrets, requireComplete } from "./secrets.mjs";
 import { readState } from "./store.mjs";
 import { writeFileAtomic, secretsPath } from "./store.mjs";
-import { DEFAULT_TILE_URL, validateTileUrl, withVidaaWrapper } from "./urls.mjs";
+import {
+  DEFAULT_TILE_IMAGE,
+  DEFAULT_TILE_URL,
+  validateTileUrl,
+  withVidaaWrapper
+} from "./urls.mjs";
 import * as session from "./session.mjs";
 
 const USAGE = `nuvio vidaa-tile — put Nuvio on a Hisense VIDAA TV as a launcher tile
@@ -29,7 +34,8 @@ Commands:
   pair <host>                            pair with a TV (enter the PIN it shows)
   list <host>                            list launcher tiles
   install <host> [url] [--name N] [--app-id ID] [--image URL]
-                                         (url defaults to the free hosted build)
+                                         (url defaults to the free hosted build, image
+                                         to its square Nuvio icon; app id to "nuvio")
   launch <host> <appId> [--url U] [--name N]
   remove <host> <appId>
 
@@ -158,7 +164,7 @@ async function main() {
         appId: flags["app-id"] || "nuvio",
         name: flags.name || "Nuvio",
         url,
-        image: flags.image || ""
+        image: flags.image || DEFAULT_TILE_IMAGE
       },
       { secrets }
     );
