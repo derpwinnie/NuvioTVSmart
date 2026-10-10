@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
+import { Platform } from "../../../platform/index.js";
 
 export function createPlayerScreenMethods67() {
   const {
@@ -104,7 +105,7 @@ export function createPlayerScreenMethods67() {
                           </div>`
                         : "";
                       return `
-                        <article class="player-source-card player-episode-stream-card${sourceSide ? "" : " no-side"} focusable${focused ? " focused" : ""}"
+                        <article class="player-source-card player-episode-stream-card${sourceSide ? "" : " no-side"} focusable${focused ? " focused" : ""}"${Platform.isVidaa() ? ' tabindex="-1" role="button"' : ""}
                                  data-episode-stream-index="${index}">
                           <div class="player-source-main">
                             ${topBadges}

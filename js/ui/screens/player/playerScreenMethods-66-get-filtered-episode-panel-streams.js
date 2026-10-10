@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
+import { Platform } from "../../../platform/index.js";
 
 export function createPlayerScreenMethods66() {
   const { streamRepository, isSelectKeyCode, t, clamp, normalizeItemType, streamMergeKey } = internals;
@@ -245,13 +246,17 @@ export function createPlayerScreenMethods66() {
             this.moveEpisodePanel(-1);
           } else {
             this.episodePanelFocusZone = hasSeasonTabs ? "seasons" : "close";
-            this.renderEpisodePanel();
+            if (!this.syncEpisodePanelFocusDom()) {
+              this.renderEpisodePanel();
+            }
           }
           return true;
         }
         if (this.episodePanelFocusZone === "seasons") {
           this.episodePanelFocusZone = "close";
-          this.renderEpisodePanel();
+          if (!this.syncEpisodePanelFocusDom()) {
+            this.renderEpisodePanel();
+          }
           return true;
         }
         return true;
@@ -260,12 +265,16 @@ export function createPlayerScreenMethods66() {
       if (keyCode === 40) {
         if (this.episodePanelFocusZone === "close") {
           this.episodePanelFocusZone = hasSeasonTabs ? "seasons" : "episodes";
-          this.renderEpisodePanel();
+          if (!this.syncEpisodePanelFocusDom()) {
+            this.renderEpisodePanel();
+          }
           return true;
         }
         if (this.episodePanelFocusZone === "seasons") {
           this.episodePanelFocusZone = "episodes";
-          this.renderEpisodePanel();
+          if (!this.syncEpisodePanelFocusDom()) {
+            this.renderEpisodePanel();
+          }
           return true;
         }
         this.moveEpisodePanel(1);
@@ -286,13 +295,58 @@ export function createPlayerScreenMethods66() {
         }
         if (this.episodePanelFocusZone === "seasons") {
           this.episodePanelFocusZone = "episodes";
-          this.renderEpisodePanel();
+          if (!this.syncEpisodePanelFocusDom()) {
+            this.renderEpisodePanel();
+          }
           return true;
         }
         this.playEpisodeFromPanel();
         return true;
       }
 
+      return true;
+    },
+    syncEpisodePanelFocusDom() {
+      // VIDAA only: move the focus class in place instead of rebuilding the
+      // panel on every D-pad step. Other platforms keep the full re-render.
+      if (!Platform.isVidaa()) {
+        return false;
+      }
+      const panel = this.uiRefs?.root?.querySelector("#episodeSidePanel");
+      if (!panel || !this.episodePanelVisible || this.episodePanelMode === "streams") {
+        return false;
+      }
+
+      const zone = String(this.episodePanelFocusZone || "episodes");
+      let target = null;
+      if (zone === "close") {
+        target = panel.querySelector("[data-episode-action='close']");
+      } else if (zone === "seasons") {
+        target = panel.querySelector(`[data-episode-season-index="${Number(this.episodePanelSeasonIndex || 0)}"]`);
+      } else {
+        target = panel.querySelector(`[data-episode-index="${Number(this.episodePanelIndex || 0)}"]`);
+      }
+      if (!target) {
+        return false;
+      }
+
+      panel.querySelectorAll(".focused").forEach((node) => {
+        if (node !== target) {
+          node.classList.remove("focused");
+        }
+      });
+      target.classList.add("focused");
+
+      if (zone === "episodes") {
+        panel.querySelectorAll(".player-episode-item.selected").forEach((node) => {
+          if (node !== target) {
+            node.classList.remove("selected");
+          }
+        });
+        target.classList.add("selected");
+      }
+
+      this.scrollEpisodePanelIntoView();
       return true;
     },
     scrollEpisodePanelIntoView() {
