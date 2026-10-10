@@ -1,0 +1,41 @@
+name: NPM CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vidaa:
+    name: Lint, VIDAA tests and package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      # Runs the VIDAA unit tests, the tile tool tests, builds the VIDAA
+      # package and checks it (see "test:vidaa" in package.json).
+      - name: Run VIDAA test suites
+        run: npm run test:vidaa
