@@ -3,7 +3,8 @@ import {
   parseDescriptor,
   readDateHeader,
   _classifyReply,
-  _descriptorTargets
+  _descriptorTargets,
+  tvTimestamp
 } from "../tools/vidaa-tile/discovery.mjs";
 
 const xml = `<root><device><friendlyName>Living Room</friendlyName>
@@ -42,6 +43,19 @@ assert.ok(
   _descriptorTargets("1.2.3.4", "https://1.2.3.4/x").every((t) =>
     t.path.includes("rendererdevicedesc")
   )
+);
+
+// TV clock: use the TV's answer, else fall back to local time instead of
+// aborting (as Sidee does).
+assert.equal(await tvTimestamp("tv", { query: async () => 1759800000 }), 1759800000);
+assert.equal(
+  await tvTimestamp("tv", {
+    query: async () => {
+      throw new Error("TV did not report its clock");
+    },
+    now: () => 1760000000123
+  }),
+  1760000000
 );
 
 console.log("discovery helper tests passed");
