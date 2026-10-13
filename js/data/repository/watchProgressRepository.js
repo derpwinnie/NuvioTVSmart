@@ -720,7 +720,8 @@ class WatchProgressRepository {
       },
       pid
     );
-    invalidateContinueWatchingDisplaySnapshot();
+    // Keep the last Home display for cold startup; Home reconciles it against
+    // fresh progress in the background, as Android does.
     if (syncRemote) {
       queueWatchProgressCloudSync(pid);
     }
@@ -754,7 +755,8 @@ class WatchProgressRepository {
       })),
       pid
     );
-    invalidateContinueWatchingDisplaySnapshot();
+    // Keep the last Home display for cold startup; Home reconciles it against
+    // fresh progress in the background, as Android does.
     if (syncRemote) {
       queueWatchProgressCloudSync(pid);
     }
@@ -915,7 +917,7 @@ class WatchProgressRepository {
       profileId,
       (Array.isArray(items) ? items : []).filter((item) => !isCloudProgressItem(item))
     );
-    invalidateContinueWatchingDisplaySnapshot();
+    // A remote pull must not erase the display cache before Home can reconcile it.
   }
 
   /**

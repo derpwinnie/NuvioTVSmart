@@ -39,6 +39,14 @@ export function createPlayerScreenMethods27() {
         ["avplaytrackschanged", onTrackListChanged],
         ["avplaysubtitlechange", onAvPlaySubtitleChange],
         ["webosaudiotrackselectionchanged", onWebOsAudioTrackSelectionChanged],
+        [
+          "webosaudioconversionchanged",
+          () => {
+            this.invalidateTrackDialogCaches();
+            this.renderAudioDialog();
+            this.updateLoadingVisibility();
+          }
+        ],
         ["hlstrackschanged", onTrackListChanged],
         ["dashtrackschanged", onTrackListChanged]
       ];

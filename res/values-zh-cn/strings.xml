@@ -2585,4 +2585,9 @@
     <string name="player_post_play_trailer_countdown">%1$d 秒后播放预告片</string>
     <string name="player_post_play_trailer_playing">正在播放预告片</string>
     <string name="player_post_play_trailer">预告片</string>
+
+    <string name="mdblist_show_on_hero_title">在主横幅中使用评分</string>
+    <string name="mdblist_show_on_hero_subtitle">在主横幅中显示MDBList评分（Modern和Classic/Grid）</string>
+    <string name="mdblist_rating_order_title">评分顺序</string>
+    <string name="mdblist_rating_order_subtitle">Modern横幅显示前3个已启用且可用的评分。使用箭头调整顺序。</string>
 </resources>

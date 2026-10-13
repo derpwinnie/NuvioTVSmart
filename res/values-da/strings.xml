@@ -87,4 +87,11 @@
     <string name="player_post_play_trailer_countdown">Trailer om %1$d</string>
     <string name="player_post_play_trailer_playing">Trailer afspilles</string>
     <string name="player_post_play_trailer">Trailer</string>
+
+    <string name="mdblist_show_on_hero_title">Brug bedømmelser i hovedbanneret</string>
+    <string name="mdblist_show_on_hero_subtitle">Vis MDBList-bedømmelser i hovedbanneret (Modern og Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Rækkefølge af bedømmelser</string>
+    <string name="mdblist_rating_order_subtitle">De første 3 aktiverede og tilgængelige bedømmelser vises i Modern-banneret. Brug pilene til at ændre rækkefølgen.</string>
+    <string name="cd_move_up">Flyt op</string>
+    <string name="cd_move_down">Flyt ned</string>
 </resources>

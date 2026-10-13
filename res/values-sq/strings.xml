@@ -3003,4 +3003,9 @@
     <string name="player_post_play_trailer_countdown">Traileri pas %1$d</string>
     <string name="player_post_play_trailer_playing">Traileri po luhet</string>
     <string name="player_post_play_trailer">Trailer</string>
+
+    <string name="mdblist_show_on_hero_title">Përdor vlerësimet në banerin kryesor</string>
+    <string name="mdblist_show_on_hero_subtitle">Shfaq vlerësimet MDBList në banerin kryesor (Modern dhe Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Renditja e vlerësimeve</string>
+    <string name="mdblist_rating_order_subtitle">Baneri Modern shfaq 3 vlerësimet e para të aktivizuara dhe të disponueshme. Përdor shigjetat për të ndryshuar renditjen.</string>
 </resources>

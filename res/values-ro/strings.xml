@@ -1164,4 +1164,11 @@
     <string name="player_post_play_trailer_countdown">Trailer în %1$d</string>
     <string name="player_post_play_trailer_playing">Trailer în redare</string>
     <string name="player_post_play_trailer">Trailer</string>
+
+    <string name="mdblist_show_on_hero_title">Folosește evaluările în bannerul principal</string>
+    <string name="mdblist_show_on_hero_subtitle">Afișează evaluările MDBList în bannerul principal (Modern și Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Ordinea evaluărilor</string>
+    <string name="mdblist_rating_order_subtitle">Bannerul Modern afișează primele 3 evaluări activate și disponibile. Folosește săgețile pentru a schimba ordinea.</string>
+    <string name="cd_move_up">Mută în sus</string>
+    <string name="cd_move_down">Mută în jos</string>
 </resources>

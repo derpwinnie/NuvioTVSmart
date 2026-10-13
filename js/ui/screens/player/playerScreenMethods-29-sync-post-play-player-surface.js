@@ -9,7 +9,9 @@ export function createPlayerScreenMethods29() {
     syncPostPlayPlayerSurface(state = this.getPostPlayState()) {
       const usingAvPlay = Boolean(Environment.isTizen() && PlayerController.isUsingAvPlay?.());
       const video = PlayerController.video;
-      const avPlayObject = document.getElementById("avPlayerObject");
+      // Reading this native object can force style updates even on webOS.
+      // Only Tizen uses the AVPlay surface; retain its visibility lifecycle.
+      const avPlayObject = Environment.isTizen() ? document.getElementById("avPlayerObject") : null;
       const background = this.uiRefs?.postPlay?.querySelector(".player-post-play-background");
       const viewportWidth = Math.max(1, Math.round(Number(window.innerWidth || 1920)));
       const viewportHeight = Math.max(1, Math.round(Number(window.innerHeight || 1080)));
@@ -301,6 +303,9 @@ export function createPlayerScreenMethods29() {
       return Boolean(this.loadingVisible && !this.hasPresentedPlaybackFrame);
     },
     isBufferingSpinnerVisible() {
+      if (Environment.isWebOS() && PlayerController.isWebOsDtsAudioBuffering?.()) {
+        return !this.isStartupLoadingVisible() && !this.isExternalFrameMode() && !this.isStartupErrorVisible();
+      }
       if (this.seekLoading) {
         if (this.isStartupLoadingVisible()) {
           return false;

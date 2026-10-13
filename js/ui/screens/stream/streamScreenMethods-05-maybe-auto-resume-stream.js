@@ -257,6 +257,7 @@ export function createStreamScreenMethods05() {
       return this.sourceChips.some((chip) => chip.name === filter && chip.status === "loading");
     },
     setAddonFilter(nextFilter, preferredZone = "filter", preferredIndex = 0) {
+      this.streamUserMovedFocus = true;
       const targetFilter = String(nextFilter || "all");
       const filterChanged = targetFilter !== this.addonFilter;
       this.addonFilter = targetFilter;
@@ -273,7 +274,7 @@ export function createStreamScreenMethods05() {
         const ordered = ["all", ...this.getOrderedFilterNames()];
         this.focusState = {
           zone: "filter",
-          index: clamp(ordered.indexOf(targetFilter), 0, Math.max(0, ordered.length - 1))
+          index: 1 + clamp(ordered.indexOf(targetFilter), 0, Math.max(0, ordered.length - 1))
         };
       }
       // Android's LazyColumn effect is keyed by the selected addon, so

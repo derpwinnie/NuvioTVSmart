@@ -41,6 +41,7 @@ export function createPlayerScreenMethods60() {
               normalizedTrackIndex === selectedAvPlayAudioTrack ||
               (selectedAvPlayAudioTrack < 0 && normalizedTrackIndex === this.selectedAudioTrackIndex),
             supported: support.supported,
+            canTryAudioConversion: Boolean(support.canTryAudioConversion),
             unsupportedReason: support.unsupportedReason,
             avplayAudioTrackIndex: normalizedTrackIndex,
             track: {
@@ -63,6 +64,7 @@ export function createPlayerScreenMethods60() {
               secondary: display.secondary,
               selected: index === selectedDashAudioTrack || (selectedDashAudioTrack < 0 && index === this.selectedAudioTrackIndex),
               supported: support.supported,
+              canTryAudioConversion: Boolean(support.canTryAudioConversion),
               unsupportedReason: support.unsupportedReason,
               dashAudioTrackIndex: index,
               track: {
@@ -86,6 +88,7 @@ export function createPlayerScreenMethods60() {
                 secondary: display.secondary,
                 selected: index === selectedHlsAudioTrack || (selectedHlsAudioTrack < 0 && index === this.selectedAudioTrackIndex),
                 supported: support.supported,
+                canTryAudioConversion: Boolean(support.canTryAudioConversion),
                 unsupportedReason: support.unsupportedReason,
                 hlsAudioTrackIndex: index,
                 track: {
@@ -95,9 +98,19 @@ export function createPlayerScreenMethods60() {
               };
             });
           } else {
-            const audioTracks = this.getAudioTracks();
+            const conversion = Environment.isWebOS() ? PlayerController.webOsDtsAudioState : null;
+            const projectedTracks = Boolean(conversion?.id && this.embeddedAudioTracks.length);
+            // LG may expose only the converted track. Its native index no longer
+            // represents the source list; retain all original language choices.
+            const audioTracks = projectedTracks ? [] : this.getAudioTracks();
             if (audioTracks.length || this.embeddedAudioTracks.length) {
               entries = this.getMergedAudioTrackEntries(audioTracks);
+              if (projectedTracks) {
+                const selectedIndex = conversion.sourceTrackIndex ?? conversion.targetIndex;
+                entries.forEach((entry) => {
+                  entry.selected = entry.embeddedAudioTrackIndex === selectedIndex;
+                });
+              }
             } else if (this.manifestAudioTracks.length) {
               entries = this.manifestAudioTracks.map((track, index) => {
                 const display = formatAudioTrackDisplay(track, index);
@@ -108,6 +121,7 @@ export function createPlayerScreenMethods60() {
                   secondary: display.secondary,
                   selected: this.selectedManifestAudioTrackId === track.id,
                   supported: support.supported,
+                  canTryAudioConversion: Boolean(support.canTryAudioConversion),
                   unsupportedReason: support.unsupportedReason,
                   manifestAudioTrackId: track.id,
                   track: {
@@ -168,6 +182,7 @@ export function createPlayerScreenMethods60() {
         secondary: display.secondary,
         selected: true,
         supported: support.supported,
+        canTryAudioConversion: Boolean(support.canTryAudioConversion),
         unsupportedReason: support.unsupportedReason,
         implicitAudioTrack: true,
         audioTrackIndex: 0,
@@ -196,7 +211,9 @@ export function createPlayerScreenMethods60() {
         return false;
       }
       const selectedEntry = entries.find((entry) => entry?.selected);
-      const shouldFallback = selectedEntry ? selectedEntry.supported === false : entries[0]?.supported === false;
+      const shouldFallback = selectedEntry
+        ? selectedEntry.supported === false && !selectedEntry.canTryAudioConversion
+        : entries[0]?.supported === false && !entries[0]?.canTryAudioConversion;
       if (!shouldFallback) {
         return false;
       }

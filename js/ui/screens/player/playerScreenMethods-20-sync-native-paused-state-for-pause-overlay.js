@@ -14,10 +14,28 @@ export function createPlayerScreenMethods20() {
   } = internals;
 
   return {
+    isBufferingForPauseOverlay() {
+      const video = PlayerController.video;
+      const readyState =
+        typeof PlayerController.getPlaybackReadyState === "function"
+          ? Number(PlayerController.getPlaybackReadyState() || 0)
+          : Number(video?.readyState || 0);
+      return Boolean(
+        this.loadingVisible ||
+        this.bufferingActive ||
+        this.seekLoading ||
+        this.pendingPlaybackRestore ||
+        this.startupAudioGateActive ||
+        video?.seeking ||
+        readyState < 3 ||
+        PlayerController.isWebOsDtsAudioBuffering?.() ||
+        PlayerController.webOsDtsAudioState?.cancelReload
+      );
+    },
     syncNativePausedStateForPauseOverlay() {
       if (
         this.isExternalFrameMode() ||
-        this.loadingVisible ||
+        this.isBufferingForPauseOverlay() ||
         this.startupAudioGateActive ||
         (typeof PlayerController.isUsingAvPlay === "function" && PlayerController.isUsingAvPlay())
       ) {
@@ -105,7 +123,7 @@ export function createPlayerScreenMethods20() {
       if (!overlay) {
         return;
       }
-      const hidden = !this.pauseOverlayVisible || this.loadingVisible;
+      const hidden = !this.pauseOverlayVisible || this.isBufferingForPauseOverlay();
       overlay.classList.toggle("hidden", hidden);
       overlay.classList.toggle("is-still-watching", Boolean(this.stillWatchingPromptVisible));
       controlsOverlay?.classList.toggle("pause-overlay-active", !hidden);

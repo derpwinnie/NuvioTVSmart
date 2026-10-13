@@ -2816,4 +2816,9 @@
     <string name="auth_qr_manual_instruction">Alebo prejdite na %1$s a zadajte</string>
     <string name="unsupported_device_warning">Nuvio TV môžete napriek tomu skúsiť spustiť, no aplikácia nemusí na tomto televízore fungovať správne. Táto konfigurácia nie je oficiálne podporovaná.</string>
     <string name="unsupported_device_try_anyway">Napriek tomu spustiť</string>
+
+    <string name="mdblist_show_on_hero_title">Použiť hodnotenia v hlavnom sekčnom paneli</string>
+    <string name="mdblist_show_on_hero_subtitle">Zobrazovať hodnotenia MDBList v hlavnom karuseli (moderné aj klasické/mriežka)</string>
+    <string name="mdblist_rating_order_title">Poradie hodnotení</string>
+    <string name="mdblist_rating_order_subtitle">Prvé 3 povolené a dostupné hodnotenia sa zobrazia v modernom hlavnom paneli. Zmeňte poradie pomocou šípok.</string>
 </resources>

@@ -31,7 +31,9 @@ export function createStreamScreenMethods03() {
       this.streamLastNavigationRepeatAt = 0;
       this.loadToken = (this.loadToken || 0) + 1;
       const token = this.loadToken;
-      this.focusState = { zone: "filter", index: 0 };
+      this.focusState = { zone: "filter", index: 1 };
+      this.streamUserMovedFocus = false;
+      this.streamInitialResultFocusAssigned = false;
       this.listScrollTop = 0;
       this.error = "";
       this.loading = true;
@@ -103,11 +105,13 @@ export function createStreamScreenMethods03() {
           ? navigationContext.restoredState
           : null;
       if (restored) {
+        this.streamUserMovedFocus = true;
+        this.streamInitialResultFocusAssigned = true;
         this.loading = Boolean(restored.loading);
         this.error = String(restored.error || "");
         this.streams = Array.isArray(restored.streams) ? restored.streams.map((stream) => ({ ...stream })) : [];
         this.addonFilter = String(restored.addonFilter || "all");
-        this.focusState = restored.focusState ? { ...restored.focusState } : { zone: "filter", index: 0 };
+        this.focusState = restored.focusState ? { ...restored.focusState } : { zone: "filter", index: 1 };
         this.sourceChips = Array.isArray(restored.sourceChips) ? restored.sourceChips.map((chip) => ({ ...chip })) : [];
         this.addonLogoLookup =
           restored.addonLogoLookup && typeof restored.addonLogoLookup === "object"

@@ -115,6 +115,7 @@ export function createStreamScreenMethods08() {
     },
     buildSourceChipMarkup() {
       return [
+        `<button class="stream-route-chip focusable" data-action="refreshStreams" aria-label="${escapeHtml(t("cd_refresh", {}, "Refresh"))}"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.93 9h-2.02A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z"/></svg></button>`,
         this.renderChip("all", this.addonFilter === "all", "success"),
         ...this.getOrderedFilterNames().map((name) => {
           const chip = this.sourceChips.find((entry) => entry.name === name) || {
@@ -135,7 +136,7 @@ export function createStreamScreenMethods08() {
         this.addonFilter = "all";
         this.listScrollTop = 0;
         const allStreams = this.getFilteredStreams("all");
-        this.focusState = allStreams.length ? { zone: "card", row: 0, action: "play" } : { zone: "filter", index: 0 };
+        this.focusState = allStreams.length ? { zone: "card", row: 0, action: "play" } : { zone: "filter", index: 1 };
         this.streamVirtualFocusReset = true;
         this.streamVirtualPreferredIndex = allStreams.length ? 0 : null;
         filterReset = true;

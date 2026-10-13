@@ -289,7 +289,9 @@ export function createDiscoverScreenMethods02() {
       }
       const gridNode = this.container.querySelector("#discoverGridMount");
       if (gridNode instanceof HTMLElement) {
+        const loadedPosters = this.captureLoadedDiscoverPosters();
         gridNode.innerHTML = this.renderDiscoverCards(selectedCatalog);
+        this.restoreLoadedDiscoverPosters(loadedPosters);
       }
       const loadingNode = this.container.querySelector("#discoverLoadingMount");
       if (loadingNode instanceof HTMLElement) {

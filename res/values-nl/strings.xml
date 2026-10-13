@@ -1317,4 +1317,11 @@
     <string name="player_post_play_trailer_countdown">Trailer over %1$d</string>
     <string name="player_post_play_trailer_playing">Trailer wordt afgespeeld</string>
     <string name="player_post_play_trailer">Trailer</string>
+
+    <string name="mdblist_show_on_hero_title">Beoordelingen in de hoofdbanner gebruiken</string>
+    <string name="mdblist_show_on_hero_subtitle">MDBList-beoordelingen in de hoofdbanner tonen (Modern en Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Volgorde van beoordelingen</string>
+    <string name="mdblist_rating_order_subtitle">De Modern-banner toont de eerste 3 ingeschakelde en beschikbare beoordelingen. Gebruik de pijlen om de volgorde te wijzigen.</string>
+    <string name="cd_move_up">Omhoog verplaatsen</string>
+    <string name="cd_move_down">Omlaag verplaatsen</string>
 </resources>

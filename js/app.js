@@ -485,6 +485,21 @@ function setupProviderCredentialForegroundLifecycle() {
   window.addEventListener("focus", requestAfterBackground);
 }
 
+function setupTizenPlaybackLifecycle() {
+  if (!Platform.isTizen()) return;
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "hidden" || Router.getCurrent() !== "player") return;
+
+    // Samsung requires hidden playback to follow the player exit path.
+    // Do not consume a regular Back: it can merely dismiss an overlay and
+    // leave playback running. Reuse the existing stop/progress/return path.
+    const screen = Router.getCurrentScreen();
+    screen?.cancelSourceLoad?.();
+    screen?.navigateBackToStreamScreen?.();
+  });
+}
+
 function setupPluginRuntimeLifecycle() {
   const cancel = () => PluginRuntime.cancelAll();
   document.addEventListener("visibilitychange", () => {
@@ -565,6 +580,7 @@ async function bootstrapApp() {
 
   FocusEngine.init();
   setupProviderCredentialForegroundLifecycle();
+  setupTizenPlaybackLifecycle();
   setupPluginRuntimeLifecycle();
   setupWebOsAppLifecycle();
 

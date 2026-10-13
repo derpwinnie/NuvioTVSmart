@@ -2592,4 +2592,9 @@
     <string name="player_post_play_trailer_countdown">Tráiler en %1$d</string>
     <string name="player_post_play_trailer_playing">Reproduciendo tráiler</string>
     <string name="player_post_play_trailer">Tráiler</string>
+
+    <string name="mdblist_show_on_hero_title">Usar calificaciones en la cabecera</string>
+    <string name="mdblist_show_on_hero_subtitle">Mostrar calificaciones de MDBList en la cabecera (Modern y Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Orden de las calificaciones</string>
+    <string name="mdblist_rating_order_subtitle">La cabecera Modern muestra las primeras 3 calificaciones activadas y disponibles. Usa las flechas para cambiar el orden.</string>
 </resources>

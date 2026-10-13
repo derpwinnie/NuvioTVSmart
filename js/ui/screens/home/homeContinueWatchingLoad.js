@@ -35,8 +35,12 @@ export function startHomeContinueWatchingLoad(context) {
     suppressContinueWatchingLoading,
     hasExistingContinueWatchingDisplay
   } = context;
+  const loadGeneration = (this.homeContinueWatchingLoadGeneration || 0) + 1;
+  this.homeContinueWatchingLoadGeneration = loadGeneration;
   const isCurrentHomeContinueWatchingLoad = () =>
     token === this.homeLoadToken &&
+    loadGeneration === this.homeContinueWatchingLoadGeneration &&
+    watchProgressRepository.getContinueWatchingSourceKey() === continueWatchingSourceKey &&
     (refreshGeneration == null || refreshGeneration === this.homeContinueWatchingSyncRefreshGeneration) &&
     Router.getCurrent() === "home";
   {
@@ -79,35 +83,33 @@ export function startHomeContinueWatchingLoad(context) {
       }).slice(0, CW_MAX_NEXT_UP_LOOKUPS);
       const shouldShowLoading = Boolean((this.continueWatching?.length || 0) + (this.nextUpProgressCandidates?.length || 0));
       const initialContinueWatchingPending = !this.continueWatchingInitialResolved;
-      // A local Nuvio Sync snapshot is provisional while the cold pull is
-      // active. Do not publish it as the first row, because the pull can
-      // replace it with additional remote entries moments later.
+      // Publish usable local progress while the cold pull runs, like Android.
+      // Only an empty local result needs to wait for the authoritative pull.
       const shouldWaitForStartupSync = Boolean(
         initialContinueWatchingPending &&
+        !shouldShowLoading &&
         (startupSyncPullPromise || startupSyncCompletedDuringLoad) &&
         !progressErrors.all &&
         !progressErrors.recent
       );
-      if (!shouldWaitForStartupSync) {
-        this.continueWatchingInitialResolved = true;
-      }
       const previousDisplaySignature = buildContinueWatchingSignature(this.continueWatchingDisplay);
       const previousHeroIdentity = buildHeroIdentity(this.heroItem);
       const previousLoadingState = Boolean(this.continueWatchingLoading);
-      if (shouldWaitForStartupSync) {
+      if (startupSyncPullPromise || startupSyncCompletedDuringLoad) {
         const refreshAfterStartupPull = () => {
           if (!isCurrentHomeContinueWatchingLoad()) {
             return;
           }
           const renderedSignature = this.renderedSyncSensitiveSignature;
           if (
-            StartupSyncService.getLastPullChangedHomeInputs?.() === false &&
-            renderedSignature &&
-            this.buildSyncSensitiveHomeSignature?.() === renderedSignature
+            this.isInitialHomeLoading ||
+            (StartupSyncService.getLastPullChangedHomeInputs?.() === false &&
+              renderedSignature &&
+              this.buildSyncSensitiveHomeSignature?.() === renderedSignature)
           ) {
             // The initial progress reads ran while the profile pull was in
-            // flight. Re-read just Continue Watching after a confirmed no-op
-            // pull, so its loading state settles without rebuilding catalogs.
+            // flight. Re-read just Continue Watching while the initial gate is
+            // active, or after a no-op pull, without rebuilding catalogs.
             const retryProgressErrors = { all: null, recent: null };
             startHomeContinueWatchingLoad.call(this, {
               ...context,
@@ -138,6 +140,8 @@ export function startHomeContinueWatchingLoad(context) {
         } else if (startupSyncCompletedDuringLoad) {
           refreshAfterStartupPull();
         }
+      }
+      if (shouldWaitForStartupSync) {
         this.continueWatchingLoading = true;
         if (!previousLoadingState) {
           this.requestBackgroundRender();
@@ -152,6 +156,9 @@ export function startHomeContinueWatchingLoad(context) {
           requireArtwork: false
         });
         this.continueWatchingLoading = Boolean(shouldShowLoading && !this.continueWatchingDisplay.length);
+        if (this.continueWatchingDisplay.length) {
+          this.persistContinueWatchingSnapshot();
+        }
         const immediateDisplaySignature = buildContinueWatchingSignature(this.continueWatchingDisplay);
         if (
           this.layoutMode === "modern" &&
@@ -170,6 +177,17 @@ export function startHomeContinueWatchingLoad(context) {
         if (previousLoadingState !== this.continueWatchingLoading || previousDisplaySignature !== immediateDisplaySignature) {
           this.requestBackgroundRender();
         }
+      }
+
+      if (!shouldWaitForStartupSync && (!shouldShowLoading || this.continueWatchingDisplay?.length)) {
+        this.continueWatchingInitialResolved = true;
+      }
+      if (this.isInitialHomeLoading && this.hasLoadedOnce && this.continueWatchingInitialResolved) {
+        this.releaseInitialHomeLoading();
+        if (!this.heroItem && !this.hasUserInteractedSinceHomePaint) {
+          this.heroItem = this.pickInitialHero();
+        }
+        this.requestBackgroundRender();
       }
 
       if (!shouldShowLoading) {
@@ -242,6 +260,10 @@ export function startHomeContinueWatchingLoad(context) {
           return;
         }
         this.continueWatchingDisplay = nextDisplay;
+        this.continueWatchingInitialResolved = true;
+        if (this.hasLoadedOnce) {
+          this.releaseInitialHomeLoading();
+        }
         this.continueWatchingLoading = false;
         if (nextDisplay.length) {
           this.persistContinueWatchingSnapshot();
@@ -249,7 +271,7 @@ export function startHomeContinueWatchingLoad(context) {
           this.clearContinueWatchingSnapshot();
         }
         if (this.layoutMode === "modern" && this.layoutPrefs?.continueWatchingEnabled !== false && this.continueWatchingDisplay.length) {
-          if (!preserveHomeReturnState && !this.suppressInitialContinueWatchingFocus) {
+          if (!preserveHomeReturnState && !this.suppressInitialContinueWatchingFocus && !this.hasUserInteractedSinceHomePaint) {
             this.heroItem = this.pickInitialHero();
           }
           if (
@@ -276,6 +298,10 @@ export function startHomeContinueWatchingLoad(context) {
         this.maybeStartPendingHomeBackgroundRefresh();
       } catch (error) {
         console.warn("Continue watching async enrichment failed", error);
+        this.continueWatchingInitialResolved = true;
+        if (this.hasLoadedOnce) {
+          this.releaseInitialHomeLoading();
+        }
         this.continueWatchingLoading = false;
         if (!suppressContinueWatchingLoading && previousLoadingState) {
           this.requestBackgroundRender();
@@ -287,7 +313,11 @@ export function startHomeContinueWatchingLoad(context) {
       if (!isCurrentHomeContinueWatchingLoad()) {
         return;
       }
+      this.continueWatchingInitialResolved = true;
       this.continueWatchingLoading = false;
+      if (this.hasLoadedOnce) {
+        this.releaseInitialHomeLoading();
+      }
       if (!suppressContinueWatchingLoading) {
         this.requestBackgroundRender();
       }

@@ -1766,4 +1766,9 @@
     <string name="player_post_play_trailer_countdown">Najava za %1$d</string>
     <string name="player_post_play_trailer_playing">Najava se reproducira</string>
     <string name="player_post_play_trailer">Najava</string>
+
+    <string name="mdblist_show_on_hero_title">Koristi ocjene u glavnom baneru</string>
+    <string name="mdblist_show_on_hero_subtitle">Prikaži MDBList ocjene u glavnom baneru (Modern i Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Redoslijed ocjena</string>
+    <string name="mdblist_rating_order_subtitle">U baneru Modern prikazuju se prve 3 uključene i dostupne ocjene. Koristite strelice za promjenu redoslijeda.</string>
 </resources>

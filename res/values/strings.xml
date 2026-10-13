@@ -3006,4 +3006,11 @@
     <string name="auth_qr_manual_instruction">Or go to %1$s and enter</string>
     <string name="unsupported_device_warning">You can try to start Nuvio TV anyway, but the app may not work correctly on this TV. This configuration is not officially supported.</string>
     <string name="unsupported_device_try_anyway">Try anyway</string>
+    <string name="player_audio_dts_conversion_warning">DTS audio may not work on this TV because automatic conversion is unavailable for this track.</string>
+    <string name="player_audio_conversion_warning">Audio may not work on this TV because automatic conversion is unavailable for this track.</string>
+
+    <string name="mdblist_show_on_hero_title">Use Ratings on Hero</string>
+    <string name="mdblist_show_on_hero_subtitle">Show MDBList ratings on hero carousel (modern and classic/grid)</string>
+    <string name="mdblist_rating_order_title">Rating Order</string>
+    <string name="mdblist_rating_order_subtitle">First 3 enabled and available ratings are shown on the modern hero. Use arrows to reorder.</string>
 </resources>

@@ -7,6 +7,7 @@ export function createPlayerScreenMethods51() {
     PlayerSettingsStore,
     I18n,
     Environment,
+    PlayerController,
     SUBTITLE_LANGUAGE_OFF_KEY,
     cleanDisplayText,
     normalizeComparableText,
@@ -147,7 +148,8 @@ export function createPlayerScreenMethods51() {
           label: cleanDisplayText(entry?.label || ""),
           secondary: cleanDisplayText(entry?.secondary || ""),
           selected: Boolean(entry?.selected),
-          supported: entry?.supported !== false,
+          supported: entry?.supported !== false || Boolean(entry?.canTryAudioConversion),
+          requiresAudioConversion: Boolean(entry?.canTryAudioConversion),
           languageKey,
           languageLabel: getAudioTrackLanguageLabel(track, entry),
           entry,
@@ -201,6 +203,11 @@ export function createPlayerScreenMethods51() {
       }
       const options = this.collectAudioOptionItems();
       for (const target of normalizedTargets) {
+        const compatibleOptions = options.filter((entry) => !entry.requiresAudioConversion);
+        const compatibleMatch =
+          compatibleOptions.find((entry) => entry.supported && entry.languageKey === target) ||
+          compatibleOptions.find((entry) => entry.supported && this.matchesStartupAudioTarget(entry, target));
+        if (compatibleMatch) return compatibleMatch;
         const exactOption = options.find((entry) => entry.supported && entry.languageKey === target);
         if (exactOption) {
           return exactOption;
@@ -218,6 +225,8 @@ export function createPlayerScreenMethods51() {
       }
 
       const preferredTargets = this.getStartupPreferredAudioLanguageTargets();
+      const selectionReady = (option) =>
+        Boolean(option?.selected) && (!option.requiresAudioConversion || Boolean(PlayerController.webOsDtsAudioState));
       // `loadedmetadata` fires before Tizen AVPlay publishes `getTotalTrackInfo`,
       // so the option list can still hold nothing but the synthetic startup entry.
       // Concluding there means falling back to the runtime's first audio track and
@@ -227,7 +236,7 @@ export function createPlayerScreenMethods51() {
       const rememberedOption = isStillLoading && matchedRememberedOption?.entry?.implicitAudioTrack ? null : matchedRememberedOption;
       if (rememberedOption?.entry && Number.isFinite(rememberedOption.entryIndex)) {
         this.startupAudioFallbackApplied = false;
-        if (rememberedOption.selected) {
+        if (selectionReady(rememberedOption)) {
           this.clearStartupAudioPreferenceRetry();
           this.startupAudioPreferenceApplied = true;
           return true;
@@ -243,7 +252,7 @@ export function createPlayerScreenMethods51() {
           this.scheduleStartupAudioPreferenceRetry();
           return false;
         }
-        if (this.findRememberedAudioOption()?.selected) {
+        if (selectionReady(this.findRememberedAudioOption())) {
           this.clearStartupAudioPreferenceRetry();
           this.startupAudioPreferenceApplied = true;
           return true;
@@ -272,7 +281,18 @@ export function createPlayerScreenMethods51() {
         targetIndex > 0 && Boolean(this.findStartupPreferredAudioOption(preferredTargets.slice(0, targetIndex)));
       const selectedOption = this.collectAudioOptionItems().find((entry) => entry.selected);
       const selectedTargetIndex = getPreferredTargetIndex(selectedOption);
-      if (selectedTargetIndex >= 0 && !hasHigherPriorityPreferredOption(selectedTargetIndex)) {
+      const bestPreferredOption = this.findStartupPreferredAudioOption(preferredTargets);
+      const compatiblePreferredAvailable =
+        selectedOption?.requiresAudioConversion &&
+        bestPreferredOption &&
+        !bestPreferredOption.requiresAudioConversion &&
+        getPreferredTargetIndex(bestPreferredOption) <= selectedTargetIndex;
+      if (
+        selectionReady(selectedOption) &&
+        selectedTargetIndex >= 0 &&
+        !compatiblePreferredAvailable &&
+        !hasHigherPriorityPreferredOption(selectedTargetIndex)
+      ) {
         this.clearStartupAudioPreferenceRetry();
         this.startupAudioFallbackApplied = false;
         this.startupAudioPreferenceApplied = true;

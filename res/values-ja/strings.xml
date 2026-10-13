@@ -1914,4 +1914,11 @@
     <string name="player_post_play_trailer_countdown">%1$d秒後に予告編</string>
     <string name="player_post_play_trailer_playing">予告編を再生中</string>
     <string name="player_post_play_trailer">予告編</string>
+
+    <string name="mdblist_show_on_hero_title">メインバナーに評価を表示</string>
+    <string name="mdblist_show_on_hero_subtitle">メインバナーにMDBListの評価を表示します（ModernとClassic/Grid）</string>
+    <string name="mdblist_rating_order_title">評価の表示順</string>
+    <string name="mdblist_rating_order_subtitle">Modernのバナーには有効で利用可能な評価が先頭から3件表示されます。矢印で順序を変更できます。</string>
+    <string name="cd_move_up">上へ移動</string>
+    <string name="cd_move_down">下へ移動</string>
 </resources>

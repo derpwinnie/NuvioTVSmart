@@ -238,6 +238,11 @@ async function stageService() {
 
   await mkdir(path.join(serviceStageDir, "src"), { recursive: true });
   await mkdir(path.join(serviceStageDir, "runtime"), { recursive: true });
+  await cp(
+    path.join(webOsServiceSourceDir, "runtime", "dts"),
+    path.join(serviceStageDir, "runtime", "dts"),
+    { recursive: true }
+  );
 
   await Promise.all([
     writeFile(

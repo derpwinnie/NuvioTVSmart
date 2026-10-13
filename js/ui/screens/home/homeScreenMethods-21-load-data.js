@@ -88,6 +88,24 @@ export function createHomeScreenMethods21() {
       // slow addon or Trakt call never blocks catalog rows. The section paints
       // from the cached snapshot when available, or raw progress before enrichment.
 
+      startHomeContinueWatchingLoad.call(this, {
+        token,
+        watchedItemsPromise,
+        progressAllPromise,
+        recentProgressPromise,
+        progressErrors,
+        continueWatchingSourceKey,
+        continueWatchingSource,
+        startupSyncPendingAtLoad,
+        startupSyncPullPromiseAtLoad,
+        nextUpSeedOptions,
+        prefs,
+        background,
+        preserveHomeReturnState,
+        suppressContinueWatchingLoading,
+        hasExistingContinueWatchingDisplay
+      });
+
       const addons = refreshManifests
         ? await addonRepository.getInstalledAddons({
             staleWhileRevalidate: true,
@@ -260,7 +278,7 @@ export function createHomeScreenMethods21() {
         if (matchedHeroIndex >= 0) {
           this.heroIndex = matchedHeroIndex;
         }
-      } else {
+      } else if (!this.hasUserInteractedSinceHomePaint) {
         this.heroIndex = 0;
         this.heroItem = this.pickInitialHero();
       }
@@ -352,23 +370,6 @@ export function createHomeScreenMethods21() {
           });
       }
 
-      startHomeContinueWatchingLoad.call(this, {
-        token,
-        watchedItemsPromise,
-        progressAllPromise,
-        recentProgressPromise,
-        progressErrors,
-        continueWatchingSourceKey,
-        continueWatchingSource,
-        startupSyncPendingAtLoad,
-        startupSyncPullPromiseAtLoad,
-        nextUpSeedOptions,
-        prefs,
-        background,
-        preserveHomeReturnState,
-        suppressContinueWatchingLoading,
-        hasExistingContinueWatchingDisplay
-      });
       this.retryPendingCatalogRows();
     }
   };

@@ -34,18 +34,21 @@
   --modern-hero-media-height: calc(100% - var(--modern-rows-viewport-height) + 132px);
   --modern-trailer-overscan-zoom: 1.35;
   --modern-hero-copy-top-safe: 40px;
-  --modern-hero-copy-bottom-gap: 40px;
-  --modern-hero-copy-right: 52px;
+  --modern-hero-copy-bottom-gap: 32px;
+  --modern-hero-copy-right: 96px;
   --modern-hero-copy-max-width: 42%;
   --modern-hero-logo-max-width: 440px;
   --modern-hero-logo-max-height: 200px;
-  --modern-hero-title-size: calc(var(--home-poster-width) * 0.36);
+  --modern-hero-title-size: 51.52px;
+  --modern-hero-title-line-height: 66.24px;
+  --modern-hero-copy-gap: 14.72px;
   --modern-hero-title-max-width: 100%;
-  --modern-hero-meta-size: calc(var(--home-poster-width) * 0.1);
+  --modern-hero-meta-size: 24px;
   --modern-hero-meta-max-width: 100%;
-  --modern-hero-secondary-size: calc(var(--home-poster-width) * 0.085);
-  --modern-hero-description-size: 22px;
-  --modern-hero-description-max-width: min(100%, 560px);
+  --modern-hero-secondary-size: 24px;
+  --modern-hero-description-size: 25.2px;
+  --modern-hero-description-line-height: 36px;
+  --modern-hero-description-max-width: 100%;
   --home-modern-portrait-poster-width: var(--home-poster-width);
   --home-modern-portrait-poster-height: calc(var(--home-modern-portrait-poster-width) * 1.5);
   --home-modern-portrait-expanded-width: calc(var(--home-modern-portrait-poster-width) * 2.66);
@@ -61,6 +64,11 @@
 }
 
 .home-screen-shell.home-layout-modern.home-modern-landscape-posters {
+  --modern-hero-title-size: 56px;
+  --modern-hero-title-line-height: 72px;
+  --modern-hero-copy-gap: 16px;
+  --modern-hero-description-size: 28px;
+  --modern-hero-description-line-height: 40px;
   --home-row-gap: 24px;
   --modern-rows-viewport-height: 49%;
   --modern-rows-viewport-padding-bottom: 49vh;
@@ -287,7 +295,7 @@
   flex-direction: column;
   justify-content: flex-end;
   align-items: flex-start;
-  gap: 16px;
+  gap: var(--modern-hero-copy-gap);
   width: min(
     var(--modern-hero-copy-max-width),
     calc(100% - var(--home-content-start) - var(--modern-hero-copy-right))
@@ -314,7 +322,7 @@
   height: var(--modern-hero-logo-max-height);
   max-height: var(--modern-hero-logo-max-height);
   object-fit: contain;
-  object-position: left top;
+  object-position: left center;
 }
 
 .home-screen-shell .home-hero-logo.home-hero-logo-transition-enter {
@@ -349,7 +357,16 @@
 .home-screen-shell.home-layout-modern .home-hero-title-text {
   max-width: min(100%, var(--modern-hero-title-max-width));
   font-size: var(--modern-hero-title-size);
-  line-height: 0.94;
+  line-height: var(--modern-hero-title-line-height);
+}
+
+.home-screen-shell.home-layout-modern .home-hero-title-text:not(.is-hidden) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-height: 2.57143em;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .home-screen-shell.home-layout-modern .home-hero-meta-primary {
@@ -368,15 +385,15 @@
 .home-screen-shell.home-layout-modern .home-modern-hero-secondary {
   display: flex;
   flex: 0 0 auto;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 14px;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 16px;
   margin-top: 0;
   width: min(100%, var(--modern-hero-meta-max-width));
   max-width: min(100%, var(--modern-hero-meta-max-width));
   color: #b3b3b3;
   font-size: var(--modern-hero-meta-size);
-  line-height: 1.25;
+  line-height: 32px;
   font-weight: 500;
   opacity: 1;
   transition: opacity 480ms ease;
@@ -384,7 +401,7 @@
 
 .home-screen-shell.home-layout-modern .home-modern-hero-meta-group {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 12px;
   min-width: 0;
@@ -397,6 +414,10 @@
 .home-screen-shell.home-layout-modern .home-modern-hero-meta-group-leading {
   flex: 0 1 auto;
   max-width: 100%;
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .home-screen-shell.home-layout-modern .home-modern-hero-meta-group-trailing {
@@ -409,7 +430,7 @@
 .home-screen-shell.home-layout-modern .home-modern-hero-secondary {
   color: rgba(255, 255, 255, 0.88);
   font-size: var(--modern-hero-secondary-size);
-  line-height: 1.35;
+  line-height: 32px;
   font-weight: 600;
 }
 
@@ -417,6 +438,14 @@
   color: #fff;
   font-weight: 600;
   letter-spacing: 0.04em;
+}
+
+.home-screen-shell.home-layout-modern .home-modern-hero-highlight,
+.home-screen-shell.home-layout-modern .home-modern-hero-secondary-detail {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .home-screen-shell.home-layout-modern .home-modern-hero-secondary-detail {

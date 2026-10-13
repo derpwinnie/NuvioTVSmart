@@ -17,6 +17,8 @@ export function createPlayerScreenMethods31() {
       // Mark user-initiated seeks so the player can stay responsive while it settles.
       this.seekLoadingBaselineSeconds = this.getPlaybackCurrentSeconds();
       this.seekLoadingTargetSeconds = Number(seconds || 0);
+      this.seekLoadingSettled = false;
+      this.seekLoadingProgressSeconds = null;
       this.seekLoading = true;
       this.updateLoadingVisibility();
       this.prepareBitmapSubtitleForSeek(this.seekLoadingTargetSeconds);
@@ -107,6 +109,7 @@ export function createPlayerScreenMethods31() {
       }
     },
     updateLoadingVisibility() {
+      if (this.isBufferingForPauseOverlay()) this.dismissPauseOverlay();
       const overlay = this.uiRefs?.loadingOverlay;
       const bufferingSpinner = this.uiRefs?.bufferingSpinner;
       if (!overlay) {

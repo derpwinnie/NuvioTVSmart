@@ -1413,4 +1413,11 @@
     <string name="player_post_play_trailer_countdown">Előzetes %1$d múlva</string>
     <string name="player_post_play_trailer_playing">Előzetes lejátszása</string>
     <string name="player_post_play_trailer">Előzetes</string>
+
+    <string name="mdblist_show_on_hero_title">Értékelések használata a fő bannerben</string>
+    <string name="mdblist_show_on_hero_subtitle">MDBList-értékelések megjelenítése a fő bannerben (Modern és Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Értékelések sorrendje</string>
+    <string name="mdblist_rating_order_subtitle">A Modern banner az első 3 engedélyezett és elérhető értékelést jeleníti meg. A nyilakkal módosítható a sorrend.</string>
+    <string name="cd_move_up">Mozgatás fel</string>
+    <string name="cd_move_down">Mozgatás le</string>
 </resources>

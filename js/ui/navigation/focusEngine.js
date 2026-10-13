@@ -393,6 +393,20 @@ export const FocusEngine = {
     const currentScreen = Router.getCurrentScreen();
     currentScreen?.onPointerMove?.(event);
     const target = this.getPointerFocusable(event);
+    const activeElement = document.activeElement;
+    // Hover must not end an editing session while the Magic Remote travels
+    // toward the system keyboard. Explicit clicks and D-pad navigation still
+    // move focus through their existing handlers.
+    if (
+      activeElement !== target &&
+      activeElement?.matches?.(
+        "input:not([type]), input[type='text'], input[type='search'], input[type='email'], input[type='password'], input[type='url'], input[type='tel'], input[type='number'], textarea"
+      ) &&
+      !activeElement.disabled &&
+      !activeElement.readOnly
+    ) {
+      return;
+    }
     if (!target || target === this.lastPointerFocusTarget) {
       return;
     }

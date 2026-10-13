@@ -2397,4 +2397,9 @@
     <string name="player_post_play_trailer_countdown">Upoutávka za %1$d</string>
     <string name="player_post_play_trailer_playing">Upoutávka se přehrává</string>
     <string name="player_post_play_trailer">Upoutávka</string>
+
+    <string name="mdblist_show_on_hero_title">Používat hodnocení v hlavním banneru</string>
+    <string name="mdblist_show_on_hero_subtitle">Zobrazovat hodnocení MDBList v hlavním banneru (Modern a Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Pořadí hodnocení</string>
+    <string name="mdblist_rating_order_subtitle">V banneru Modern se zobrazují první 3 zapnutá a dostupná hodnocení. Pořadí změňte pomocí šipek.</string>
 </resources>

@@ -2697,4 +2697,9 @@
     <string name="auth_qr_manual_instruction">Ή μεταβείτε στο %1$s και εισάγετε τον κωδικό</string>
     <string name="unsupported_device_warning">Μπορείτε να δοκιμάσετε να εκκινήσετε το Nuvio TV, αλλά η εφαρμογή ενδέχεται να μην λειτουργεί σωστά σε αυτήν την τηλεόραση. Αυτή η διαμόρφωση δεν υποστηρίζεται επίσημα.</string>
     <string name="unsupported_device_try_anyway">Δοκιμή ούτως ή άλλως</string>
+
+    <string name="mdblist_show_on_hero_title">Χρήση βαθμολογιών στην ηρωική ενότητα</string>
+    <string name="mdblist_show_on_hero_subtitle">Εμφάνιση βαθμολογιών MDBList στο καρουζέλ της ηρωικής ενότητας (μοντέρνα και κλασική προβολή/πλέγμα)</string>
+    <string name="mdblist_rating_order_title">Σειρά βαθμολογιών</string>
+    <string name="mdblist_rating_order_subtitle">Οι πρώτες 3 ενεργοποιημένες και διαθέσιμες βαθμολογίες εμφανίζονται στη μοντέρνα ηρωική ενότητα. Χρησιμοποιήστε τα βέλη για αναδιάταξη.</string>
 </resources>

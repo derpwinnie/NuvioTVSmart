@@ -30,8 +30,7 @@ export function createPlayerScreenMethods72() {
           !this.isStartupErrorVisible() &&
           !this.isPostPlayVisible() &&
           !this.isDialogOpen() &&
-          !this.pauseOverlayVisible &&
-          !PlayerController.avplaySeekInFlight
+          !this.pauseOverlayVisible
         ) {
           event?.preventDefault?.();
           this.commitSeekPreview();

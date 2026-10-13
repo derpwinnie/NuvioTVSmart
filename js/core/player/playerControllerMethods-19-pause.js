@@ -12,6 +12,10 @@ export function createPlayerControllerMethods19() {
   return {
     pause() {
       if (!this.video) return;
+      if (this.webOsDtsAudioState) {
+        this.webOsDtsAudioState.resumePlayback = false;
+        this.webOsDtsAudioState.controlPaused = true;
+      }
 
       this.stopProgressSaving();
       this.cancelProgressSyncAfterSeek();
@@ -40,6 +44,10 @@ export function createPlayerControllerMethods19() {
     },
     resume() {
       if (!this.video) return;
+      if (this.webOsDtsAudioState) {
+        this.webOsDtsAudioState.resumePlayback = true;
+        this.webOsDtsAudioState.controlPaused = false;
+      }
 
       this.cancelProgressSyncAfterSeek();
       this.flushCurrentProgress({ allowCloudSync: false });
@@ -93,6 +101,7 @@ export function createPlayerControllerMethods19() {
       this.syncWebOsPlaybackKeepAwake();
     },
     stop({ forceCloudSync = true, allowCloudSync = true, flushProgress = true } = {}) {
+      this.stopWebOsDtsAudioTranscode({ resetFailures: true });
       this.stopWebOsPlaybackKeepAlive();
       this.stopWebOsServiceKeepAlive();
       if (!this.video) return;

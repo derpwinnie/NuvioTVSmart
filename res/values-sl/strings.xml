@@ -2579,4 +2579,9 @@
     <string name="player_post_play_trailer_countdown">Napovednik čez %1$d</string>
     <string name="player_post_play_trailer_playing">Napovednik se predvaja</string>
     <string name="player_post_play_trailer">Napovednik</string>
+
+    <string name="mdblist_show_on_hero_title">Uporabi ocene v glavni pasici</string>
+    <string name="mdblist_show_on_hero_subtitle">Prikaži ocene MDBList v glavni pasici (Modern in Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Vrstni red ocen</string>
+    <string name="mdblist_rating_order_subtitle">V pasici Modern so prikazane prve 3 omogočene in razpoložljive ocene. S puščicami spremenite vrstni red.</string>
 </resources>

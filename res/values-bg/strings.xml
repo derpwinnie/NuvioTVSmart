@@ -87,4 +87,11 @@
     <string name="player_post_play_trailer_countdown">Трейлър след %1$d</string>
     <string name="player_post_play_trailer_playing">Трейлърът се възпроизвежда</string>
     <string name="player_post_play_trailer">Трейлър</string>
+
+    <string name="mdblist_show_on_hero_title">Използване на оценки в основния банер</string>
+    <string name="mdblist_show_on_hero_subtitle">Показване на оценки от MDBList в основния банер (Modern и Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Ред на оценките</string>
+    <string name="mdblist_rating_order_subtitle">В банера Modern се показват първите 3 включени и налични оценки. Използвайте стрелките за промяна на реда.</string>
+    <string name="cd_move_up">Премести нагоре</string>
+    <string name="cd_move_down">Премести надолу</string>
 </resources>

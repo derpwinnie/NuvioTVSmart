@@ -239,6 +239,7 @@ export function renderHeroMarkup(layoutMode, heroItem, heroCandidates) {
           <div class="home-hero-meta-primary${display.metaPrimary.length ? "" : " is-empty"}">${renderMetaTokens(display.metaPrimary)}</div>
           <div class="home-hero-chip-row${display.chips.length ? "" : " is-empty"}">${display.chips.map((chip) => `<span class="home-hero-chip">${escapeHtml(chip)}</span>`).join("")}</div>
           <div class="home-hero-meta-secondary${display.metaSecondary.length ? "" : " is-empty"}">${renderMetaTokens(display.metaSecondary)}</div>
+          <div class="home-hero-mdb-ratings${display.mdbListMarkup ? "" : " is-empty"}">${display.mdbListMarkup || ""}</div>
           <p class="home-hero-description">${escapeHtml(display.description)}</p>
         </div>
         <div class="home-hero-indicators">${buildHeroIndicators(heroCandidates, heroItem)}</div>

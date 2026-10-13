@@ -92,4 +92,11 @@
     <string name="unsupported_device_close">Zatvori</string>
     <string name="unsupported_device_try_anyway">Ipak pokreni</string>
     <string name="unsupported_device_unavailable">Nije dostupno</string>
+
+    <string name="mdblist_show_on_hero_title">Koristi ocene u glavnom baneru</string>
+    <string name="mdblist_show_on_hero_subtitle">Prikaži MDBList ocene u glavnom baneru (Modern i Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Redosled ocena</string>
+    <string name="mdblist_rating_order_subtitle">U baneru Modern prikazuju se prve 3 uključene i dostupne ocene. Koristite strelice za promenu redosleda.</string>
+    <string name="cd_move_up">Pomeri nagore</string>
+    <string name="cd_move_down">Pomeri nadole</string>
 </resources>

@@ -1815,4 +1815,9 @@
     <string name="player_post_play_trailer_countdown">Trailer om %1$d</string>
     <string name="player_post_play_trailer_playing">Trailer spelas upp</string>
     <string name="player_post_play_trailer">Trailer</string>
+
+    <string name="mdblist_show_on_hero_title">Använd betyg i huvudbannern</string>
+    <string name="mdblist_show_on_hero_subtitle">Visa MDBList-betyg i huvudbannern (Modern och Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Betygsordning</string>
+    <string name="mdblist_rating_order_subtitle">Modern-bannern visar de första 3 aktiverade och tillgängliga betygen. Använd pilarna för att ändra ordningen.</string>
 </resources>

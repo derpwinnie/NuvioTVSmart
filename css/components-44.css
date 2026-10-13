@@ -177,7 +177,6 @@
 .stream-route-chip-spinner {
   width: 42px;
   height: 42px;
-  color: inherit;
 }
 
 .stream-route-panel-shell {
@@ -348,8 +347,8 @@
   animation: none !important;
 }
 
-.performance-constrained .nuvio-loading-indicator-spoke {
-  animation-duration: 1000ms !important;
+.performance-constrained .nuvio-loading-indicator-arc {
+  animation-duration: 2000ms !important;
   animation-iteration-count: infinite !important;
 }
 

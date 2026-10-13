@@ -2307,4 +2307,9 @@
     <string name="player_post_play_trailer_countdown">العرض الدعائي خلال %1$d</string>
     <string name="player_post_play_trailer_playing">العرض الدعائي قيد التشغيل</string>
     <string name="player_post_play_trailer">العرض الدعائي</string>
+
+    <string name="mdblist_show_on_hero_title">استخدام التقييمات في الواجهة الرئيسية</string>
+    <string name="mdblist_show_on_hero_subtitle">عرض تقييمات MDBList في واجهة المحتوى الرئيسية (Modern وClassic/Grid)</string>
+    <string name="mdblist_rating_order_title">ترتيب التقييمات</string>
+    <string name="mdblist_rating_order_subtitle">تعرض واجهة Modern أول ثلاثة تقييمات مفعلة ومتاحة. استخدم الأسهم لتغيير ترتيبها.</string>
 </resources>

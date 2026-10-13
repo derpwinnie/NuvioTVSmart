@@ -38,6 +38,22 @@ export function createAuthQrSignInScreenMethods01() {
       this.isServerMenuOpen = false;
       this.focusAfterRender = null;
       this.showSignOutConfirmation = false;
+      this.lastActivation = null;
+      if (!this.container.__nuvioActivationDedupe) {
+        this.container.__nuvioActivationDedupe = true;
+        this.container.addEventListener(
+          "click",
+          (event) => {
+            const target = event.target?.closest?.("[data-action], .focusable, button");
+            if (!target || !this.container?.contains(target) || target.matches("input, textarea")) return;
+            if (this.isActivationDuplicated("click")) {
+              event.stopImmediatePropagation();
+              event.preventDefault();
+            }
+          },
+          true
+        );
+      }
       this.isSignedIn = AuthManager.isAuthenticated;
       this.connectedStats = null;
       this.isConnectedStatsLoading = this.isSignedIn;

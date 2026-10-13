@@ -1442,4 +1442,11 @@
     <string name="player_post_play_trailer_countdown">%1$d में ट्रेलर</string>
     <string name="player_post_play_trailer_playing">ट्रेलर चल रहा है</string>
     <string name="player_post_play_trailer">ट्रेलर</string>
+
+    <string name="mdblist_show_on_hero_title">मुख्य बैनर में रेटिंग इस्तेमाल करें</string>
+    <string name="mdblist_show_on_hero_subtitle">मुख्य बैनर में MDBList रेटिंग दिखाएँ (Modern और Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">रेटिंग का क्रम</string>
+    <string name="mdblist_rating_order_subtitle">Modern बैनर में पहली 3 सक्षम और उपलब्ध रेटिंग दिखाई जाती हैं। क्रम बदलने के लिए तीरों का इस्तेमाल करें।</string>
+    <string name="cd_move_up">ऊपर ले जाएँ</string>
+    <string name="cd_move_down">नीचे ले जाएँ</string>
 </resources>

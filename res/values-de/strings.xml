@@ -2464,4 +2464,9 @@
     <string name="player_post_play_trailer_countdown">Trailer in %1$d</string>
     <string name="player_post_play_trailer_playing">Trailer wird abgespielt</string>
     <string name="player_post_play_trailer">Trailer</string>
+
+    <string name="mdblist_show_on_hero_title">Bewertungen im Hauptbanner verwenden</string>
+    <string name="mdblist_show_on_hero_subtitle">MDBList-Bewertungen im Hauptbanner anzeigen (Modern und Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Reihenfolge der Bewertungen</string>
+    <string name="mdblist_rating_order_subtitle">Im Modern-Banner werden die ersten 3 aktivierten und verfügbaren Bewertungen angezeigt. Mit den Pfeilen lässt sich die Reihenfolge ändern.</string>
 </resources>

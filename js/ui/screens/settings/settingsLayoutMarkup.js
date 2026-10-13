@@ -115,6 +115,9 @@ export function renderLayoutMarkup(model) {
                   })
                 : ""
             }
+            ${
+              !isModernLayout
+                ? `
             ${this.renderToggleRow({
               focusKey: "layout:heroSection",
               title: t("settings.layout.heroSection.title"),
@@ -122,6 +125,9 @@ export function renderLayoutMarkup(model) {
               checked: Boolean(model.layout.heroSectionEnabled)
             })}
             ${model.layout.heroSectionEnabled ? this.renderActionRow({ focusKey: "layout:heroCatalogs", title: t("layout_hero_catalog", {}, "Hero catalogs"), subtitle: t("layout_hero_catalog_sub", {}, "Choose catalogs used by the Hero section"), value: model.layout.heroCatalogKeys?.length ? String(model.layout.heroCatalogKeys.length) : t("common_all", {}, "All") }) : ""}
+            `
+                : ""
+            }
             ${this.renderActionRow({
               focusKey: "layout:searchDiscover",
               title: t("layout_discover_location_action", {}, "Discover location"),

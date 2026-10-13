@@ -31,11 +31,11 @@
   .home-screen-shell.home-layout-modern .home-modern-hero-copy {
     left: 104px;
     top: 40px;
-    right: 52px;
-    bottom: 60vh;
-    width: 640px;
-    max-width: 640px;
-    gap: 16px;
+    right: var(--modern-hero-copy-right);
+    bottom: calc(var(--modern-rows-viewport-height) + var(--modern-hero-copy-bottom-gap));
+    width: 42%;
+    max-width: 100%;
+    gap: var(--modern-hero-copy-gap);
   }
 
   .home-screen-shell.home-layout-modern .home-hero-logo {
@@ -47,26 +47,26 @@
 
   .home-screen-shell.home-layout-modern .home-hero-title-text {
     max-width: 640px;
-    font-size: 76px;
+    font-size: var(--modern-hero-title-size);
   }
 
   .home-screen-shell.home-layout-modern .home-modern-hero-meta-line,
   .home-screen-shell.home-layout-modern .home-modern-hero-secondary,
   .home-screen-shell.home-layout-modern .home-hero-description {
-    width: 560px;
-    max-width: 560px;
+    width: 100%;
+    max-width: 100%;
   }
 
   .home-screen-shell.home-layout-modern .home-modern-hero-meta-line {
-    font-size: 21px;
+    font-size: var(--modern-hero-meta-size);
   }
 
   .home-screen-shell.home-layout-modern .home-modern-hero-secondary {
-    font-size: 18px;
+    font-size: var(--modern-hero-secondary-size);
   }
 
   .home-screen-shell.home-layout-modern .home-hero-description {
-    font-size: 22px;
+    font-size: var(--modern-hero-description-size);
   }
 
   .player-controls-overlay {
@@ -289,7 +289,7 @@
 .legacy-tizen .home-screen-shell.home-layout-modern .home-hero-description {
   /* The measured truncation pass is skipped on these runtimes. Keep the
      Android TV four-line limit in CSS so long synopses cannot lift the title. */
-  max-height: 5.4em;
+  max-height: 5.71429em;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;

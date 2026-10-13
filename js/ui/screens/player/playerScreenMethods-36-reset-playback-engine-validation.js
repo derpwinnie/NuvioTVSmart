@@ -280,18 +280,7 @@ export function createPlayerScreenMethods36() {
         );
       }
       if (this.seekLoading) {
-        const seekBaselineSeconds = Number(this.seekLoadingBaselineSeconds);
-        const seekTargetSeconds = Number(this.seekLoadingTargetSeconds);
-        const reachedSeekTarget =
-          Number.isFinite(currentSeconds) && Number.isFinite(seekTargetSeconds) && Math.abs(currentSeconds - seekTargetSeconds) <= 0.75;
-        if (
-          (reachedSeekTarget && this.isPlaybackFrameReady()) ||
-          (Number.isFinite(currentSeconds) &&
-            Number.isFinite(seekBaselineSeconds) &&
-            currentSeconds > seekBaselineSeconds + STARTUP_PLAYBACK_ADVANCE_EPSILON_SECONDS)
-        ) {
-          this.clearSeekLoading({ hideBuffering: reachedSeekTarget });
-        }
+        this.completeSeekLoadingIfReady();
       }
       this.bufferingSpinnerBaselineSeconds = currentSeconds;
       this.lastPlaybackProgressAt = Date.now();
@@ -304,6 +293,11 @@ export function createPlayerScreenMethods36() {
         this.updateLoadingVisibility();
       }
       this.scheduleBufferingSpinnerRefresh();
+      // Audio startup can finish after the last playing event. Reconsider the
+      // initial advisory on actual progress rather than waiting for a later seek.
+      if (!this.parentalGuideShown && !this.isBufferingForPauseOverlay()) {
+        this.maybeShowParentalGuideOverlay();
+      }
     },
     getCurrentEngineFsStatsUrl() {
       const state = this.currentEngineFsStream || null;

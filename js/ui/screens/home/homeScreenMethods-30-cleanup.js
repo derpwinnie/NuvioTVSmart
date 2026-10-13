@@ -6,6 +6,7 @@ export function createHomeScreenMethods30() {
 
   return {
     cleanup() {
+      this.heroMdbListRequest = null;
       if (this.unsubscribeStartupSyncPullCompleted) {
         this.unsubscribeStartupSyncPullCompleted();
         this.unsubscribeStartupSyncPullCompleted = null;

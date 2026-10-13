@@ -286,7 +286,7 @@ export function createPlayerScreenMethods19() {
         PlayerSettingsStore.get().pauseOverlayEnabled !== false &&
         !this.isExternalFrameMode() &&
         this.paused &&
-        !this.loadingVisible &&
+        !this.isBufferingForPauseOverlay() &&
         !this.seekOverlayVisible &&
         this.seekPreviewSeconds == null &&
         !this.isDialogOpen() &&

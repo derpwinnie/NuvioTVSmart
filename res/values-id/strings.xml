@@ -2478,4 +2478,9 @@
     <string name="player_post_play_trailer_countdown">Trailer dalam %1$d</string>
     <string name="player_post_play_trailer_playing">Trailer sedang diputar</string>
     <string name="player_post_play_trailer">Trailer</string>
+
+    <string name="mdblist_show_on_hero_title">Gunakan rating di banner utama</string>
+    <string name="mdblist_show_on_hero_subtitle">Tampilkan rating MDBList di banner utama (Modern dan Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Urutan rating</string>
+    <string name="mdblist_rating_order_subtitle">Banner Modern menampilkan 3 rating pertama yang diaktifkan dan tersedia. Gunakan panah untuk mengubah urutan.</string>
 </resources>

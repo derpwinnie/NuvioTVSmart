@@ -442,6 +442,7 @@ export function getAudioTrackSupportState(track = {}) {
   const supported = !isUnsupportedWebOsAudioTrack(track);
   return {
     supported,
+    canTryAudioConversion: !supported && Environment.isWebOS() && /dts|true[\s_-]*hd/i.test(getWebOsAudioTrackCompatibilityText(track)),
     unsupportedReason: supported ? null : "codec"
   };
 }

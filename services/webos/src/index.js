@@ -1519,3 +1519,20 @@ registerBitmapSubtitleCommand();
 registerEmbeddedTextSubtitleCommand();
 registerTorrentProxyCommands();
 registerEngineFsDiagnosticCommand();
+
+var audioTranscode = require("./audioTranscode");
+service.register("audioTranscodeCreate", function (message) {
+  ensureRuntimeStarted();
+  audioTranscode.createSession(message.payload || {}).then(
+    function (result) {
+      message.respond(Object.assign({ returnValue: true }, result));
+    },
+    function () {
+      message.respond({ returnValue: false, errorText: "Audio conversion unavailable" });
+    }
+  );
+});
+service.register("audioTranscodeStop", function (message) {
+  audioTranscode.stop((message.payload || {}).id);
+  message.respond({ returnValue: true });
+});

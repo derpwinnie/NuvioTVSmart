@@ -2,8 +2,18 @@
 import * as internals from "./authQrSignInScreen.js";
 
 export function createAuthQrSignInScreenMethods02() {
-  const { Router, QrLoginService, LocalStore, I18n, QrCodeGenerator, GUEST_QR_BYPASS_KEY, escapeHtml, formatDuration, parseQrExpiration } =
-    internals;
+  const {
+    Platform,
+    Router,
+    QrLoginService,
+    LocalStore,
+    I18n,
+    QrCodeGenerator,
+    GUEST_QR_BYPASS_KEY,
+    escapeHtml,
+    formatDuration,
+    parseQrExpiration
+  } = internals;
 
   return {
     bindControls() {
@@ -62,6 +72,24 @@ export function createAuthQrSignInScreenMethods02() {
       }
       this.isServerMenuOpen = !this.isServerMenuOpen;
       this.render();
+    },
+    suppressNativeActivation(event) {
+      if (!Platform.isWebOS()) return false;
+      event?.preventDefault?.();
+      return this.isActivationDuplicated("keydown");
+    },
+    isActivationDuplicated(kind) {
+      if (!Platform.isWebOS()) return false;
+      const now = Date.now();
+      const previous = this.lastActivation;
+      // Consume only the opposite event in a key/click pair. Do not debounce
+      // consecutive OK presses or pointer clicks, or extend a consumed pair.
+      if (previous && previous.kind !== kind && now - previous.at >= 0 && now - previous.at <= 400) {
+        this.lastActivation = null;
+        return true;
+      }
+      this.lastActivation = { kind, at: now };
+      return false;
     },
     toggleLoginMode(useEmail) {
       // Auth requests already in flight cannot safely be cancelled.

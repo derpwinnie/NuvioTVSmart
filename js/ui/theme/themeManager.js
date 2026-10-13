@@ -1,3 +1,4 @@
+import { syncLoadingIndicatorPalette } from "../components/loadingIndicator.js";
 import { MemberAccessRepository } from "../../data/remote/supabase/memberAccessRepository.js";
 import { accentColorForTheme, ThemeStore } from "../../data/local/themeStore.js";
 import { syncBrandWordmarks } from "../components/brandWordmark.js";
@@ -225,6 +226,7 @@ export const ThemeManager = {
     );
     document.documentElement.dataset.nuvioTheme = themeName;
     syncBrandWordmarks(themeName);
+    syncLoadingIndicatorPalette(colors);
     document.documentElement.style.setProperty("color-scheme", "dark");
 
     if (!SUPPORTS_CSS_VARS) {

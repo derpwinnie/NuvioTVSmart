@@ -184,6 +184,7 @@ export function createPlayerScreenMethods59() {
               ? embeddedTrackIndex === this.selectedEmbeddedAudioTrackIndex
               : index === this.selectedAudioTrackIndex,
           supported: support.supported,
+          canTryAudioConversion: Boolean(support.canTryAudioConversion),
           unsupportedReason: support.unsupportedReason,
           audioTrackIndex: index,
           track: {
@@ -213,6 +214,7 @@ export function createPlayerScreenMethods59() {
           secondary: display.secondary,
           selected: normalizedEmbeddedIndex === this.selectedEmbeddedAudioTrackIndex,
           supported: support.supported,
+          canTryAudioConversion: Boolean(support.canTryAudioConversion),
           unsupportedReason: support.unsupportedReason,
           embeddedAudioTrackIndex: normalizedEmbeddedIndex,
           track: {

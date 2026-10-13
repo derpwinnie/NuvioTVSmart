@@ -2736,4 +2736,9 @@
     <string name="player_post_play_trailer_countdown">Bande-annonce dans %1$d</string>
     <string name="player_post_play_trailer_playing">Bande-annonce en cours</string>
     <string name="player_post_play_trailer">Bande-annonce</string>
+
+    <string name="mdblist_show_on_hero_title">Utiliser les notes dans le bandeau principal</string>
+    <string name="mdblist_show_on_hero_subtitle">Afficher les notes MDBList dans le bandeau principal (Modern et Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Ordre des notes</string>
+    <string name="mdblist_rating_order_subtitle">Le bandeau Modern affiche les 3 premières notes activées et disponibles. Utilisez les flèches pour modifier leur ordre.</string>
 </resources>

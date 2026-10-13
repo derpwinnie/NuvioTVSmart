@@ -1323,4 +1323,11 @@ Klaida: Bandomoji simuliuojama klaida — tai nėra tikras gedimas. Šaltinis gr
     <string name="player_post_play_trailer_countdown">Anonsas po %1$d</string>
     <string name="player_post_play_trailer_playing">Anonsas leidžiamas</string>
     <string name="player_post_play_trailer">Anonsas</string>
+
+    <string name="mdblist_show_on_hero_title">Naudoti įvertinimus pagrindinėje juostoje</string>
+    <string name="mdblist_show_on_hero_subtitle">Rodyti MDBList įvertinimus pagrindinėje juostoje (Modern ir Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Įvertinimų tvarka</string>
+    <string name="mdblist_rating_order_subtitle">Modern juostoje rodomi pirmi 3 įjungti ir prieinami įvertinimai. Rodyklėmis pakeiskite jų tvarką.</string>
+    <string name="cd_move_up">Perkelti aukštyn</string>
+    <string name="cd_move_down">Perkelti žemyn</string>
 </resources>

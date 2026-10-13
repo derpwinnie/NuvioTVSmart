@@ -2,7 +2,7 @@
 import * as internals from "./playerScreenContext.js";
 
 export function createPlayerScreenMethods28() {
-  const { t, clamp, escapeHtml } = internals;
+  const { PlayerController, t, clamp, escapeHtml } = internals;
 
   return {
     unbindVideoEvents() {
@@ -11,14 +11,23 @@ export function createPlayerScreenMethods28() {
       });
       this.videoListeners = [];
     },
+    getPlaybackControlPaused() {
+      const conversion = PlayerController.webOsDtsAudioState;
+      // Native decoder pauses during a track reload are not user commands.
+      if (conversion && (conversion.preparing || conversion.cancelReload || conversion.buffering)) {
+        return conversion.controlPaused;
+      }
+      return this.paused;
+    },
     getControlDefinitions() {
+      const paused = this.getPlaybackControlPaused();
       const uiState = this.getPlayerUiState();
       const nextEpisode = this.resolveNextEpisodeInfo();
       const base = [
         {
           action: "playPause",
-          label: this.paused ? ">" : "II",
-          icon: this.paused ? "assets/icons/ic_player_play.svg" : "assets/icons/ic_player_pause.svg",
+          label: paused ? ">" : "II",
+          icon: paused ? "assets/icons/ic_player_play.svg" : "assets/icons/ic_player_pause.svg",
           title: "Play/Pause",
           primary: true
         }

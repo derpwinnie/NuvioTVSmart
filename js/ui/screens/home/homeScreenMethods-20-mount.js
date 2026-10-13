@@ -221,7 +221,7 @@ export function createHomeScreenMethods20() {
       // prevents catalog cards from becoming the accidental focus anchor.
       this.continueWatchingLoading = continueWatchingEnabled && !this.continueWatchingInitialResolved;
       this.heroCandidates = [];
-      this.heroItem = null;
+      this.heroItem = this.pickInitialHero();
       // Paint from local profile/member/avatar state first. Remote membership and
       // avatar refresh is already started by loadData after this first render.
       this.sidebarProfile = await getSidebarProfileState({ cacheOnly: true }).catch(() => null);
@@ -256,7 +256,7 @@ export function createHomeScreenMethods20() {
           if (loadToken !== this.homeLoadToken || Router.getCurrent() !== "home") {
             return;
           }
-          this.releaseInitialHomeLoading();
+          this.releaseInitialHomeLoading({ force: true });
           console.error("Home background load failed", error);
           this.requestBackgroundRender();
         });

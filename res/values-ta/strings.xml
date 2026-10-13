@@ -2466,4 +2466,9 @@
     <string name="player_post_play_trailer_countdown">%1$d இல் டிரெய்லர்</string>
     <string name="player_post_play_trailer_playing">டிரெய்லர் இயங்குகிறது</string>
     <string name="player_post_play_trailer">டிரெய்லர்</string>
+
+    <string name="mdblist_show_on_hero_title">முதன்மை பேனரில் மதிப்பீடுகளைப் பயன்படுத்து</string>
+    <string name="mdblist_show_on_hero_subtitle">முதன்மை பேனரில் MDBList மதிப்பீடுகளைக் காட்டு (Modern மற்றும் Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">மதிப்பீடுகளின் வரிசை</string>
+    <string name="mdblist_rating_order_subtitle">Modern பேனரில் இயக்கப்பட்டு கிடைக்கும் முதல் 3 மதிப்பீடுகள் காட்டப்படும். வரிசையை மாற்ற அம்புகளைப் பயன்படுத்தவும்.</string>
 </resources>

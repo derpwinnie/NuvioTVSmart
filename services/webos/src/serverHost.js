@@ -1,3 +1,4 @@
+var audioTranscode = require("./audioTranscode");
 var fs = require("fs");
 var http = require("http");
 var path = require("path");
@@ -120,6 +121,7 @@ function installImageProxyHttpHook() {
     }
 
     var wrapped = function (req, res) {
+      if (audioTranscode.handle(req, res)) return;
       if (supabaseProxyHandler(req, res)) {
         return;
       }

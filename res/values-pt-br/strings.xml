@@ -2848,4 +2848,9 @@
     <string name="auth_qr_manual_instruction">Or go to %1$s and enter</string>
     <string name="unsupported_device_warning">Você pode tentar iniciar o Nuvio TV mesmo assim, mas o aplicativo pode não funcionar corretamente nesta TV. Esta configuração não tem suporte oficial.</string>
     <string name="unsupported_device_try_anyway">Tentar mesmo assim</string>
+
+    <string name="mdblist_show_on_hero_title">Usar avaliações no destaque</string>
+    <string name="mdblist_show_on_hero_subtitle">Mostrar avaliações do MDBList no destaque (Modern e Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Ordem das avaliações</string>
+    <string name="mdblist_rating_order_subtitle">O destaque Modern mostra as 3 primeiras avaliações ativadas e disponíveis. Use as setas para alterar a ordem.</string>
 </resources>

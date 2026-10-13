@@ -1715,4 +1715,11 @@
     <string name="auth_qr_manual_instruction">Or go to %1$s and enter</string>
     <string name="unsupported_device_warning">אפשר לנסות להפעיל את Nuvio TV בכל זאת, אך ייתכן שהאפליקציה לא תפעל כראוי בטלוויזיה הזו. תצורה זו אינה נתמכת באופן רשמי.</string>
     <string name="unsupported_device_try_anyway">נסה בכל זאת</string>
+
+    <string name="mdblist_show_on_hero_title">שימוש בדירוגים בבאנר הראשי</string>
+    <string name="mdblist_show_on_hero_subtitle">הצגת דירוגי MDBList בבאנר הראשי (Modern ו-Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">סדר הדירוגים</string>
+    <string name="mdblist_rating_order_subtitle">בבאנר Modern מוצגים 3 הדירוגים הראשונים שמופעלים וזמינים. השתמשו בחצים כדי לשנות את הסדר.</string>
+    <string name="cd_move_up">הזזה למעלה</string>
+    <string name="cd_move_down">הזזה למטה</string>
 </resources>

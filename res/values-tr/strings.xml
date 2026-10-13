@@ -2827,4 +2827,9 @@
     <string name="player_post_play_trailer_countdown">Fragman %1$d sonra</string>
     <string name="player_post_play_trailer_playing">Fragman oynatılıyor</string>
     <string name="player_post_play_trailer">Fragman</string>
+
+    <string name="mdblist_show_on_hero_title">Hero Alanında Puanları Göster</string>
+    <string name="mdblist_show_on_hero_subtitle">Hero karuselinde MDBList puanlarını göster (modern ve klasik/ızgara)</string>
+    <string name="mdblist_rating_order_title">Puan Sıralaması</string>
+    <string name="mdblist_rating_order_subtitle">Etkin ve kullanılabilir ilk 3 puan modern hero alanında gösterilir. Sıralamak için okları kullanın.</string>
 </resources>

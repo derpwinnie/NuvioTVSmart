@@ -2917,4 +2917,11 @@
     <string name="player_post_play_trailer_countdown">Trailer tra %1$d</string>
     <string name="player_post_play_trailer_playing">Trailer in riproduzione</string>
     <string name="player_post_play_trailer">Trailer</string>
+    <string name="player_audio_dts_conversion_warning">L’audio DTS potrebbe non funzionare su questa TV: la ricodifica automatica non è disponibile per questa traccia.</string>
+    <string name="player_audio_conversion_warning">L’audio potrebbe non funzionare su questa TV perché la ricodifica automatica non è disponibile per questa traccia.</string>
+
+    <string name="mdblist_show_on_hero_title">Usa le valutazioni nell’hero</string>
+    <string name="mdblist_show_on_hero_subtitle">Mostra le valutazioni MDBList nell’hero (Modern e Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Ordine delle valutazioni</string>
+    <string name="mdblist_rating_order_subtitle">Nell’hero Modern vengono mostrate le prime 3 valutazioni abilitate e disponibili. Usa le frecce per cambiarne l’ordine.</string>
 </resources>

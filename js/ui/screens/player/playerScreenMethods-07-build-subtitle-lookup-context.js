@@ -276,6 +276,7 @@ export function createPlayerScreenMethods07() {
         !this.parentalWarnings.length ||
         this.paused ||
         this.loadingVisible ||
+        this.isBufferingForPauseOverlay() ||
         this.startupAudioGateActive ||
         !this.hasPresentedPlaybackFrame
       ) {

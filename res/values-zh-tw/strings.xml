@@ -89,4 +89,11 @@
     <string name="player_post_play_trailer_countdown">%1$d 秒後播放預告片</string>
     <string name="player_post_play_trailer_playing">正在播放預告片</string>
     <string name="player_post_play_trailer">預告片</string>
+
+    <string name="mdblist_show_on_hero_title">在主橫幅中使用評分</string>
+    <string name="mdblist_show_on_hero_subtitle">在主橫幅中顯示MDBList評分（Modern和Classic/Grid）</string>
+    <string name="mdblist_rating_order_title">評分順序</string>
+    <string name="mdblist_rating_order_subtitle">Modern橫幅顯示前3個已啟用且可用的評分。使用箭頭調整順序。</string>
+    <string name="cd_move_up">上移</string>
+    <string name="cd_move_down">下移</string>
 </resources>

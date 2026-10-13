@@ -239,9 +239,7 @@ function renderModernHeroMarkup({
   if (!display) {
     return "";
   }
-  const primaryLeft = display.leadingMeta
-    .map((token) => `<span>${escapeHtml(token)}</span>`)
-    .join('<span class="home-hero-dot">•</span>');
+  const primaryLeft = escapeHtml(display.leadingMeta.filter(Boolean).join(" • "));
   const primaryRightParts = display.trailingMeta.map(
     (token) => `<span>${escapeHtml(token)}</span>`
   );
@@ -276,6 +274,7 @@ function renderModernHeroMarkup({
       `<span class="home-modern-hero-secondary-detail">${escapeHtml(display.languageText)}</span>`
     );
   }
+  if (display.mdbListMarkup) secondaryParts.push(display.mdbListMarkup);
   return `
     <section class="home-hero home-hero-modern">
       <article class="home-hero-card home-modern-hero-card${heroItem?.heroMetaEnriching ? " is-hero-meta-enriching" : ""}"
@@ -308,7 +307,7 @@ function renderModernHeroMarkup({
               ${primaryRightParts.join('<span class="home-hero-dot">•</span>')}
             </div>
           </div>
-          <div class="home-modern-hero-secondary${display.secondaryHighlightText || display.badges.length || display.showImdbSecondary || display.languageText ? "" : " is-empty"}">
+          <div class="home-modern-hero-secondary${display.secondaryHighlightText || display.badges.length || display.showImdbSecondary || display.languageText || display.mdbListMarkup ? "" : " is-empty"}">
             ${secondaryParts.join('<span class="home-hero-dot">•</span>')}
           </div>
           <p class="home-hero-description${display.description ? "" : " is-empty"}">${escapeHtml(display.description)}</p>

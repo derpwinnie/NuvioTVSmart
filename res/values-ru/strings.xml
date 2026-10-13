@@ -2517,4 +2517,9 @@
     <string name="player_post_play_trailer_countdown">Трейлер через %1$d</string>
     <string name="player_post_play_trailer_playing">Воспроизводится трейлер</string>
     <string name="player_post_play_trailer">Трейлер</string>
+
+    <string name="mdblist_show_on_hero_title">Использовать оценки в главном баннере</string>
+    <string name="mdblist_show_on_hero_subtitle">Показывать оценки MDBList в главном баннере (Modern и Classic/Grid)</string>
+    <string name="mdblist_rating_order_title">Порядок оценок</string>
+    <string name="mdblist_rating_order_subtitle">В баннере Modern отображаются первые 3 включённые и доступные оценки. Используйте стрелки, чтобы изменить порядок.</string>
 </resources>

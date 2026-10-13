@@ -22,12 +22,7 @@ export function createHomeScreenMethods22() {
   return {
     pickInitialHero() {
       if (this.layoutMode === "modern" && this.layoutPrefs?.continueWatchingEnabled !== false) {
-        if (
-          this.continueWatchingLoading &&
-          Array.isArray(this.continueWatching) &&
-          this.continueWatching.length &&
-          !this.continueWatchingDisplay?.length
-        ) {
+        if (this.continueWatchingLoading && !this.continueWatchingInitialResolved && !this.continueWatchingDisplay?.length) {
           return null;
         }
         const continueHero = normalizeContinueWatchingItem(this.continueWatchingDisplay?.[0] || null);
