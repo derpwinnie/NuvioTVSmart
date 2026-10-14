@@ -2,6 +2,7 @@
 import * as internals from "./playerScreenContext.js";
 import { Platform } from "../../../platform/index.js";
 import { armVidaaBufferGap, VIDAA_RESUME_GAP_SECONDS, VIDAA_SEEK_GAP_SECONDS } from "../../../platform/vidaa/vidaaBufferGap.js";
+import { decideVidaaResumeRestore, timeRangesToArray, VIDAA_RESTORE_RETRY_MS } from "../../../platform/vidaa/vidaaResumeRestore.js";
 
 export function createPlayerScreenMethods31() {
   const { PlayerController, PlayerSettingsStore, t, escapeHtml, formatNextEpisodeAirDate } = internals;
@@ -49,6 +50,7 @@ export function createPlayerScreenMethods31() {
         return;
       }
       this.pendingPlaybackRestore = null;
+      this.clearVidaaRestoreRetryTimer();
       const currentSeconds = this.getPlaybackCurrentSeconds();
       this.startupPlaybackBaselineSeconds = Number.isFinite(currentSeconds) ? currentSeconds : null;
       this.startupPlaybackHasAdvanced = false;
@@ -59,10 +61,33 @@ export function createPlayerScreenMethods31() {
       }
       this.paused = false;
     },
+    // VIDAA can drop the resume seek and then fire no more events; retry on a timer.
+    startVidaaRestoreRetryTimer() {
+      if (this.vidaaRestoreRetryTimer) {
+        return;
+      }
+      this.vidaaRestoreRetryTimer = setInterval(() => {
+        if (!this.pendingPlaybackRestore) {
+          this.clearVidaaRestoreRetryTimer();
+          return;
+        }
+        this.attemptPendingPlaybackRestore();
+      }, VIDAA_RESTORE_RETRY_MS);
+    },
+    clearVidaaRestoreRetryTimer() {
+      if (this.vidaaRestoreRetryTimer) {
+        clearInterval(this.vidaaRestoreRetryTimer);
+        this.vidaaRestoreRetryTimer = null;
+      }
+    },
     attemptPendingPlaybackRestore({ force = false } = {}) {
       const restore = this.pendingPlaybackRestore;
       if (!restore) {
         return;
+      }
+      const isVidaa = Platform.isVidaa();
+      if (isVidaa) {
+        this.startVidaaRestoreRetryTimer();
       }
 
       const durationSeconds = this.getPlaybackDurationSeconds();
@@ -105,11 +130,35 @@ export function createPlayerScreenMethods31() {
         return;
       }
 
+      let seekSeconds = targetSeconds;
+      if (isVidaa) {
+        const video = PlayerController.video;
+        const decision = decideVidaaResumeRestore({
+          targetSeconds,
+          ranges: timeRangesToArray(video?.buffered),
+          seeking: Boolean(video?.seeking),
+          force,
+          attempts: Number(restore.attempts || 0)
+        });
+        if (decision.action === "wait") {
+          return;
+        }
+        if (decision.action === "give-up") {
+          console.warn("VIDAA resume restore gave up", {
+            targetSeconds: Math.round(targetSeconds),
+            currentSeconds: Number.isFinite(currentSeconds) ? Math.round(currentSeconds) : null
+          });
+          this.finalizePendingPlaybackRestore(restore);
+          return;
+        }
+        seekSeconds = decision.seconds;
+      }
+
       restore.timeSeconds = targetSeconds;
       restore.lastAttemptAt = now;
       restore.attempts = Number(restore.attempts || 0) + 1;
 
-      const didSeek = this.seekPlaybackSeconds(targetSeconds, {
+      const didSeek = this.seekPlaybackSeconds(seekSeconds, {
         vidaaGapMaxSeconds: VIDAA_RESUME_GAP_SECONDS
       });
       if (!didSeek && restore.attempts >= 8) {

@@ -58,6 +58,7 @@ export function createPlayerScreenMethods73() {
           deferRemoveMs: ENGINEFS_NAVIGATION_CLEANUP_GRACE_MS
         });
         this.cancelSeekPreview({ commit: false });
+        this.clearVidaaRestoreRetryTimer();
         this.dismissPauseOverlay();
         this.clearSubtitleDelayOverlayTimer();
         this.subtitleDelayOverlayVisible = false;

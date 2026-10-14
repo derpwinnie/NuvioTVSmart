@@ -26,6 +26,7 @@ tests/*
 !tests/test-vidaa-autoplay-selecting.mjs
 !tests/test-vidaa-autoplay-failover.mjs
 !tests/test-vidaa-mkv-tracks.mjs
+!tests/test-vidaa-resume-restore.mjs
 !tests/test-vidaa-tracks-endpoint.mjs
 !tests/fixtures/
 tests/fixtures/*
