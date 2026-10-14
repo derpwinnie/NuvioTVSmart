@@ -120,15 +120,19 @@ export function createPlayerScreenMethods61() {
           const nativeTrackIndex = Number(embeddedTrack?.nativeTrackIndex);
           const targetTrackIndex =
             Number.isFinite(nativeTrackIndex) && nativeTrackIndex >= 0 ? nativeTrackIndex : selectedEntry.embeddedAudioTrackIndex;
-          this.pendingWebOsAudioSelection = {
-            selectionKind: "embedded",
-            targetTrackIndex,
-            selectedTrackIndex: selectedEntry.embeddedAudioTrackIndex,
-            entryId: selectedEntry.id || "",
-            automaticFallback: Boolean(automaticFallback),
-            rememberSelection: Boolean(rememberSelection),
-            trackPreference: this.getAudioTrackPreference(selectedEntry)
-          };
+          // Only webOS confirms a selection asynchronously. VIDAA switches right here,
+          // and a pending entry left behind would hold the startup audio gate (muted).
+          if (!Environment.isVidaa()) {
+            this.pendingWebOsAudioSelection = {
+              selectionKind: "embedded",
+              targetTrackIndex,
+              selectedTrackIndex: selectedEntry.embeddedAudioTrackIndex,
+              entryId: selectedEntry.id || "",
+              automaticFallback: Boolean(automaticFallback),
+              rememberSelection: Boolean(rememberSelection),
+              trackPreference: this.getAudioTrackPreference(selectedEntry)
+            };
+          }
           applied =
             Environment.isWebOS() && (selectedEntry.canTryAudioConversion || PlayerController.webOsDtsAudioState)
               ? PlayerController.setWebOsAudioTrackWithDtsConversion(
@@ -142,12 +146,6 @@ export function createPlayerScreenMethods61() {
               : typeof PlayerController.setWebOsEmbeddedAudioTrack === "function"
                 ? PlayerController.setWebOsEmbeddedAudioTrack(targetTrackIndex, selectedEntry.embeddedAudioTrackIndex)
                 : false;
-          if (!Environment.isWebOS()) {
-            // Only webOS confirms a selection asynchronously. Elsewhere (VIDAA) the
-            // switch is done or impossible right here, and a pending entry left
-            // behind would hold the startup audio gate (muted) forever.
-            this.pendingWebOsAudioSelection = null;
-          }
         }
         if (applied) {
           if (Environment.isWebOS()) {
