@@ -11,6 +11,35 @@ const IMAGE_SELECTOR = [
   .map((selector) => `.home-main ${selector}[src]`)
   .join(", ");
 
+const backdropLoadBindings = new WeakMap();
+
+// Keep at most one load/error pair per expanded backdrop. Either event drops
+// both listeners, and releasing the source drops a pending pair, so repeated
+// expand/release cycles cannot stack stale handlers on the same image.
+export function bindExpandedBackdropLoad(image, { onLoad, onError }) {
+  if (!image?.addEventListener || backdropLoadBindings.has(image)) return;
+  const cleanup = () => {
+    image.removeEventListener("load", loaded);
+    image.removeEventListener("error", failed);
+    backdropLoadBindings.delete(image);
+  };
+  const loaded = () => {
+    cleanup();
+    onLoad?.();
+  };
+  const failed = () => {
+    cleanup();
+    onError?.();
+  };
+  backdropLoadBindings.set(image, cleanup);
+  image.addEventListener("load", loaded);
+  image.addEventListener("error", failed);
+}
+
+export function unbindExpandedBackdropLoad(image) {
+  backdropLoadBindings.get(image)?.();
+}
+
 // Use a larger retention window than the loader's prefetch window. Going back
 // one card/row reuses warm artwork; traversing a catalog doesn't retain every
 // decoded poster and full-size expanded backdrop indefinitely.
@@ -21,8 +50,8 @@ export function releaseVidaaHomeImage(image) {
   image.dataset.src = src;
   image.removeAttribute("src");
   if (image.classList.contains("home-poster-expanded-backdrop")) {
+    unbindExpandedBackdropLoad(image);
     image.dataset.loadState = "";
-    image.dataset.loadBound = "false";
     image.closest(".home-content-card")?.classList.remove("is-expanded-backdrop-ready");
   }
 }

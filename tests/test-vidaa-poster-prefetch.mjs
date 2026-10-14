@@ -13,7 +13,8 @@ const {
   prefetchVidaaPosterSource,
   reconcileVidaaHomePosterPrefetches
 } = await import("../js/ui/screens/home/vidaaHomePosterPrefetch.js");
-const { releaseVidaaHomeImage } = await import("../js/ui/screens/home/vidaaHomeImageWindow.js");
+const { releaseVidaaHomeImage, bindExpandedBackdropLoad } =
+  await import("../js/ui/screens/home/vidaaHomeImageWindow.js");
 
 let now = 0,
   id = 0,
@@ -160,6 +161,59 @@ releaseVidaaHomeImage(live);
 assert.equal(live.dataset.src, "visible-poster");
 assert.equal(listeners.get("load").size, 0);
 cancelVidaaPosterObservation(live);
+// Expand/release cycles must not stack load/error handlers on a backdrop.
+{
+  const backdropListeners = new Map([
+    ["load", new Set()],
+    ["error", new Set()]
+  ]);
+  const cardClasses = new Set();
+  const backdrop = {
+    src: "",
+    dataset: {},
+    classList: { contains: (name) => name === "home-poster-expanded-backdrop" },
+    closest: () => ({ classList: { remove: (name) => cardClasses.delete(name) } }),
+    addEventListener: (type, callback) => backdropListeners.get(type).add(callback),
+    removeEventListener: (type, callback) => backdropListeners.get(type).delete(callback),
+    getAttribute: () => backdrop.src,
+    removeAttribute() {
+      backdrop.src = "";
+    }
+  };
+  let loads = 0;
+  let errors = 0;
+  const expand = () => {
+    backdrop.src = "backdrop.jpg";
+    bindExpandedBackdropLoad(backdrop, { onLoad: () => loads++, onError: () => errors++ });
+  };
+  for (let cycle = 0; cycle < 50; cycle++) {
+    expand();
+    expand();
+    assert.equal(backdropListeners.get("load").size, 1, "One pending load handler per backdrop");
+    assert.equal(backdropListeners.get("error").size, 1, "One pending error handler per backdrop");
+    releaseVidaaHomeImage(backdrop);
+    assert.equal(backdropListeners.get("load").size, 0, "Release drops the pending load handler");
+    assert.equal(backdropListeners.get("error").size, 0, "Release drops the pending error handler");
+  }
+  expand();
+  [...backdropListeners.get("load")][0]();
+  assert.equal(loads, 1);
+  assert.equal(
+    backdropListeners.get("error").size,
+    0,
+    "A loaded backdrop keeps no stale error handler"
+  );
+  releaseVidaaHomeImage(backdrop);
+  expand();
+  [...backdropListeners.get("error")][0]();
+  assert.equal(errors, 1);
+  assert.equal(loads, 1);
+  assert.equal(
+    backdropListeners.get("load").size,
+    0,
+    "A failed backdrop keeps no stale load handler"
+  );
+}
 console.log(
   "VIDAA poster stress passed: 2000 reversals, bounded requests/cache/listeners, timeout and cleanup recovery, no forced decode."
 );

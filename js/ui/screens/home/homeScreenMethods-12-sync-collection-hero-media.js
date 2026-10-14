@@ -1,4 +1,5 @@
 import * as internals from "./homeScreenContext.js";
+import { bindExpandedBackdropLoad } from "./vidaaHomeImageWindow.js";
 
 export function createHomeScreenMethods12() {
   const { Platform, MODERN_HOME_CONSTANTS, firstNonEmpty, isCollectionFolderItem, normalizeCollectionFolderItem } = internals;
@@ -68,27 +69,15 @@ export function createHomeScreenMethods12() {
             markBackdropReady();
           } else if (src) {
             markBackdropPending();
-            if (backdrop.dataset.loadBound !== "true") {
-              backdrop.dataset.loadBound = "true";
-              backdrop.addEventListener(
-                "load",
-                () => {
-                  markBackdropReady();
-                },
-                { once: true }
-              );
-              backdrop.addEventListener(
-                "error",
-                () => {
-                  if (node.isConnected) {
-                    node.classList.remove("is-expanded-backdrop-ready");
-                  }
-                  backdrop.dataset.loadState = "error";
-                  backdrop.dataset.loadBound = "false";
-                },
-                { once: true }
-              );
-            }
+            bindExpandedBackdropLoad(backdrop, {
+              onLoad: markBackdropReady,
+              onError: () => {
+                if (node.isConnected) {
+                  node.classList.remove("is-expanded-backdrop-ready");
+                }
+                backdrop.dataset.loadState = "error";
+              }
+            });
           } else {
             markBackdropPending();
           }
