@@ -10,8 +10,11 @@ near(getVidaaBufferGapTarget(259.9, [[262.888, 278]]), 262.898);
 // Playing inside a buffered range: nothing to do.
 assert.equal(getVidaaBufferGapTarget(270, [[262.888, 278]]), null);
 
+// Wide keyframe spacing: resume at 420.82 with the buffer starting at 429.5.
+near(getVidaaBufferGapTarget(420.82, [[429.5, 430.6]]), 429.51);
+
 // A range far ahead is a real buffering wait, not a keyframe gap.
-assert.equal(getVidaaBufferGapTarget(100, [[120, 140]]), null);
+assert.equal(getVidaaBufferGapTarget(100, [[125, 140]]), null);
 
 // Nothing buffered yet, or only behind the position.
 assert.equal(getVidaaBufferGapTarget(50, []), null);
