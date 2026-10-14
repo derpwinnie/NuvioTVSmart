@@ -299,6 +299,10 @@ export function createStreamScreenMethods04() {
         this.scheduleErrorChipCleanup();
         this.maybeAutoResumeStream({ allLoaded: true });
         this.maybeAutoPlayStream({ allLoaded: true });
+        if (!this.autoPlayLaunching && !this.autoPlayCountdown) {
+          // No automatic pick (none matched or nothing found): show the list.
+          this.endVidaaAutoPlaySelecting();
+        }
       } catch (error) {
         if (token !== this.loadToken) {
           return;
@@ -306,6 +310,7 @@ export function createStreamScreenMethods04() {
         this.streamSearchCompleted = true;
         this.loading = false;
         this.autoResumeUiActive = false;
+        this.vidaaAutoPlayUiActive = false;
         this.error = error?.message || "Failed to load streams.";
         this.sourceChips = this.sourceChips.map((chip) => (chip.status === "loading" ? { ...chip, status: "error" } : chip));
         this.requestRender();

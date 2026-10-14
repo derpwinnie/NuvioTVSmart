@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./streamScreen.js";
+import { shouldShowVidaaAutoPlaySelecting } from "../../../platform/vidaa/vidaaAutoPlaySelecting.js";
 
 export function createStreamScreenMethods03() {
   const {
@@ -15,6 +16,7 @@ export function createStreamScreenMethods03() {
     normalizeAddonLogoLookup,
     preloadAddonLogoImages,
     Environment,
+    isAutoPlayEffectivelyEnabled,
     ensureAddonLogoImageProxyReady
   } = internals;
 
@@ -69,6 +71,14 @@ export function createStreamScreenMethods03() {
         (String(this.params?.resumeStreamIdentity || "").trim() || String(this.params?.preferredStreamId || "").trim())
       );
       this.autoPlayAttempted = returningFromPlayer;
+      this.autoPlayLaunching = false;
+      this.vidaaAutoPlayUiActive = shouldShowVidaaAutoPlaySelecting({
+        isVidaa: Environment.isVidaa(),
+        isBackNavigation: Boolean(navigationContext?.isBackNavigation),
+        manualSelection: Boolean(this.params?.manualSelection),
+        autoPlayMode: playerSettings.streamAutoPlayMode,
+        autoPlayEnabled: isAutoPlayEffectivelyEnabled(playerSettings)
+      });
       this.cancelAutoPlayCountdown();
       this.cancelAutoPlaySelectionWait();
       const autoPlayWaitSeconds = Math.max(0, Math.trunc(Number(playerSettings.streamAutoPlayTimeoutSeconds || 0)));

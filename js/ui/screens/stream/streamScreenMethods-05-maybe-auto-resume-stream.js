@@ -126,6 +126,7 @@ export function createStreamScreenMethods05() {
         return;
       }
       this.autoPlayAttempted = true;
+      this.autoPlayLaunching = true;
       this.cancelAutoPlaySelectionWait();
       void this.playStream(selected.id);
     },
@@ -148,6 +149,7 @@ export function createStreamScreenMethods05() {
         void this.playStream(stream.id);
         return;
       }
+      this.endVidaaAutoPlaySelecting();
       this.autoPlayCountdown = {
         streamId: stream.id,
         label: getStreamHeadline(stream) || stream.addonName || "stream",
@@ -193,8 +195,16 @@ export function createStreamScreenMethods05() {
             </div>
           </div>`;
     },
+    // VIDAA only: leave the "finding source" overlay and show the source list.
+    endVidaaAutoPlaySelecting() {
+      if (!this.vidaaAutoPlayUiActive) {
+        return;
+      }
+      this.vidaaAutoPlayUiActive = false;
+      this.requestRender({ delayMs: 0 });
+    },
     renderContinueWatchingResumeOverlay() {
-      if (!this.autoResumeUiActive) {
+      if (!this.autoResumeUiActive && !this.vidaaAutoPlayUiActive) {
         return "";
       }
       const title = String(this.params?.episodeTitle || this.params?.itemTitle || this.params?.playerTitle || "").trim();
