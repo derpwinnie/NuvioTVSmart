@@ -2469,4 +2469,5 @@
     <string name="mdblist_show_on_hero_subtitle">MDBList-Bewertungen im Hauptbanner anzeigen (Modern und Classic/Grid)</string>
     <string name="mdblist_rating_order_title">Reihenfolge der Bewertungen</string>
     <string name="mdblist_rating_order_subtitle">Im Modern-Banner werden die ersten 3 aktivierten und verfügbaren Bewertungen angezeigt. Mit den Pfeilen lässt sich die Reihenfolge ändern.</string>
+    <string name="player_audio_vidaa_switch_unsupported">Dieses Gerät zeigt die Tonspuren an, kann aber nicht zwischen ihnen wechseln. Es läuft die Standard-Tonspur.</string>
 </resources>

@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
+import { isVidaaAudioSwitchingUnavailable } from "../../../platform/vidaa/vidaaAudioSwitching.js";
 
 export function createPlayerScreenMethods12() {
   const {
@@ -101,9 +102,17 @@ export function createPlayerScreenMethods12() {
       );
     },
     getAudioDialogSupportNotice() {
-      return this.isTizenDashAudioSwitchingUnsupported()
-        ? t("player_audio_tizen_dash_unsupported", {}, "Changing DASH audio tracks is not supported on this TV.")
-        : "";
+      if (this.isTizenDashAudioSwitchingUnsupported()) {
+        return t("player_audio_tizen_dash_unsupported", {}, "Changing DASH audio tracks is not supported on this TV.");
+      }
+      if (Environment.isVidaa() && isVidaaAudioSwitchingUnavailable(PlayerController.video, this.embeddedAudioTracks.length)) {
+        return t(
+          "player_audio_vidaa_switch_unsupported",
+          {},
+          "This device lists the audio tracks but cannot switch between them. The default track plays."
+        );
+      }
+      return "";
     },
     getSubtitleDialogSupportNotice() {
       const notices = [];
