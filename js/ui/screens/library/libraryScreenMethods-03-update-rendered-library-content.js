@@ -108,8 +108,7 @@ export function createLibraryScreenMethods03() {
       bindRootSidebarEvents(this.container, {
         currentRoute: "library",
         onSelectedAction: () => this.focusMainNode(),
-        onExpandSidebar: () => this.focusSidebarNode(),
-        onCollapseSidebar: () => this.focusMainNode()
+        onExpandSidebar: () => this.focusSidebarNode()
       });
       if (this.isModalFocusLocked()) {
         return;
