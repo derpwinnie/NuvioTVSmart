@@ -125,11 +125,14 @@ async function loadTiles() {
   const r = await api("GET", "/api/tiles?host=" + encodeURIComponent(selectedHost));
   const box = $("tiles");
   box.innerHTML = "";
+  // Show why the list is missing instead of an empty list.
+  if (r.error) return msg($("install-msg"), "Could not list the tiles: " + r.error, false);
   (r.tiles || []).forEach((t) => {
     const d = document.createElement("div");
     d.innerHTML = `${esc(t.name || t.appId)} <span class="muted">${esc(t.url || t.appUrl || "")}</span> <button class="secondary">Remove</button>`;
     d.querySelector("button").onclick = async () => {
-      await api("DELETE", "/api/tiles", { host: selectedHost, appId: t.appId });
+      const del = await api("DELETE", "/api/tiles", { host: selectedHost, appId: t.appId });
+      if (del.error) return msg($("install-msg"), del.error, false);
       loadTiles();
     };
     box.appendChild(d);
