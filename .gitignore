@@ -22,6 +22,7 @@ tests/*
 !tests/test-vidaa-return-focus.mjs
 !tests/test-vidaa-playback-headers.mjs
 !tests/test-vidaa-buffer-gap.mjs
+!tests/test-vidaa-stall-restart.mjs
 !tests/test-vidaa-back-navigation.mjs
 !tests/test-vidaa-autoplay-selecting.mjs
 !tests/test-vidaa-autoplay-failover.mjs
