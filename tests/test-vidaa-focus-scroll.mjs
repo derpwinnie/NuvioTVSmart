@@ -265,4 +265,17 @@ for (const methods of [createSearchScreenMethods04(), createMetaDetailsScreenMet
   }
 }
 
+// The viewport origin restore is VIDAA-only: other platforms must not get a
+// document scroll reset or an extra animation frame per focus change.
+for (const platform of ["vidaa", "tizen", "webos", "browser"]) {
+  globalThis.__NUVIO_PLATFORM__ = platform;
+  Platform.current = null;
+  frames.clear();
+  const container = { style: { display: "none" } };
+  ScreenUtils.show(container);
+  assert.equal(container.style.display, "block");
+  assert.equal(frames.size, platform === "vidaa" ? 1 : 0, `${platform} viewport restore frames`);
+  frames.clear();
+}
+
 console.log("VIDAA continuous focus scrolling and geometry regressions passed.");
