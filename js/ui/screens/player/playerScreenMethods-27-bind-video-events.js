@@ -1,6 +1,8 @@
 import * as internals from "./playerScreenContext.js";
 import { createPlayerVideoLifecycleHandlers } from "./playerVideoLifecycleHandlers.js";
 import { createPlayerVideoEventHandlers } from "./playerVideoEventHandlers.js";
+import { Platform } from "../../../platform/index.js";
+import { getVidaaBufferGapTarget, timeRangesToArray } from "../../../platform/vidaa/vidaaBufferGap.js";
 
 export function createPlayerScreenMethods27() {
   return {
@@ -50,6 +52,18 @@ export function createPlayerScreenMethods27() {
         ["hlstrackschanged", onTrackListChanged],
         ["dashtrackschanged", onTrackListChanged]
       ];
+      if (Platform.isVidaa()) {
+        // A resume seek can leave currentTime in front of the first buffered keyframe, where
+        // playback never starts. Step over that small gap and keep playing unless paused.
+        const onBufferGap = () => {
+          if (video.seeking) return;
+          const target = getVidaaBufferGapTarget(video.currentTime, timeRangesToArray(video.buffered));
+          if (target === null) return;
+          video.currentTime = target;
+          if (!this.paused) video.play()?.catch?.(() => {});
+        };
+        ["waiting", "progress", "canplay", "seeked"].forEach((eventName) => bindings.push([eventName, onBufferGap]));
+      }
 
       bindings.forEach(([eventName, handler]) => {
         video.addEventListener(eventName, handler);
