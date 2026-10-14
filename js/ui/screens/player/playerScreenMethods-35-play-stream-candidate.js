@@ -297,9 +297,10 @@ export function createPlayerScreenMethods35() {
       if (nextIndex >= 0) {
         this.currentStreamIndex = nextIndex;
       }
+      // Log list positions, not stream ids: ids can contain stream URLs with tokens.
       console.warn("VIDAA auto-play: source failed to start, trying the next one", {
-        failed: failedCandidate?.id || "",
-        next: next.id || "",
+        failedIndex: this.streamCandidates.findIndex((entry) => entry?.id && entry.id === failedCandidate?.id),
+        nextIndex,
         attempt: this.vidaaAutoPlayFailoverAttempts
       });
       // Like the engine switch: let the next source report its own startup error
