@@ -4,6 +4,7 @@ import {
   isWebOsCompanionServiceAvailable,
   requestWebOsCompanionService
 } from "../../platform/webos/webosCompanionService.js";
+import { fetchVidaaMkvAudioTracks } from "../../platform/vidaa/vidaaMkvTracks.js";
 
 const LOCAL_MEDIA_SERVER_PORT_CANDIDATES = [2710, 2711, 2712, 2713, 2714];
 const REQUEST_TIMEOUT_MS = 4000;
@@ -183,6 +184,21 @@ export const localMediaTracksRepository = {
           expiresAt: Date.now() + Math.min(TRACK_CACHE_TTL_MS, 5000)
         });
         return [];
+      }
+
+      if (Platform.isVidaa()) {
+        // No local media service on VIDAA: read the MKV header directly.
+        let tracks = [];
+        try {
+          tracks = await fetchVidaaMkvAudioTracks(targetUrl);
+        } catch (error) {
+          console.warn("VIDAA MKV track names unavailable", error);
+        }
+        tracksCache.set(targetUrl, {
+          tracks,
+          expiresAt: Date.now() + (tracks.length > 0 ? TRACK_CACHE_TTL_MS : Math.min(TRACK_CACHE_TTL_MS, 5000))
+        });
+        return tracks;
       }
 
       if (Platform.isBrowser()) {
