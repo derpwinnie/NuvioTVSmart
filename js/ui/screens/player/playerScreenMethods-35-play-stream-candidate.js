@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
+import { pickVidaaNextAutoPlayCandidate } from "../../../platform/vidaa/vidaaAutoPlayFailover.js";
 
 export function createPlayerScreenMethods35() {
   const {
@@ -12,7 +13,10 @@ export function createPlayerScreenMethods35() {
     getP2pInfoHash,
     t,
     extractPlaybackHttpStatus,
-    streamDirectPlaybackUrl
+    streamDirectPlaybackUrl,
+    PlayerSettingsStore,
+    isAutoPlayEffectivelyEnabled,
+    Environment
   } = internals;
 
   return {
@@ -232,6 +236,37 @@ export function createPlayerScreenMethods35() {
         mountToken,
         sourceCandidate: streamCandidate
       });
+    },
+    // VIDAA + automatic source selection: when a source fails to start, play the
+    // next one instead of showing the error. Returns true when a retry started.
+    tryVidaaAutoPlayNextSource(failedCandidate = this.getCurrentStreamCandidate()) {
+      const settings = PlayerSettingsStore.get();
+      const autoPlayOn =
+        String(settings.streamAutoPlayMode || "MANUAL").toUpperCase() !== "MANUAL" && isAutoPlayEffectivelyEnabled(settings);
+      if (!Environment.isVidaa() || !autoPlayOn || this.params?.streamRouteParams?.manualSelection) {
+        return false;
+      }
+      const next = pickVidaaNextAutoPlayCandidate(this.streamCandidates, {
+        currentId: failedCandidate?.id || "",
+        failedUrls: this.failedPlaybackUrls || new Set(),
+        failedIds: this.failedPlaybackStreamIds || new Set(),
+        attempts: Number(this.vidaaAutoPlayFailoverAttempts || 0)
+      });
+      if (!next) {
+        return false;
+      }
+      this.vidaaAutoPlayFailoverAttempts = Number(this.vidaaAutoPlayFailoverAttempts || 0) + 1;
+      const nextIndex = this.streamCandidates.indexOf(next);
+      if (nextIndex >= 0) {
+        this.currentStreamIndex = nextIndex;
+      }
+      console.warn("VIDAA auto-play: source failed to start, trying the next one", {
+        failed: failedCandidate?.id || "",
+        next: next.id || "",
+        attempt: this.vidaaAutoPlayFailoverAttempts
+      });
+      void this.playStreamCandidate(next, { preservePlaybackState: true });
+      return true;
     },
     async switchStream(direction) {
       if (!this.streamCandidates.length) {

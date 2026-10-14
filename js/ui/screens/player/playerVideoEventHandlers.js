@@ -223,6 +223,9 @@ export function createPlayerVideoEventHandlers(video, isTizenAvPlayPlayback) {
         return;
       }
       this.markPlaybackSourceFailed(this.activePlaybackUrl);
+      if (this.tryVidaaAutoPlayNextSource(currentSourceCandidate)) {
+        return;
+      }
       const startupErrorMessage = this.getStartupErrorMessage(mediaErrorCode, playbackErrorDetail, currentSourceCandidate);
       this.clearPlaybackStallGuard();
       this.releaseStartupAudioGate({ resume: false });
