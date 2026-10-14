@@ -1,8 +1,9 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
+import { getVidaaPlayerBackTarget } from "../../../platform/vidaa/vidaaBackNavigation.js";
 
 export function createPlayerScreenMethods21() {
-  const { PlayerController, Router, ENGINEFS_NAVIGATION_CLEANUP_GRACE_MS, normalizeItemType, isSeriesItemType } = internals;
+  const { PlayerController, Router, Environment, ENGINEFS_NAVIGATION_CLEANUP_GRACE_MS, normalizeItemType, isSeriesItemType } = internals;
 
   return {
     resolveNextEpisodeInfo() {
@@ -236,6 +237,13 @@ export function createPlayerScreenMethods21() {
       const shouldReturnToLibrary = !forceDetail && this.params?.returnToLibraryOnBack === true;
       const shouldReturnToHome = !forceDetail && this.params?.returnToHomeOnBack === true;
       const shouldReturnToStream = !shouldReturnToLibrary && !shouldReturnToHome && !forceDetail && this.shouldReturnToStreamOnBack();
+      const vidaaBackTarget = shouldReturnToStream && Environment.isVidaa() ? getVidaaPlayerBackTarget(Router.stack) : null;
+      if (
+        vidaaBackTarget &&
+        Router.popToExistingRoute?.(vidaaBackTarget.route, vidaaBackTarget.params, { allowSingleIntermediateRoute: true })
+      ) {
+        return "history";
+      }
       const targetRoute = shouldReturnToHome
         ? "home"
         : shouldReturnToLibrary
