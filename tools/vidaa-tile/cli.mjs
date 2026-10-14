@@ -38,6 +38,7 @@ Commands:
                                          to its square Nuvio icon; app id to "nuvio")
   launch <host> <appId> [--url U] [--name N]
   remove <host> <appId>
+  selftest                               check that the program and its MQTT library work
 
 Secrets (certificate and protocol constants) live in your user config and never
 ship with this repo. See docs/vidaa-tile.md.`;
@@ -91,6 +92,12 @@ async function main() {
 
   if (cmd === "--help" || cmd === "-h" || cmd === "help") {
     console.log(USAGE);
+    return;
+  }
+
+  if (cmd === "selftest") {
+    await session.selfTest();
+    console.log("selftest ok");
     return;
   }
 

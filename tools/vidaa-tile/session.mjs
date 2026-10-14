@@ -180,6 +180,42 @@ async function openVerified({ host, port, creds, secrets, expectedFingerprint = 
   });
 }
 
+// Check that the mqtt library loads and builds a CONNECT packet, by letting it
+// write one into a local socket. Used by `selftest` to smoke-test the bundled
+// program, whose mqtt is otherwise only loaded when talking to a TV.
+export async function selfTest({ timeoutMs = 5000 } = {}) {
+  const mqtt = await loadMqtt();
+  if (typeof mqtt.MqttClient !== "function") throw new Error("mqtt client not available");
+  const server = net.createServer();
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  let client;
+  try {
+    const firstByte = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("mqtt sent nothing")), timeoutMs);
+      server.once("connection", (s) => {
+        s.on("error", () => {});
+        s.once("data", (d) => {
+          clearTimeout(timer);
+          resolve(d[0]);
+        });
+      });
+      const socket = net.connect(server.address().port, "127.0.0.1");
+      socket.on("error", () => {});
+      client = new mqtt.MqttClient(() => socket, {
+        protocolVersion: 4,
+        clientId: "selftest",
+        reconnectPeriod: 0,
+        connectTimeout: timeoutMs
+      });
+      client.on("error", () => {});
+    });
+    if (firstByte !== 0x10) throw new Error("mqtt did not send a CONNECT packet");
+  } finally {
+    client?.end(true);
+    server.close();
+  }
+}
+
 function saveRecord(record) {
   const state = readState();
   state.tvs[record.host] = { ...record };

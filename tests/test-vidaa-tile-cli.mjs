@@ -12,6 +12,9 @@ const cli = (args) =>
 assert.match(cli(["--help"]), /import-apk/);
 assert.match(cli(["--help"]), /pair <host>/);
 
+// selftest loads mqtt and lets it build a CONNECT packet.
+assert.match(cli(["selftest"]), /selftest ok/);
+
 // status reports everything missing on a fresh home.
 const status = JSON.parse(cli(["status"]));
 assert.equal(status.needApk, true);

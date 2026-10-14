@@ -55,12 +55,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node scripts/build-vidaa-tile.mjs
-      # Smoke test: the built program starts and prints its help.
+      # Smoke test: the built program starts, prints its help, and its bundled
+      # mqtt library loads and builds a CONNECT packet (help alone never loads it).
       - name: Smoke test
         shell: bash
         run: |
           exe=$(ls dist/vidaa-tile/nuvio-vidaa-tile-*)
           "./$exe" --help | grep -q import-sidee
+          "./$exe" selftest | grep -q "selftest ok"
       - uses: actions/upload-artifact@v4
         with:
           name: vidaa-tile-${{ runner.os }}-${{ runner.arch }}
