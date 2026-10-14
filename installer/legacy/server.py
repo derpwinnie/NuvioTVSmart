@@ -34,7 +34,8 @@ SPOOF_DOMAIN = "vidaahub.com"
 DNS_PORT = 53
 HTTPS_PORT = 443
 INSTALLER_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(INSTALLER_DIR)
+# This file lives in installer/legacy/, two levels below the repository root.
+REPO_ROOT = os.path.dirname(os.path.dirname(INSTALLER_DIR))
 FALLBACK_UPSTREAM_DNS_SERVERS = [("1.1.1.1", 53), ("8.8.8.8", 53)]
 
 # ---------------------------------------------------------------------------
@@ -256,15 +257,67 @@ def dns_server(local_ip):
 # HTTPS server (port 443)
 # ---------------------------------------------------------------------------
 
+SHARED_FILES = {
+    "icon.png": os.path.join(REPO_ROOT, "assets", "images", "icon.png"),
+    "largeIcon.png": os.path.join(REPO_ROOT, "assets", "images", "largeIcon.png"),
+    "logo.png": os.path.join(REPO_ROOT, "assets", "brand", "app_logo_wordmark.png"),
+    "nuviotv.png": os.path.join(REPO_ROOT, "assets", "images", "nuviotv.png")
+}
+
+# Only the built app is served, never the repository itself.
+APP_DIR_CANDIDATES = [
+    os.path.join(REPO_ROOT, "dist", "vidaa"),
+    os.path.join(REPO_ROOT, "dist"),
+]
+
+
+def is_inside(base_dir, candidate):
+    """True when candidate (after resolving symlinks and '..') lies inside base_dir."""
+    base = os.path.realpath(base_dir)
+    target = os.path.realpath(candidate)
+    try:
+        return os.path.commonpath([base, target]) == base
+    except ValueError:  # different drives on Windows
+        return False
+
+
+def resolve_shared_file(name):
+    """Path for /shared/<name>: a known asset or a plain file in the installer folder."""
+    if (
+        not name
+        or ".." in name
+        or name != os.path.basename(name)
+        or "/" in name
+        or "\\" in name
+    ):
+        return None
+    mapped = SHARED_FILES.get(name)
+    if mapped and os.path.isfile(mapped):
+        return mapped
+    local = os.path.join(INSTALLER_DIR, name)
+    if is_inside(INSTALLER_DIR, local) and os.path.isfile(local):
+        return local
+    return None
+
+
+def find_app_dir():
+    for candidate in APP_DIR_CANDIDATES:
+        if os.path.isfile(os.path.join(candidate, "app.bundle.js")):
+            return candidate
+    return None
+
+
+def resolve_app_file(app_dir, request_path):
+    """Path of a built app file for request_path, or None when it is missing or outside app_dir."""
+    relative = request_path.lstrip("/") or "index.html"
+    candidate = os.path.normpath(os.path.join(app_dir, relative))
+    if is_inside(app_dir, candidate) and os.path.isfile(candidate):
+        return candidate
+    return None
+
+
 class InstallerHandler(http.server.SimpleHTTPRequestHandler):
     """Serve installer UI, web app, and assets."""
-
-    SHARED_FILES = {
-        "icon.png": os.path.join(REPO_ROOT, "assets", "images", "icon.png"),
-        "largeIcon.png": os.path.join(REPO_ROOT, "assets", "images", "largeIcon.png"),
-        "logo.png": os.path.join(REPO_ROOT, "assets", "brand", "app_logo_wordmark.png"),
-        "nuviotv.png": os.path.join(REPO_ROOT, "assets", "images", "nuviotv.png")
-    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=INSTALLER_DIR, **kwargs)
@@ -272,80 +325,58 @@ class InstallerHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
+    def send_file(self, file_path, mime_type, extra_headers=()):
+        self.send_response(200)
+        self.send_header("Content-Type", mime_type)
+        self.send_header("Content-Length", str(os.path.getsize(file_path)))
+        for name, value in extra_headers:
+            self.send_header(name, value)
+        self.end_headers()
+        with open(file_path, "rb") as handle:
+            self.wfile.write(handle.read())
+
     def do_GET(self):
-        parsed = urllib.parse.urlparse(self.path)
-        path = parsed.path
+        # Query strings are dropped; the path is URL-decoded exactly once,
+        # before any check, so "%2e%2e" and "..%2f" are seen as "..".
+        path = urllib.parse.unquote(urllib.parse.urlparse(self.path).path)
+        if "\x00" in path:
+            self.send_error(404, "File not found")
+            return
 
         # Dedicated installer UI endpoints
         if path in ("/install", "/installer", "/installer/", "/install/index.html", "/installer/index.html"):
             installer_index = os.path.join(INSTALLER_DIR, "index.html")
-            if os.path.exists(installer_index):
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(os.path.getsize(installer_index)))
-                self.end_headers()
-                with open(installer_index, "rb") as f:
-                    self.wfile.write(f.read())
+            if os.path.isfile(installer_index):
+                self.send_file(installer_index, "text/html; charset=utf-8")
                 return
 
-        # Shared installer branding assets
+        # Shared installer branding assets: a known name, or a plain file name
+        # in the installer folder. Nothing with a path in it.
         if path.startswith("/shared/"):
-            filename = path.split("/", 2)[-1]
-            file_path = self.SHARED_FILES.get(filename)
-            if not file_path or not os.path.exists(file_path):
-                # Fallback to current folder icon if available
-                alt_path = os.path.join(INSTALLER_DIR, filename)
-                if os.path.exists(alt_path):
-                    file_path = alt_path
-                else:
-                    self.send_error(404, "File not found")
-                    return
-
+            file_path = resolve_shared_file(path[len("/shared/"):])
+            if not file_path:
+                self.send_error(404, "File not found")
+                return
             mime_type, _ = mimetypes.guess_type(file_path)
-            self.send_response(200)
-            self.send_header("Content-Type", mime_type or "application/octet-stream")
-            self.send_header("Content-Length", str(os.path.getsize(file_path)))
-            self.end_headers()
-            with open(file_path, "rb") as handle:
-                self.wfile.write(handle.read())
+            self.send_file(file_path, mime_type or "application/octet-stream")
             return
 
-        # Serve web app files from dist or root
-        app_dir = None
-        candidates = [
-            os.path.join(REPO_ROOT, "dist", "vidaa"),
-            os.path.join(REPO_ROOT, "dist"),
-            REPO_ROOT,
-        ]
-        for c in candidates:
-            if os.path.isfile(os.path.join(c, "app.bundle.js")):
-                app_dir = c
-                break
-
-        if app_dir:
-            req_rel = path.lstrip("/")
-            if not req_rel or req_rel == "index.html":
-                req_rel = "index.html"
-            file_path = os.path.normpath(os.path.join(app_dir, req_rel))
-            if file_path.startswith(app_dir) and os.path.isfile(file_path):
-                mime_type, _ = mimetypes.guess_type(file_path)
-                if not mime_type:
-                    if file_path.endswith(".mjs") or file_path.endswith(".js"):
-                        mime_type = "application/javascript"
-                    elif file_path.endswith(".json"):
-                        mime_type = "application/json"
-                    elif file_path.endswith(".css"):
-                        mime_type = "text/css"
-                    else:
-                        mime_type = "application/octet-stream"
-                self.send_response(200)
-                self.send_header("Content-Type", mime_type)
-                self.send_header("Content-Length", str(os.path.getsize(file_path)))
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                with open(file_path, "rb") as handle:
-                    self.wfile.write(handle.read())
-                return
+        # Serve the built web app (never the repository itself)
+        app_dir = find_app_dir()
+        file_path = resolve_app_file(app_dir, path) if app_dir else None
+        if file_path:
+            mime_type, _ = mimetypes.guess_type(file_path)
+            if not mime_type:
+                if file_path.endswith(".mjs") or file_path.endswith(".js"):
+                    mime_type = "application/javascript"
+                elif file_path.endswith(".json"):
+                    mime_type = "application/json"
+                elif file_path.endswith(".css"):
+                    mime_type = "text/css"
+                else:
+                    mime_type = "application/octet-stream"
+            self.send_file(file_path, mime_type, [("Access-Control-Allow-Origin", "*")])
+            return
 
         # Fallback to installer page if app bundle not yet built
         if path in ("/", "/index.html"):

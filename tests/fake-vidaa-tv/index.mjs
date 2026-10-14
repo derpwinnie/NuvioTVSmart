@@ -147,16 +147,21 @@ export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } =
   await new Promise((r) => descServer.listen(0, "127.0.0.1", r));
   const descriptorPort = descServer.address().port;
 
-  // Optional SSDP responder (used by the discovery test)
+  // Optional SSDP responder (used by the discovery test). Resolves the bound
+  // port; pass { port: 0 } for an ephemeral one that discover() is pointed at.
   let ssdp;
-  function startSsdp() {
+  function startSsdp({ port: ssdpPort = 1900, address } = {}) {
     ssdp = dgram.createSocket({ type: "udp4", reuseAddr: true });
-    ssdp.bind(1900, () => {
-      try {
-        ssdp.addMembership("239.255.255.250");
-      } catch {
-        /* ignore */
-      }
+    const bound = new Promise((resolve, reject) => {
+      ssdp.once("error", reject);
+      ssdp.bind(ssdpPort, address, () => {
+        try {
+          ssdp.addMembership("239.255.255.250");
+        } catch {
+          /* ignore */
+        }
+        resolve(ssdp.address().port);
+      });
     });
     ssdp.on("message", (msg, rinfo) => {
       if (!/M-SEARCH/.test(msg.toString())) return;
@@ -171,6 +176,7 @@ export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } =
       );
       ssdp.send(reply, rinfo.port, rinfo.address, () => {});
     });
+    return bound;
   }
 
   async function stop() {

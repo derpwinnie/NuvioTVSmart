@@ -1,8 +1,10 @@
 // Local dashboard for the VIDAA tile tool.
 //
 // Binds 127.0.0.1 by default. With { lan: true } it binds all interfaces and
-// requires a random access key (set in a cookie, never in the URL), so a phone
-// on the same network can drive it without exposing it to the world.
+// requires a random access key, so a phone on the same network can drive it
+// without exposing it to the world. The printed login link carries the key
+// once (/login?key=…); the server answers with an HttpOnly cookie and a
+// redirect to "/", so the dashboard page itself never has the key in its URL.
 
 import http from "node:http";
 import { networkInterfaces } from "node:os";
@@ -33,17 +35,43 @@ function send(res, status, body, headers = {}) {
   res.end(payload);
 }
 
+// Request bodies are small JSON objects; anything bigger is refused.
+export const MAX_BODY_BYTES = 64 * 1024;
+
+class BodyTooLargeError extends Error {
+  constructor() {
+    super("request body too large");
+    this.name = "BodyTooLargeError";
+  }
+}
+
 function readBody(req) {
-  return new Promise((resolve) => {
-    let b = "";
-    req.on("data", (c) => (b += c));
+  return new Promise((resolve, reject) => {
+    if (Number(req.headers["content-length"]) > MAX_BODY_BYTES) {
+      req.resume();
+      return reject(new BodyTooLargeError());
+    }
+    const chunks = [];
+    let size = 0;
+    req.on("data", (c) => {
+      size += c.length;
+      if (size > MAX_BODY_BYTES) {
+        req.removeAllListeners("data");
+        req.resume(); // drain and drop the rest
+        reject(new BodyTooLargeError());
+        return;
+      }
+      chunks.push(c);
+    });
     req.on("end", () => {
       try {
+        const b = Buffer.concat(chunks).toString("utf8");
         resolve(b ? JSON.parse(b) : {});
       } catch {
         resolve({});
       }
     });
+    req.on("error", reject);
   });
 }
 
@@ -71,18 +99,25 @@ export function openBrowser(link) {
     .catch(() => {});
 }
 
-export async function startDashboard({ lan = false, port = 0 } = {}) {
+// `tv` is for tests only (never set from HTTP): the fake TV's MQTT port, its
+// fixed clock and shortened launcher pauses.
+export async function startDashboard({ lan = false, port = 0, tv = {} } = {}) {
   const host = lan ? "0.0.0.0" : "127.0.0.1";
   const key = lan ? randomBytes(16).toString("hex") : null;
-  const pending = { resolvePin: null, promise: null, ready: null };
+  // The pairing in progress: { resolvePin, cancel, promise } or null.
+  let pending = null;
+  const opts = (secrets) => ({ secrets, getTimestamp: tv.getTimestamp, delays: tv.delays });
 
+  const keyMatches = (candidate) => {
+    if (!key || typeof candidate !== "string") return false;
+    const a = Buffer.from(candidate);
+    const b = Buffer.from(key);
+    return a.length === b.length && timingSafeEqual(a, b);
+  };
   const authed = (req) => {
     if (!key) return true;
     const cookie = /(?:^|;\s*)vk=([a-f0-9]+)/.exec(req.headers.cookie || "");
-    if (!cookie) return false;
-    const a = Buffer.from(cookie[1]);
-    const b = Buffer.from(key);
-    return a.length === b.length && timingSafeEqual(a, b);
+    return Boolean(cookie) && keyMatches(cookie[1]);
   };
 
   const api = {
@@ -114,31 +149,51 @@ export async function startDashboard({ lan = false, port = 0 } = {}) {
       return { tvs: await discover({ timeoutMs: 4000 }) };
     },
     async "POST /api/pair/start"(body) {
+      if (!body.host) throw new Error("no TV address given");
       const secrets = loadSecrets();
-      pending.ready = null;
-      const readySignal = new Promise((r) => (pending.ready = r));
-      pending.promise = session
+      // A new request replaces an unfinished pairing (cancelled, not counted).
+      if (pending) pending.cancel(new Error("replaced by a new pairing"));
+      const entry = {};
+      const pin = new Promise((resolve, reject) => {
+        entry.resolvePin = resolve;
+        entry.cancel = reject;
+      });
+      pin.catch(() => {}); // a cancel before the TV asks is not unhandled
+      let ready;
+      const readySignal = new Promise((r) => (ready = r));
+      entry.promise = session
         .pair({
           host: body.host,
+          ...(tv.port ? { port: tv.port } : {}),
+          getTimestamp: tv.getTimestamp,
           secrets,
-          onPinReady: () => pending.ready(),
-          pinProvider: () => new Promise((r) => (pending.resolvePin = r))
+          onPinReady: () => ready(),
+          pinProvider: () => pin
         })
         .then((rec) => ({ ok: true, host: rec.host }))
         .catch((e) => ({ ok: false, error: classify(e) }));
-      // Resolve this call once the TV has shown its PIN (or pairing failed).
-      await Promise.race([readySignal, pending.promise]);
+      pending = entry;
+      // Resolve this call once the TV has shown its PIN, or with the failure
+      // if pairing ended before that.
+      const early = await Promise.race([readySignal.then(() => null), entry.promise]);
+      if (early) {
+        if (pending === entry) pending = null;
+        return early;
+      }
       return { ok: true, waitingForPin: true };
     },
     async "POST /api/pair/submit"(body) {
-      if (!pending.resolvePin) throw new Error("no pairing in progress");
-      pending.resolvePin(String(body.pin || ""));
-      return pending.promise;
+      const entry = pending;
+      if (!entry) throw new Error("no pairing in progress");
+      entry.resolvePin(String(body.pin || ""));
+      const result = await entry.promise;
+      if (pending === entry) pending = null;
+      return result;
     },
     async "GET /api/tiles"(body, url) {
       const secrets = loadSecrets();
       return {
-        tiles: await session.listTiles(recordFor(url.searchParams.get("host")), { secrets })
+        tiles: await session.listTiles(recordFor(url.searchParams.get("host")), opts(secrets))
       };
     },
     async "POST /api/tiles"(body) {
@@ -153,7 +208,7 @@ export async function startDashboard({ lan = false, port = 0 } = {}) {
           url: withVidaaWrapper(v.url),
           image: body.image || DEFAULT_TILE_IMAGE
         },
-        { secrets }
+        opts(secrets)
       );
       return { ok: true, tiles };
     },
@@ -162,13 +217,13 @@ export async function startDashboard({ lan = false, port = 0 } = {}) {
       await session.launchTile(
         recordFor(body.host),
         { appId: body.appId, name: body.name || body.appId, url: body.url || "" },
-        { secrets }
+        opts(secrets)
       );
       return { ok: true };
     },
     async "DELETE /api/tiles"(body) {
       const secrets = loadSecrets();
-      const gone = await session.removeTile(recordFor(body.host), body.appId, { secrets });
+      const gone = await session.removeTile(recordFor(body.host), body.appId, opts(secrets));
       return { ok: true, removed: gone };
     }
   };
@@ -202,12 +257,16 @@ export async function startDashboard({ lan = false, port = 0 } = {}) {
     if (req.method !== "GET" && !originAllowed(req)) {
       return send(res, 403, { error: "cross-origin request refused" });
     }
-    // LAN login: accept the key once, set the cookie.
+    // LAN login: accept the key once, set the cookie and redirect to "/", so
+    // the page itself never loads with the key in its address.
     if (key && url.pathname === "/login" && url.searchParams.get("key")) {
-      const ok = url.searchParams.get("key") === key;
+      const ok = keyMatches(url.searchParams.get("key"));
+      const common = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" };
       res.writeHead(
         ok ? 302 : 403,
-        ok ? { "Set-Cookie": `vk=${key}; HttpOnly; SameSite=Strict`, Location: "/" } : {}
+        ok
+          ? { ...common, "Set-Cookie": `vk=${key}; HttpOnly; SameSite=Strict`, Location: "/" }
+          : common
       );
       return res.end(ok ? "" : "bad key");
     }
@@ -219,6 +278,9 @@ export async function startDashboard({ lan = false, port = 0 } = {}) {
         const body = req.method === "GET" ? {} : await readBody(req);
         return send(res, 200, await api[route](body, url));
       } catch (e) {
+        if (e instanceof BodyTooLargeError) {
+          return send(res, 413, { error: e.message }, { Connection: "close" });
+        }
         return send(res, 400, { error: classify(e) });
       }
     }

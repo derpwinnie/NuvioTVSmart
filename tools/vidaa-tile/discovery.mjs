@@ -51,7 +51,7 @@ export function _directedBroadcasts() {
   return [...new Set(out)];
 }
 
-function msearch(sock, target) {
+function msearch(sock, target, ssdpPort) {
   const msg = Buffer.from(
     [
       "M-SEARCH * HTTP/1.1",
@@ -64,10 +64,17 @@ function msearch(sock, target) {
       ""
     ].join("\r\n")
   );
-  sock.send(msg, SSDP_PORT, target, () => {});
+  sock.send(msg, ssdpPort, target, () => {});
 }
 
-export async function discover({ timeoutMs = 4000, port = 0 } = {}) {
+// `targets` and `ssdpPort` default to every broadcast/multicast address on the
+// standard SSDP port; tests point them at a local responder.
+export async function discover({
+  timeoutMs = 4000,
+  port = 0,
+  targets = null,
+  ssdpPort = SSDP_PORT
+} = {}) {
   const locations = new Map();
   const sock = dgram.createSocket({ type: "udp4", reuseAddr: true });
   await new Promise((resolve) => {
@@ -80,12 +87,12 @@ export async function discover({ timeoutMs = 4000, port = 0 } = {}) {
       resolve();
     });
   });
-  const targets = [..._directedBroadcasts(), "255.255.255.255", SSDP_MULTICAST];
+  const sendTo = targets || [..._directedBroadcasts(), "255.255.255.255", SSDP_MULTICAST];
   sock.on("message", (data, rinfo) => {
     const loc = _classifyReply(data.toString("utf8"));
     if (loc && !locations.has(rinfo.address)) locations.set(rinfo.address, loc);
   });
-  const blast = () => targets.forEach((t) => msearch(sock, t));
+  const blast = () => sendTo.forEach((t) => msearch(sock, t, ssdpPort));
   blast();
   const ticker = setInterval(blast, 500);
   await new Promise((r) => setTimeout(r, timeoutMs));

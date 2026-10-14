@@ -38,6 +38,7 @@ Commands:
                                          to its square Nuvio icon; app id to "nuvio")
   launch <host> <appId> [--url U] [--name N]
   remove <host> <appId>
+  selftest                               check that the program and its MQTT library work
 
 Secrets (certificate and protocol constants) live in your user config and never
 ship with this repo. See docs/vidaa-tile.md.`;
@@ -94,6 +95,12 @@ async function main() {
     return;
   }
 
+  if (cmd === "selftest") {
+    await session.selfTest();
+    console.log("selftest ok");
+    return;
+  }
+
   if (cmd === "status") {
     console.log(JSON.stringify(requireComplete(), null, 2));
     return;
@@ -137,6 +144,16 @@ async function main() {
   if (!["pair", "list", "install", "launch", "remove"].includes(cmd)) {
     console.error(`unknown command: ${cmd}\n`);
     console.log(USAGE);
+    process.exitCode = 2;
+    return;
+  }
+
+  // The rest act on one TV. Never fall back to a default address: mqtt would
+  // quietly try localhost.
+  if (!rest[0]) {
+    console.error(
+      `error: ${cmd} needs the TV's address, e.g. "${cmd} 192.168.1.20" (find it with: discover)`
+    );
     process.exitCode = 2;
     return;
   }
