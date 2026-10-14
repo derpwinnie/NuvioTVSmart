@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createTextInputHarness, TestEvent } from "./helpers/vidaaTextInputHarness.mjs";
 import { Platform } from "../js/platform/index.js";
+import { shouldPreserveVidaaTextInputKey } from "../js/platform/vidaa/vidaaKeyboard.js";
 import { FocusEngine } from "../js/ui/navigation/focusEngine.js";
 import { Router } from "../js/ui/navigation/routerState.js";
 import { NuvioDialog } from "../js/ui/components/nuvioDialog.js";
@@ -131,7 +132,7 @@ for (const options of [
     true,
     "Back works after a keyboard dismissal with stale DOM focus"
   );
-  assert.equal(Platform.shouldPreserveTextInputKey(h.key(39, input)), false);
+  assert.equal(shouldPreserveVidaaTextInputKey(h.key(39, input)), false);
   const nativeBack = Object.create({ keyCode: 8, target: input });
   assert.equal(
     Platform.isBackEvent(nativeBack),

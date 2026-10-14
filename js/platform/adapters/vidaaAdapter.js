@@ -2,7 +2,6 @@ import { isBackEvent, normalizeKeyEvent } from "../sharedKeys.js";
 import {
   installVidaaKeyboardFix,
   isVidaaTextInputEditingActive,
-  shouldPreserveVidaaTextInputKey,
   handleVidaaTextInputKey,
   getVidaaTextInputKeyCode
 } from "../vidaa/vidaaKeyboard.js";
@@ -56,7 +55,6 @@ export const vidaaAdapter = {
   name: "vidaa",
   nativeTextInput: true,
   isNativeTextInputEditingActive: isVidaaTextInputEditingActive,
-  shouldPreserveTextInputKey: shouldPreserveVidaaTextInputKey,
   handleTextInputKey: handleVidaaTextInputKey,
 
   init() {

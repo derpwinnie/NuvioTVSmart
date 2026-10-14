@@ -142,20 +142,12 @@ export const Platform = {
     return this.getName() === "browser";
   },
 
-  usesNativeTextInput() {
-    return getAdapter().nativeTextInput === true;
-  },
-
   // Only adapters that opt in (currently VIDAA) route text-editing keys
   // through these hooks; Tizen/webOS/browser keep their existing handling.
   isNativeTextInputEditingActive(event = null) {
     const adapter = getAdapter();
     if (!adapter.nativeTextInput) return false;
     return Boolean(adapter.isNativeTextInputEditingActive?.(event));
-  },
-
-  shouldPreserveTextInputKey(event, fallback = false) {
-    return getAdapter().shouldPreserveTextInputKey?.(event) ?? fallback;
   },
 
   handleTextInputKey(event, options) {
