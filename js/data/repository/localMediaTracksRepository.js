@@ -30,6 +30,12 @@ function buildSameOriginTracksUrl(mediaUrl) {
   return `/tracks/${encodeURIComponent(String(mediaUrl || "").trim())}`;
 }
 
+// Set only by the dev server (scripts/serve.mjs) in nuvio.env.js. Static hosts
+// such as GitHub Pages have no /tracks endpoint and must never see stream URLs.
+function hasSameOriginTracksEndpoint() {
+  return globalThis.__NUVIO_ENV__?.NUVIO_LOCAL_TRACKS_ENDPOINT === true;
+}
+
 function rememberLocalMediaServerUrl(value) {
   try {
     const parsed = new URL(String(value || ""));
@@ -194,19 +200,21 @@ export const localMediaTracksRepository = {
         } catch (error) {
           console.warn("VIDAA MKV track names unavailable", error);
         }
-        if (tracks.length === 0) {
+        if (tracks.length === 0 && hasSameOriginTracksEndpoint()) {
           // A direct read fails when the stream host sends no CORS headers.
           // The dev server (npm run serve:vidaa) can probe the file for us.
           try {
             const payload = await fetchJson(buildSameOriginTracksUrl(targetUrl));
             tracks = Array.isArray(payload) ? payload : [];
           } catch (_) {
-            // Static hosting (e.g. GitHub Pages) has no /tracks endpoint.
+            // The dev server could not probe this file.
           }
         }
         tracksCache.set(targetUrl, {
           tracks,
-          expiresAt: Date.now() + (tracks.length > 0 ? TRACK_CACHE_TTL_MS : Math.min(TRACK_CACHE_TTL_MS, 5000))
+          expiresAt:
+            Date.now() +
+            (tracks.length > 0 ? TRACK_CACHE_TTL_MS : Math.min(TRACK_CACHE_TTL_MS, 5000))
         });
         return tracks;
       }

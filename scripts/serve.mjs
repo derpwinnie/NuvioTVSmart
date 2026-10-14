@@ -217,7 +217,9 @@ const server = http.createServer(async (request, response) => {
         "Cache-Control": "no-store",
         "Content-Type": "application/javascript; charset=utf-8"
       });
-      response.end(buildRuntimeEnvScript(env));
+      // Only this dev server proxies /tracks/<media-url>; static hosting must not
+      // receive stream URLs, so the app probes it only when this flag is set.
+      response.end(buildRuntimeEnvScript(env, { NUVIO_LOCAL_TRACKS_ENDPOINT: true }));
       return;
     }
 

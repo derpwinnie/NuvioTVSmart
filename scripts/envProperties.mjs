@@ -147,8 +147,10 @@ export async function readEnvProperties({ rootDir, sourcePath = "" } = {}) {
   };
 }
 
-export function buildRuntimeEnvScript(env = {}) {
-  const values = normalizeEnvProperties(env);
+export function buildRuntimeEnvScript(env = {}, runtimeFlags = {}) {
+  // runtimeFlags are set by the serving process itself (e.g. the dev server),
+  // never read from local.properties.
+  const values = { ...normalizeEnvProperties(env), ...runtimeFlags };
   return `(function defineNuvioEnv() {
   var root = typeof globalThis !== "undefined" ? globalThis : window;
   var env = root.__NUVIO_ENV__ || {};
