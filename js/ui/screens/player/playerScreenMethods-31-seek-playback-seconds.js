@@ -108,6 +108,17 @@ export function createPlayerScreenMethods31() {
         this.finalizePendingPlaybackRestore(restore);
       }
     },
+    // The startup overlay mutes playback until presentStartedPlayback() unmutes it,
+    // but a resume can hide the overlay through the seek/stall paths instead, which
+    // left the whole session muted. Unmute once startup has really finished.
+    unmuteStartupPresentationIfSettled() {
+      if (this.loadingVisible || this.startupAudioGateActive || !this.hasPresentedPlaybackFrame) {
+        return;
+      }
+      if (PlayerController.startupPresentationAudioMuted) {
+        PlayerController.setStartupPresentationAudioMuted?.(false);
+      }
+    },
     updateLoadingVisibility() {
       if (this.isBufferingForPauseOverlay()) this.dismissPauseOverlay();
       const overlay = this.uiRefs?.loadingOverlay;
@@ -117,6 +128,7 @@ export function createPlayerScreenMethods31() {
           if (this.isStartupGateReleaseReady()) {
             this.releaseStartupAudioGate();
           }
+          this.unmuteStartupPresentationIfSettled();
           this.clearBufferingSpinnerTimer();
         }
         this.renderSkipIntroButton();
@@ -177,6 +189,7 @@ export function createPlayerScreenMethods31() {
         if (this.isStartupGateReleaseReady()) {
           this.releaseStartupAudioGate();
         }
+        this.unmuteStartupPresentationIfSettled();
         if (this.paused) {
           this.schedulePauseOverlay();
         }
