@@ -296,6 +296,7 @@ export function initializePlayerMountState(params, initialStreamUrl) {
   this.maxSilentAudioFallbackCount = 1;
   this.lastPlaybackErrorAt = 0;
   this.failedPlaybackUrls = new Set();
+  this.vidaaAutoPlayFailoverAttempts = 0;
   this.failedPlaybackStreamIds = new Set();
   this.playbackStallTimer = null;
   this.playbackEngineValidationEngine = "";
