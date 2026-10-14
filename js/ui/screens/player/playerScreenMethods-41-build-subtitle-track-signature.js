@@ -1,6 +1,21 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
+const AUDIO_TRACK_FIELDS = ["id", "kind", "label", "language", "lang", "name", "enabled"];
+
+function toPlainAudioTrack(track) {
+  if (!track || typeof track !== "object") {
+    return track;
+  }
+  const plain = { ...track };
+  AUDIO_TRACK_FIELDS.forEach((field) => {
+    if (plain[field] === undefined && track[field] !== undefined) {
+      plain[field] = track[field];
+    }
+  });
+  return plain;
+}
+
 export function createPlayerScreenMethods41() {
   const {
     Environment,
@@ -99,7 +114,11 @@ export function createPlayerScreenMethods41() {
         secondary: embeddedTrack.secondary || String(selectedLanguage || "").toUpperCase()
       };
     },
-    mergeEmbeddedAudioTrackMetadata(track, index) {
+    mergeEmbeddedAudioTrackMetadata(nativeTrack, index) {
+      // HTMLMediaElement AudioTrack fields are prototype getters, so `{ ...track }`
+      // copies nothing. Read them explicitly, or a track the browser names
+      // "English" shows up as "Audio 1" whenever no embedded metadata is known.
+      const track = toPlainAudioTrack(nativeTrack);
       let embeddedTrack = this.getEmbeddedAudioTrackByNativeIndex(index) || this.getEmbeddedAudioTrack(index);
       const trackLanguage = getUsableAudioTrackLanguageValue(track);
       let embeddedTrackLanguage = getUsableAudioTrackLanguageValue(embeddedTrack);

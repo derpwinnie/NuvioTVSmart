@@ -27,7 +27,9 @@ const ID_SAMPLING_FREQUENCY = 0xb5;
 const TRACK_TYPE_AUDIO = 2;
 const HEAD_BYTES = 256 * 1024;
 const TRACKS_MAX_BYTES = 256 * 1024;
-const REQUEST_TIMEOUT_MS = 5000;
+// The first request often waits on the addon resolving the debrid link, which
+// can take well over 5s; later requests are fast. Allow for the slow first one.
+const REQUEST_TIMEOUT_MS = 15000;
 
 const CODEC_NAMES = [
   [/^A_EAC3/, "EAC3"],
