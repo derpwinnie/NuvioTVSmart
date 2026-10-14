@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,5 +26,13 @@ try {
   code = e.status;
 }
 assert.equal(code, 2);
+
+// TV commands without a host fail with a clear message instead of trying
+// localhost.
+for (const cmd of ["pair", "list", "install", "launch", "remove"]) {
+  const r = spawnSync("node", ["tools/vidaa-tile/cli.mjs", cmd], { env, encoding: "utf8" });
+  assert.equal(r.status, 2, `${cmd} without host exits 2`);
+  assert.match(r.stderr, new RegExp(`${cmd} needs the TV's address`));
+}
 
 console.log("cli tests passed");

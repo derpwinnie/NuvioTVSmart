@@ -141,6 +141,16 @@ async function main() {
     return;
   }
 
+  // The rest act on one TV. Never fall back to a default address: mqtt would
+  // quietly try localhost.
+  if (!rest[0]) {
+    console.error(
+      `error: ${cmd} needs the TV's address, e.g. "${cmd} 192.168.1.20" (find it with: discover)`
+    );
+    process.exitCode = 2;
+    return;
+  }
+
   const secrets = loadSecrets(); // the rest need the secrets
 
   if (cmd === "pair") {
