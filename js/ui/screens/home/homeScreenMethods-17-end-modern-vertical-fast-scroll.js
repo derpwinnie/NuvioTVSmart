@@ -1,4 +1,5 @@
 import * as internals from "./homeScreenContext.js";
+import { VIDAA_FOCUS_SCROLL_DURATION_MS } from "../../navigation/vidaaFocusScroll.js";
 
 export function createHomeScreenMethods17() {
   const { Platform, MODERN_HOME_CONSTANTS } = internals;
@@ -166,7 +167,7 @@ export function createHomeScreenMethods17() {
           }
           if (Platform.isVidaa()) {
             this.modernCameraFollowLastVerticalContainer = next.container;
-            this.animateScroll(next.container, "y", next.value, 140);
+            this.animateScroll(next.container, "y", next.value, VIDAA_FOCUS_SCROLL_DURATION_MS);
             return;
           }
           const delta = Math.abs(Number(next.container.scrollTop || 0) - Number(next.value || 0));
@@ -262,7 +263,7 @@ export function createHomeScreenMethods17() {
           }
           if (Platform.isVidaa()) {
             this.modernCameraFollowLastHorizontalContainer = next.container;
-            this.animateScroll(next.container, "x", next.value, 140);
+            this.animateScroll(next.container, "x", next.value, VIDAA_FOCUS_SCROLL_DURATION_MS);
             return;
           }
           if (Math.abs(Number(next.container.scrollLeft || 0) - Number(next.value || 0)) <= 1) {

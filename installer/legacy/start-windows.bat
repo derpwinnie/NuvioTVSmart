@@ -15,9 +15,6 @@ if %errorlevel% neq 0 (
 if exist "%~dp0server.py" (
     cd /d "%~dp0"
     python server.py
-) else if exist "%~dp0installer\server.py" (
-    cd /d "%~dp0"
-    python installer\server.py
 ) else (
     echo [ERROR] Could not find server.py
     pause

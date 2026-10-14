@@ -310,8 +310,9 @@ export function createPlayerScreenMethods62() {
       this.moreActionsVisible = false;
 
       const filters = this.getSourceFilters();
-      const filteredSources = this.getFilteredSources();
-      if (Platform.isVidaa() && filteredSources.length) {
+      // Only VIDAA starts on the current source, so skip the filter pass elsewhere.
+      const filteredSources = Platform.isVidaa() ? this.getFilteredSources() : [];
+      if (filteredSources.length) {
         const currentStream = this.getCurrentStreamCandidate();
         const currentKey = currentStream ? streamMergeKey(currentStream) : "";
         const activePlaybackUrl = String(this.activePlaybackUrl || "").trim();

@@ -1,15 +1,6 @@
-function isVidaaViewportLocked() {
-  const root = globalThis?.document?.documentElement;
-  return Boolean(
-    root?.classList?.contains("vidaa-tv") ||
-    String(globalThis?.__NUVIO_PLATFORM__ || "").toLowerCase() === "vidaa"
-  );
-}
+import { Platform } from "../../platform/index.js";
 
 function restoreVidaaViewportOrigin() {
-  if (!isVidaaViewportLocked()) {
-    return;
-  }
   const documentRef = globalThis?.document;
   try {
     if (documentRef?.documentElement) {
@@ -27,6 +18,9 @@ function restoreVidaaViewportOrigin() {
 }
 
 function scheduleVidaaViewportRestore() {
+  if (!Platform.isVidaa()) {
+    return;
+  }
   restoreVidaaViewportOrigin();
   try {
     globalThis?.requestAnimationFrame?.(() => restoreVidaaViewportOrigin());
@@ -37,7 +31,7 @@ function focusWithoutDocumentScroll(node, { preventScroll = true } = {}) {
   if (!node || typeof node.focus !== "function") {
     return;
   }
-  const vidaa = isVidaaViewportLocked();
+  const vidaa = Platform.isVidaa();
   if (!vidaa && !preventScroll) {
     try {
       node.focus();
@@ -273,7 +267,7 @@ export const ScreenUtils = {
     current.classList.remove("focused");
     target.classList.add("focused");
     focusWithoutDocumentScroll(target);
-    if (!isVidaaViewportLocked()) {
+    if (!Platform.isVidaa()) {
       return;
     }
     try {

@@ -11,6 +11,11 @@ assert.equal(validateTileUrl("http://192.168.1.5:4173/").ok, true); // private L
 assert.equal(validateTileUrl("http://100.64.1.2:4173/").ok, true); // Tailscale CGNAT
 assert.equal(validateTileUrl("http://example.com/").ok, false); // public http
 assert.equal(validateTileUrl("http://localhost/").ok, false); // loopback
+assert.equal(validateTileUrl("http://127.0.0.1/").ok, false); // loopback
+assert.equal(validateTileUrl("http://[::1]/").ok, false); // loopback
+// Hostnames that merely start like a private address are public.
+assert.equal(validateTileUrl("http://192.168.1.1.evil.com/").ok, false);
+assert.equal(validateTileUrl("http://10.0.0.1.example/").ok, false);
 assert.equal(validateTileUrl("https://user:pw@x/").ok, false); // credentials
 assert.equal(validateTileUrl("ftp://x/").ok, false); // scheme
 assert.equal(validateTileUrl("not a url").ok, false);

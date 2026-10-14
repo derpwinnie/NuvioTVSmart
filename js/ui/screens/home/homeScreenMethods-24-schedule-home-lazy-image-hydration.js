@@ -10,8 +10,6 @@ function isVidaaHomeHydrationBusy(screen) {
 
 const VIDAA_POSTER_SELECTOR = ".content-poster, .home-continue-bg";
 const VIDAA_PENDING_POSTER_SELECTOR = ".content-poster[data-src], .home-continue-bg[data-src]";
-const VIDAA_HORIZONTAL_REPEAT_FLOOR_MS = 80;
-const VIDAA_VERTICAL_REPEAT_FLOOR_MS = 112;
 const VIDAA_DEFAULT_POSTER_READY_MS = 650;
 const VIDAA_PREFETCH_SAFETY_MS = 160;
 const VIDAA_HORIZONTAL_MIN_AHEAD = 5;
@@ -65,7 +63,7 @@ function hydrateVidaaPriorityPoster(screen, image, priority = "auto") {
   return Boolean(src);
 }
 
-function getVidaaPosterSource(screen, node) {
+function getVidaaPosterSource(node) {
   if (!node) return "";
   const direct = String(node.dataset?.posterSrc || "").trim();
   if (direct) return direct;
@@ -86,14 +84,10 @@ function warmVidaaPosterNode(screen, node, priority = "low") {
   if (livePoster?.getAttribute?.("src") || livePoster?.src) {
     return true;
   }
-  return prefetchVidaaPosterSource(screen, getVidaaPosterSource(screen, node));
+  return prefetchVidaaPosterSource(screen, getVidaaPosterSource(node));
 }
 
-function getVidaaNavigationIntervalMs(
-  screen,
-  direction,
-  { horizontalFloorMs = VIDAA_HORIZONTAL_REPEAT_FLOOR_MS, verticalFloorMs = VIDAA_VERTICAL_REPEAT_FLOOR_MS } = {}
-) {
+function getVidaaNavigationIntervalMs(screen, direction, { horizontalFloorMs, verticalFloorMs }) {
   const horizontal = direction === "left" || direction === "right";
   const vertical = direction === "up" || direction === "down";
   if (!horizontal && !vertical) return 0;
@@ -119,7 +113,7 @@ function getVidaaNavigationIntervalMs(
   return state.intervalMs;
 }
 
-function getVidaaPrefetchPlan(screen, anchor, direction, throttle = {}) {
+function getVidaaPrefetchPlan(screen, anchor, direction, throttle) {
   const intervalMs = getVidaaNavigationIntervalMs(screen, direction, throttle);
   if (!intervalMs) {
     return {
@@ -379,7 +373,7 @@ export function createHomeScreenMethods24() {
       if (horizontalNavigation || verticalNavigation) {
         reconcileVidaaHomePosterPrefetches(
           this,
-          [anchor, ...enteredNodes, ...predictedNodes].map((node) => getVidaaPosterSource(this, node))
+          [anchor, ...enteredNodes, ...predictedNodes].map((node) => getVidaaPosterSource(node))
         );
       }
       if (verticalNavigation) {

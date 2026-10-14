@@ -4,6 +4,8 @@
 // http is only sensible on a trusted private network. Public sites must use
 // https. Credentials in the URL are rejected.
 
+import { isIP } from "node:net";
+
 // Free hosted build of this fork (GitHub Pages), so nobody has to self-host.
 export const DEFAULT_TILE_URL = "https://derpwinnie.github.io/NuvioTVSmart/vidaa.html";
 
@@ -21,8 +23,10 @@ const PRIVATE = [
   /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./
 ];
 
-const isLoopback = (h) => h === "localhost" || /^127\./.test(h) || h === "::1";
-const isPrivate = (h) => PRIVATE.some((re) => re.test(h));
+// Address checks only apply to IPv4 literals: a hostname such as
+// "192.168.1.1.evil.com" resolves wherever its owner wants.
+const isLoopback = (h) => h === "localhost" || h === "[::1]" || (isIP(h) === 4 && /^127\./.test(h));
+const isPrivate = (h) => isIP(h) === 4 && PRIVATE.some((re) => re.test(h));
 
 export function validateTileUrl(input) {
   let u;

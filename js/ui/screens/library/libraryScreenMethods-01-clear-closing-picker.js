@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./libraryScreen.js";
-import { animateVidaaFocusScroll } from "../../navigation/vidaaFocusScroll.js";
+import { animateVidaaFocusScroll, getVidaaCardScrollTop } from "../../navigation/vidaaFocusScroll.js";
 
 export function createLibraryScreenMethods01() {
   const {
@@ -258,19 +258,7 @@ export function createLibraryScreenMethods01() {
       if (!scroller) {
         return false;
       }
-      const viewport = scroller.getBoundingClientRect();
-      const rect = target.getBoundingClientRect();
-      const currentTop = Number(scroller.scrollTop || 0);
-      const itemTop = rect.top - viewport.top + currentTop;
-      const itemBottom = rect.bottom - viewport.top + currentTop;
-      const padding = 20;
-      let nextTop = currentTop;
-      if (itemTop < currentTop + padding) {
-        nextTop = itemTop - padding;
-      } else if (itemBottom > currentTop + scroller.clientHeight - padding) {
-        nextTop = itemBottom - scroller.clientHeight + padding;
-      }
-      animateVidaaFocusScroll(this, scroller, "y", nextTop);
+      animateVidaaFocusScroll(this, scroller, "y", getVidaaCardScrollTop(scroller, target));
       return true;
     },
     isModalFocusLocked() {
@@ -292,8 +280,7 @@ export function createLibraryScreenMethods01() {
       bindRootSidebarEvents(this.container, {
         currentRoute: "library",
         onSelectedAction: () => this.focusMainNode(),
-        onExpandSidebar: () => this.focusSidebarNode(),
-        onCollapseSidebar: () => this.focusMainNode()
+        onExpandSidebar: () => this.focusSidebarNode()
       });
     },
     renderSidebar() {

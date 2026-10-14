@@ -1,4 +1,5 @@
 import * as internals from "./homeScreenContext.js";
+import { VIDAA_NAVIGATION_SETTLE_MS } from "../../navigation/vidaaNavigationActivity.js";
 import { getTvRuntimePerformanceProfile } from "../../../platform/tvRuntimePerformance.js";
 import { startHomeContinueWatchingLoad } from "./homeContinueWatchingLoad.js";
 
@@ -114,7 +115,7 @@ export function createHomeScreenMethods04() {
   return {
     getHeroFocusDelay({ rapid = false } = {}) {
       if (Platform.isVidaa()) {
-        return 250;
+        return VIDAA_NAVIGATION_SETTLE_MS;
       }
       if (this.isLegacyTvRuntime()) {
         return rapid ? 260 : 150;

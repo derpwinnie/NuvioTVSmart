@@ -3,6 +3,26 @@
 // it or queuing movements. Geometry is read only when a new target arrives.
 export const VIDAA_FOCUS_SCROLL_DURATION_MS = 140;
 
+// Vertical scroll target that brings a card into view with edge padding, or
+// centers it. The result is unclamped; animateVidaaFocusScroll clamps it.
+export function getVidaaCardScrollTop(scroller, target, { padding = 20, center = false } = {}) {
+  const currentTop = Number(scroller.scrollTop || 0);
+  const viewport = scroller.getBoundingClientRect();
+  const rect = target.getBoundingClientRect();
+  const itemTop = rect.top - viewport.top + currentTop;
+  const itemBottom = rect.bottom - viewport.top + currentTop;
+  if (center) {
+    return itemTop - (scroller.clientHeight - rect.height) / 2;
+  }
+  if (itemTop < currentTop + padding) {
+    return itemTop - padding;
+  }
+  if (itemBottom > currentTop + scroller.clientHeight - padding) {
+    return itemBottom - scroller.clientHeight + padding;
+  }
+  return currentTop;
+}
+
 export function animateVidaaFocusScroll(
   owner,
   container,

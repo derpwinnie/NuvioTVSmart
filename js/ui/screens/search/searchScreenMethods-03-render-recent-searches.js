@@ -121,8 +121,7 @@ export function createSearchScreenMethods03() {
       bindRootSidebarEvents(this.container, {
         currentRoute: "search",
         onSelectedAction: () => this.closeSidebarToContent(),
-        onExpandSidebar: () => this.openSidebar(),
-        onCollapseSidebar: () => this.closeSidebarToContent()
+        onExpandSidebar: () => this.openSidebar()
       });
       this.bindSearchInputEvents();
       this.bindActionEvents();

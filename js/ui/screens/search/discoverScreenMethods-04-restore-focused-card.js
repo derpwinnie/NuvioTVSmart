@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./discoverScreen.js";
-import { animateVidaaFocusScroll } from "../../navigation/vidaaFocusScroll.js";
+import { animateVidaaFocusScroll, getVidaaCardScrollTop } from "../../navigation/vidaaFocusScroll.js";
 
 export function createDiscoverScreenMethods04() {
   const {
@@ -150,22 +150,7 @@ export function createDiscoverScreenMethods04() {
       if (!scroller || !target) {
         return null;
       }
-      const currentTop = Number(scroller.scrollTop || 0);
-      let nextTop = toTop ? 0 : currentTop;
-      if (!toTop) {
-        const viewport = scroller.getBoundingClientRect();
-        const rect = target.getBoundingClientRect();
-        const itemTop = rect.top - viewport.top + currentTop;
-        const itemBottom = rect.bottom - viewport.top + currentTop;
-        const padding = 20;
-        if (center) {
-          nextTop = itemTop - (scroller.clientHeight - rect.height) / 2;
-        } else if (itemTop < currentTop + padding) {
-          nextTop = itemTop - padding;
-        } else if (itemBottom > currentTop + scroller.clientHeight - padding) {
-          nextTop = itemBottom - scroller.clientHeight + padding;
-        }
-      }
+      let nextTop = toTop ? 0 : getVidaaCardScrollTop(scroller, target, { center });
       const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
       nextTop = Math.max(0, Math.min(maxTop, Math.round(nextTop)));
       animateVidaaFocusScroll(this, scroller, "y", nextTop);

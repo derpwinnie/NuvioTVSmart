@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import tls from "node:tls";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -170,7 +171,50 @@ tv.setBehavior("ok");
     session.pair({ ...b2, pinProvider: async () => "1111" }),
     (e) => e.name === "CertificateError"
   );
+
+  // An impostor on the pinned address (different certificate) must fail the
+  // TLS check before any MQTT data is sent: the CONNECT packet carries the
+  // credentials (on refresh, the refresh token).
+  {
+    const { makeTestCerts } = await import("./fake-vidaa-tv/make-test-certs.mjs");
+    const other = makeTestCerts();
+    const received = [];
+    const impostor = tls.createServer({ key: other.serverKey, cert: other.serverCert }, (s) => {
+      s.on("data", (d) => received.push(d));
+      s.on("error", () => {});
+    });
+    await new Promise((r) => impostor.listen(0, "127.0.0.1", r));
+    const fakePort = impostor.address().port;
+    const st2 = store.readState();
+    st2.tvs[tv2.host] = rec2; // the genuine pin again
+    store.writeState(st2);
+    const ts2 = async () => tv2.timestamp;
+
+    // Re-pair, token session and refresh all refuse the impostor.
+    await assert.rejects(
+      session.pair({ ...b2, port: fakePort, pinProvider: async () => "1111" }),
+      (e) => e.name === "CertificateError"
+    );
+    const moved = { ...rec2, port: fakePort };
+    await assert.rejects(
+      session.listTiles(moved, { secrets: noCa, getTimestamp: ts2 }),
+      (e) => e.name === "CertificateError"
+    );
+    await assert.rejects(
+      session.refresh(moved, { secrets: noCa, getTimestamp: ts2 }),
+      (e) => e.name === "CertificateError"
+    );
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal(Buffer.concat(received).length, 0, "no MQTT bytes reached the impostor");
+    await new Promise((r) => impostor.close(r));
+  }
+
+  // Without a CA, an unreachable TV still fails as UnreachableError.
   await tv2.stop();
+  await assert.rejects(
+    session.listTiles(rec2, { secrets: noCa, getTimestamp: async () => tv2.timestamp }),
+    (e) => e.name === "UnreachableError"
+  );
 }
 
 // Rejected tokens (CONNACK 5) -> AuthError("rejected"), i.e. "pair again".

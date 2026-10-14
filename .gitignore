@@ -36,6 +36,7 @@ tests/fixtures/*
 tests/helpers/*
 !tests/helpers/vidaaTextInputHarness.mjs
 !tests/test-vidaa-tile-*.mjs
+!tests/test-vidaa-legacy-installer.mjs
 !tests/fake-vidaa-tv/
 !tests/fake-vidaa-tv/**
 *.ipk
