@@ -34,7 +34,8 @@ SPOOF_DOMAIN = "vidaahub.com"
 DNS_PORT = 53
 HTTPS_PORT = 443
 INSTALLER_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(INSTALLER_DIR)
+# This file lives in installer/legacy/, two levels below the repository root.
+REPO_ROOT = os.path.dirname(os.path.dirname(INSTALLER_DIR))
 FALLBACK_UPSTREAM_DNS_SERVERS = [("1.1.1.1", 53), ("8.8.8.8", 53)]
 
 # ---------------------------------------------------------------------------
