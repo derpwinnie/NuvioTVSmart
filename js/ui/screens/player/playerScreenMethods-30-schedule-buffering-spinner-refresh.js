@@ -1,6 +1,8 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
+const VIDAA_STARTUP_AUDIO_GATE_MAX_WAIT_MS = 3000;
+
 export function createPlayerScreenMethods30() {
   const {
     PlayerController,
@@ -41,7 +43,11 @@ export function createPlayerScreenMethods30() {
     enableStartupAudioGate({ allowNativePlayback = false, maxWaitMs = 0 } = {}) {
       this.startupAudioGateActive = true;
       this.startupAudioGateAllowsNativePlayback = Boolean(allowNativePlayback);
-      const boundedWaitMs = Math.max(0, Number(maxWaitMs || 0));
+      // VIDAA cannot switch audio tracks, so the startup language match can wait on
+      // tracks forever once MKV track names are known: the gate keeps the video paused
+      // and muted and the spinner never goes away. Bound it so the fallback applies.
+      const requestedWaitMs = Math.max(0, Number(maxWaitMs || 0));
+      const boundedWaitMs = requestedWaitMs > 0 || !Environment.isVidaa() ? requestedWaitMs : VIDAA_STARTUP_AUDIO_GATE_MAX_WAIT_MS;
       this.startupAudioGateDeadline = boundedWaitMs > 0 ? Date.now() + boundedWaitMs : 0;
       PlayerController.setStartupAudioGate?.(true, {
         pauseNativePlayback: !allowNativePlayback
