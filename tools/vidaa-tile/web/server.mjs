@@ -1,8 +1,10 @@
 // Local dashboard for the VIDAA tile tool.
 //
 // Binds 127.0.0.1 by default. With { lan: true } it binds all interfaces and
-// requires a random access key (set in a cookie, never in the URL), so a phone
-// on the same network can drive it without exposing it to the world.
+// requires a random access key, so a phone on the same network can drive it
+// without exposing it to the world. The printed login link carries the key
+// once (/login?key=…); the server answers with an HttpOnly cookie and a
+// redirect to "/", so the dashboard page itself never has the key in its URL.
 
 import http from "node:http";
 import { networkInterfaces } from "node:os";

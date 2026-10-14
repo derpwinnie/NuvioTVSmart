@@ -88,9 +88,13 @@ publish a release.
   discovery port and retry; the tool never changes your firewall itself.
 - To drive the dashboard from your phone, start it with `--lan`
   (`npm run vidaa:tile -- --lan`, or the program with `--lan`).
-  It then binds your LAN and prints a one-time link with an access key; open
-  that link once to authorize the browser. The key is kept in a cookie, never
-  in the address bar.
+  It then binds your LAN and prints a link with an access key
+  (`…/login?key=…`); open that link once to authorize the browser. The server
+  swaps the key for an HttpOnly cookie and redirects to `/`, so the dashboard
+  itself never shows the key, but the login link stays in the browser history
+  and in your terminal. Treat it like a password until you stop the dashboard
+  (a new key is made on every start). The dashboard speaks plain http, so
+  only use `--lan` on a network you trust.
 
 ## Where the tile points
 
@@ -123,8 +127,11 @@ Only if you want your own copy:
 - The connection to the TV is over TLS. With `remoteca.bks` converted to a CA
   PEM (set `caPem` in `secrets.json`) it is fully verified. Without one, the
   TV's self-signed certificate is trusted on first pairing and **pinned**: a
-  later impostor on the same address is rejected. The only exposure is a
-  man-in-the-middle during the very first pairing on your own LAN.
+  later impostor on the same address fails the TLS handshake, before the tool
+  sends any credentials or tokens. The remaining exposure is a
+  man-in-the-middle during a first pairing, when there is nothing to compare
+  against yet: the very first one, and again after the TV gets a new IP
+  address (records are kept per address) or its record is deleted.
 - The dashboard binds `127.0.0.1` by default and rejects foreign `Host` headers
   (DNS-rebinding) and cross-origin requests (CSRF).
 
