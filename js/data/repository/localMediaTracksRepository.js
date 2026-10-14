@@ -194,6 +194,16 @@ export const localMediaTracksRepository = {
         } catch (error) {
           console.warn("VIDAA MKV track names unavailable", error);
         }
+        if (tracks.length === 0) {
+          // A direct read fails when the stream host sends no CORS headers.
+          // The dev server (npm run serve:vidaa) can probe the file for us.
+          try {
+            const payload = await fetchJson(buildSameOriginTracksUrl(targetUrl));
+            tracks = Array.isArray(payload) ? payload : [];
+          } catch (_) {
+            // Static hosting (e.g. GitHub Pages) has no /tracks endpoint.
+          }
+        }
         tracksCache.set(targetUrl, {
           tracks,
           expiresAt: Date.now() + (tracks.length > 0 ? TRACK_CACHE_TTL_MS : Math.min(TRACK_CACHE_TTL_MS, 5000))
