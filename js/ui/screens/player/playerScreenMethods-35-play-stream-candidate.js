@@ -284,7 +284,10 @@ export function createPlayerScreenMethods35() {
         next: next.id || "",
         attempt: this.vidaaAutoPlayFailoverAttempts
       });
-      void this.playStreamCandidate(next, { preservePlaybackState: true });
+      void this.playStreamCandidate(next, {
+        preservePlaybackState: true,
+        mountToken: this.playerMountToken
+      });
       return true;
     },
     async switchStream(direction) {
