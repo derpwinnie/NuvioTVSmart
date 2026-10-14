@@ -15,9 +15,12 @@ export function canReleasePlayingNativeStartupAudioGate({
 
 export function shouldAllowNativePlaybackDuringStartupAudioGate({
   isHlsPlayback = false,
-  isPrioritizedWebOsRemoteMkvPlayback = false
+  isPrioritizedWebOsRemoteMkvPlayback = false,
+  isVidaaPlayback = false
 } = {}) {
-  return Boolean(isHlsPlayback || isPrioritizedWebOsRemoteMkvPlayback);
+  // VIDAA's player often exposes no switchable audio tracks, so holding the
+  // video paused for a language match can leave it stuck on its first frame.
+  return Boolean(isHlsPlayback || isPrioritizedWebOsRemoteMkvPlayback || isVidaaPlayback);
 }
 
 export function selectStartupAudioFallbackOption(options = []) {

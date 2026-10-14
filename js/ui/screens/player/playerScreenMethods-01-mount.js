@@ -196,7 +196,8 @@ export function createPlayerScreenMethods01() {
           Environment.isWebOS() && !this.currentEngineFsStream && this.isCurrentSourceLikelyMkv(initialStreamUrl, sourceCandidate);
         const allowNativePlaybackDuringStartupAudioGate = shouldAllowNativePlaybackDuringStartupAudioGate({
           isHlsPlayback: this.isCurrentSourceLikelyHls(initialStreamUrl, sourceCandidate),
-          isPrioritizedWebOsRemoteMkvPlayback: prioritizeWebOsRemoteMkvPlayback
+          isPrioritizedWebOsRemoteMkvPlayback: prioritizeWebOsRemoteMkvPlayback,
+          isVidaaPlayback: Environment.isVidaa()
         });
         if (prioritizeWebOsRemoteMkvPlayback) {
           // The probe must start only after webOS has accepted the media request,

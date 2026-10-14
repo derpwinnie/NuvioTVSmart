@@ -98,7 +98,8 @@ export function createPlayerScreenMethods34() {
         Environment.isWebOS() && !nextEngineFsState && this.isCurrentSourceLikelyMkv(streamUrl, sourceCandidate);
       const allowNativePlaybackDuringStartupAudioGate = shouldAllowNativePlaybackDuringStartupAudioGate({
         isHlsPlayback: this.isCurrentSourceLikelyHls(streamUrl, sourceCandidate),
-        isPrioritizedWebOsRemoteMkvPlayback: prioritizeWebOsRemoteMkvPlayback
+        isPrioritizedWebOsRemoteMkvPlayback: prioritizeWebOsRemoteMkvPlayback,
+        isVidaaPlayback: Environment.isVidaa()
       });
       const sameEngineFsState = this.isSameEngineFsState(this.currentEngineFsStream, nextEngineFsState);
       if (this.currentEngineFsStream && !this.isSameEngineFsState(this.currentEngineFsStream, nextEngineFsState)) {
