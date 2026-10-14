@@ -1,4 +1,5 @@
 import * as internals from "./homeScreenContext.js";
+import { VIDAA_NAVIGATION_SETTLE_MS } from "../../navigation/vidaaNavigationActivity.js";
 
 export function createHomeScreenMethods10() {
   const { Platform, MODERN_HOME_CONSTANTS, getTvRuntimePerformanceProfile, shouldEnrichModernHero, preloadHeroAssets, buildHeroIdentity } =
@@ -56,7 +57,7 @@ export function createHomeScreenMethods10() {
         }
         callback();
       };
-      const preloadDelay = isVidaa ? Math.max(250, delay) : Math.max(0, Math.min(120, delay - 80));
+      const preloadDelay = isVidaa ? Math.max(VIDAA_NAVIGATION_SETTLE_MS, delay) : Math.max(0, Math.min(120, delay - 80));
       this.heroBackdropPreloadTimer = setTimeout(() => {
         this.heroBackdropPreloadTimer = null;
         waitForVerticalSettle(() => {

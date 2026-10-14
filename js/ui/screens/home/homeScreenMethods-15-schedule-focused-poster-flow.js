@@ -1,4 +1,5 @@
 import * as internals from "./homeScreenContext.js";
+import { VIDAA_NAVIGATION_SETTLE_MS } from "../../navigation/vidaaNavigationActivity.js";
 
 export function createHomeScreenMethods15() {
   const {
@@ -56,7 +57,7 @@ export function createHomeScreenMethods15() {
       const requestedDelayMs = canReuseExistingState
         ? Math.max(0, Number(existingState.activated ? 0 : (existingState.activateAt || now) - now))
         : defaultDelayMs;
-      const delayMs = isVidaa ? Math.max(250, requestedDelayMs) : requestedDelayMs;
+      const delayMs = isVidaa ? Math.max(VIDAA_NAVIGATION_SETTLE_MS, requestedDelayMs) : requestedDelayMs;
       const flowToken = Number(this.focusedPosterFlowToken || 0) + 1;
       this.focusedPosterFlowToken = flowToken;
       this.focusedPosterFlowState = {
@@ -95,7 +96,7 @@ export function createHomeScreenMethods15() {
         };
         this.focusedPosterTrailerPrefetchTimer = setTimeout(
           !isVidaa && deferUntilVerticalSettle ? waitForVerticalSettleThenPrefetch : prefetchTrailer,
-          isVidaa ? 250 : deferUntilVerticalSettle ? MODERN_HOME_CONSTANTS.verticalScrollSettlePollMs : 150
+          isVidaa ? VIDAA_NAVIGATION_SETTLE_MS : deferUntilVerticalSettle ? MODERN_HOME_CONSTANTS.verticalScrollSettlePollMs : 150
         );
       }
       if (

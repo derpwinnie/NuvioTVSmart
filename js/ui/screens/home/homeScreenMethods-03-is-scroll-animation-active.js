@@ -1,5 +1,6 @@
 import * as internals from "./homeScreenContext.js";
 import { isVidaaNavigationBusy } from "../../navigation/vidaaNavigationActivity.js";
+import { VIDAA_FOCUS_SCROLL_DURATION_MS } from "../../navigation/vidaaFocusScroll.js";
 
 export function createHomeScreenMethods03() {
   const {
@@ -269,7 +270,7 @@ export function createHomeScreenMethods03() {
     getScrollDuration(base) {
       const baseline = Number.isFinite(base) ? base : 150;
       if (Platform.isVidaa()) {
-        return 140;
+        return VIDAA_FOCUS_SCROLL_DURATION_MS;
       }
       if (this.isLegacyTvRuntime()) {
         return 0;

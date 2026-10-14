@@ -1,5 +1,5 @@
 import * as internals from "./homeScreenContext.js";
-import { animateVidaaFocusScroll } from "../../navigation/vidaaFocusScroll.js";
+import { animateVidaaFocusScroll, VIDAA_FOCUS_SCROLL_DURATION_MS } from "../../navigation/vidaaFocusScroll.js";
 import { settleVidaaHomeReturnFocus } from "./vidaaHomeReturnFocus.js";
 
 export function createHomeScreenMethods02() {
@@ -155,7 +155,7 @@ export function createHomeScreenMethods02() {
           this.modernCameraFollowLastHorizontalContainer = container;
         }
         animateVidaaFocusScroll(this, container, axis, targetValue, {
-          duration: Number(duration) > 0 ? 140 : 0
+          duration: Number(duration) > 0 ? VIDAA_FOCUS_SCROLL_DURATION_MS : 0
         });
         return;
       }
@@ -218,7 +218,7 @@ export function createHomeScreenMethods02() {
         return;
       }
       if (Platform.isVidaa()) {
-        animateVidaaFocusScroll(this, container, axis, targetValue, { duration: 140 });
+        animateVidaaFocusScroll(this, container, axis, targetValue, { duration: VIDAA_FOCUS_SCROLL_DURATION_MS });
         return;
       }
       const property = axis === "y" ? "scrollTop" : "scrollLeft";
