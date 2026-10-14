@@ -12,6 +12,8 @@ import { I18n } from "../../i18n/index.js";
 
 import { getTvRuntimePerformanceProfile } from "../../platform/tvRuntimePerformance.js";
 
+import { Platform } from "../../platform/index.js";
+
 import {
   renderModernSidebar,
   isModernSidebarBlurAvailable,
@@ -104,7 +106,7 @@ export function setLegacySidebarExpanded(container, expanded) {
   if (!sidebar) {
     return;
   }
-  if (getTvRuntimePerformanceProfile().platform === "vidaa") {
+  if (Platform.isVidaa()) {
     const shouldExpand = Boolean(expanded);
     const requestedExpanded = sidebar._vidaaSidebarExpanded ?? sidebar.classList.contains("expanded");
     // Every card move requests the collapsed state. Keep that path free of

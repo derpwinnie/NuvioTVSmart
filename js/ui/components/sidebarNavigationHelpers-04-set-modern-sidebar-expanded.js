@@ -12,6 +12,8 @@ import { I18n } from "../../i18n/index.js";
 
 import { getTvRuntimePerformanceProfile } from "../../platform/tvRuntimePerformance.js";
 
+import { Platform } from "../../platform/index.js";
+
 import { syncSidebarStateClasses, scheduleRootSidebarTextFit } from "./sidebarNavigationHelpers-01-root-sidebar-items.js";
 
 export function setModernSidebarExpanded(container, expanded) {
@@ -19,7 +21,7 @@ export function setModernSidebarExpanded(container, expanded) {
   if (!shell) {
     return false;
   }
-  if (getTvRuntimePerformanceProfile().platform === "vidaa") {
+  if (Platform.isVidaa()) {
     const shouldExpand = Boolean(expanded);
     const requestedExpanded = shell._vidaaSidebarExpanded ?? shell.classList.contains("expanded");
     if (requestedExpanded === shouldExpand) {
