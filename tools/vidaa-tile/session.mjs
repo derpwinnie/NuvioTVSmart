@@ -8,11 +8,14 @@
 // without it (and start faster).
 let mqttLib = null;
 const loadMqtt = async () => (mqttLib ??= (await import("mqtt")).default);
+import net from "node:net";
+import tls from "node:tls";
 import * as protocol from "./protocol.mjs";
 import { tvTimestamp as realTvTimestamp } from "./discovery.mjs";
 import { readState, writeState } from "./store.mjs";
 
 const DEFAULT_PORT = 36669;
+const CONNECT_TIMEOUT_MS = 10000;
 const REFRESH_MARGIN_MS = 12 * 3600 * 1000;
 // After this many consecutive failed pairings with the stored device UUID, the
 // next pairing uses a fresh UUID (the TV may hold a broken state for the old
@@ -54,55 +57,73 @@ export class CertificateError extends Error {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Open a verified TLS MQTT connection. Resolves a small wrapper with a message
-// log and a waitFor(topic) helper; rejects with a classified error.
+// Open the TLS connection to the TV and verify it before any MQTT data (the
+// CONNECT packet carries our credentials: the access token, or on refresh the
+// refresh token) is sent.
 //
 // Verification: with a CA (secrets.caPem) the chain is checked normally. Without
 // one, the TV's self-signed certificate is trusted on first use and pinned —
 // `expectedFingerprint` (from the stored record) must then match, so a later
-// impostor on the same address is rejected.
-// Open a connection and enforce the pinned certificate (when we are not
-// verifying against a CA). Checking here, after connect resolves, keeps the
-// end/throw out of the client's own event handler.
-async function openVerified(args) {
-  const conn = await connect(args);
-  const { secrets, expectedFingerprint } = args;
-  if (!secrets.caPem && expectedFingerprint && conn.fingerprint !== expectedFingerprint) {
-    await conn.stop();
-    throw new CertificateError("the TV certificate changed since pairing (possible impostor)");
-  }
-  return conn;
-}
-
-async function connect({ host, port, creds, secrets, expectedFingerprint = null }) {
-  const mqtt = await loadMqtt();
-  void expectedFingerprint;
+// impostor on the same address fails here, at the TLS handshake. First-ever
+// pairing has nothing to compare against (TOFU).
+function openTls({ host, port, secrets, expectedFingerprint }) {
   const opts = {
     host,
     port,
-    protocol: "mqtts",
+    ...(net.isIP(host) === 0 ? { servername: host } : {}),
+    ...(secrets.cert ? { cert: secrets.cert, key: secrets.key } : {}),
+    ...(secrets.pfx ? { pfx: secrets.pfx, passphrase: secrets.passphrase } : {}),
+    ...(secrets.caPem
+      ? { ca: secrets.caPem, rejectUnauthorized: true }
+      : { rejectUnauthorized: false })
+  };
+  return new Promise((resolve, reject) => {
+    const socket = tls.connect(opts);
+    const fail = (err) => {
+      clearTimeout(timer);
+      socket.destroy();
+      reject(err);
+    };
+    const timer = setTimeout(
+      () => fail(new UnreachableError("TV not reachable: connection timed out")),
+      CONNECT_TIMEOUT_MS
+    );
+    socket.once("error", (err) =>
+      fail(new UnreachableError(`TV not reachable: ${err?.message || err?.code || "error"}`))
+    );
+    socket.once("secureConnect", () => {
+      const fingerprint = socket.getPeerCertificate()?.fingerprint256;
+      if (!secrets.caPem && expectedFingerprint && fingerprint !== expectedFingerprint) {
+        fail(new CertificateError("the TV certificate changed since pairing (possible impostor)"));
+        return;
+      }
+      clearTimeout(timer);
+      // From here on mqtt reports socket errors; keep a no-op so none is
+      // unhandled in between.
+      socket.removeAllListeners("error");
+      socket.on("error", () => {});
+      resolve({ socket, fingerprint });
+    });
+  });
+}
+
+// Open a verified TLS MQTT connection. Resolves a small wrapper with a message
+// log and a waitFor(topic) helper; rejects with a classified error.
+async function openVerified({ host, port, creds, secrets, expectedFingerprint = null }) {
+  const mqtt = await loadMqtt();
+  const { socket, fingerprint } = await openTls({ host, port, secrets, expectedFingerprint });
+  const opts = {
     protocolVersion: 4,
     clientId: creds.clientId,
     username: creds.username,
     password: creds.password,
-    ...(secrets.cert ? { cert: secrets.cert, key: secrets.key } : {}),
-    ...(secrets.pfx ? { pfx: secrets.pfx, passphrase: secrets.passphrase } : {}),
     reconnectPeriod: 0,
-    connectTimeout: 10000,
-    pfxForceNativeStore: false
+    connectTimeout: CONNECT_TIMEOUT_MS
   };
-  if (secrets.caPem) {
-    opts.ca = secrets.caPem;
-    opts.rejectUnauthorized = true;
-  } else {
-    // Pin-on-first-use: the TV uses a self-signed certificate, so we cannot
-    // verify a chain. The caller compares the peer fingerprint against the one
-    // stored at pairing time.
-    opts.rejectUnauthorized = false;
-  }
 
   return new Promise((resolve, reject) => {
-    const client = mqtt.connect(opts);
+    // The socket is already verified; mqtt only writes CONNECT on top of it.
+    const client = new mqtt.MqttClient(() => socket, opts);
     const messages = [];
     let settled = false;
 
@@ -113,13 +134,6 @@ async function connect({ host, port, creds, secrets, expectedFingerprint = null 
     client.on("connect", () => {
       if (settled) return;
       settled = true;
-      const socket = client.stream?.socket || client.stream;
-      let fingerprint;
-      try {
-        fingerprint = socket?.getPeerCertificate?.()?.fingerprint256;
-      } catch {
-        /* ignore */
-      }
       resolve({
         client,
         messages,
@@ -155,6 +169,14 @@ async function connect({ host, port, creds, secrets, expectedFingerprint = null 
         reject(new UnreachableError(`TV not reachable: ${err?.message || code || "error"}`));
       }
     });
+
+    // The TV dropped the connection before answering CONNECT.
+    client.on("close", () => {
+      if (settled) return;
+      settled = true;
+      client.end(true);
+      reject(new UnreachableError("TV not reachable: connection closed"));
+    });
   });
 }
 
@@ -179,11 +201,9 @@ export async function pair({
   port = DEFAULT_PORT,
   pinProvider,
   onPinReady,
-  store = { readState, writeState },
   secrets,
   getTimestamp
 }) {
-  void store;
   const ts = await (getTimestamp ? getTimestamp() : realTvTimestamp(host));
   const prev = readState().tvs[host];
   const reused = Boolean(prev?.deviceId) && !pairFailuresExceeded(prev);
