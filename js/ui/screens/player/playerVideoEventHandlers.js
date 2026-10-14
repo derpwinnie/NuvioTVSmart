@@ -223,7 +223,7 @@ export function createPlayerVideoEventHandlers(video, isTizenAvPlayPlayback) {
         return;
       }
       this.markPlaybackSourceFailed(this.activePlaybackUrl);
-      if (this.tryVidaaAutoPlayNextSource(currentSourceCandidate)) {
+      if (this.tryVidaaAutoPlayNextSource(currentSourceCandidate, { mediaErrorCode })) {
         return;
       }
       const startupErrorMessage = this.getStartupErrorMessage(mediaErrorCode, playbackErrorDetail, currentSourceCandidate);

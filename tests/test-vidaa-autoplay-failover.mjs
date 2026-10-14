@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   getVidaaAutoPlayFailoverEligibility,
+  isVidaaFailoverMediaError,
   pickVidaaNextAutoPlayCandidate,
   VIDAA_AUTOPLAY_FAILOVER_MAX_ATTEMPTS
 } from "../js/platform/vidaa/vidaaAutoPlayFailover.js";
@@ -30,13 +31,13 @@ assert.equal(
   "c"
 );
 
-// Regex mode with no other match: fall back to list order instead of giving up.
+// Regex mode with no other match: stop, the user's rule excludes the rest.
 assert.equal(
   pickVidaaNextAutoPlayCandidate(list, {
     ...failedA,
     settings: { streamAutoPlayMode: "REGEX_MATCH", streamAutoPlayRegex: "2160p" }
-  })?.id,
-  "b"
+  }),
+  null
 );
 
 // Without settings: list order after the failed one, wrapping around, skipping failures.
@@ -64,6 +65,15 @@ assert.equal(
   }),
   null
 );
+
+// Only decode/format errors, or network errors while online, trigger a failover.
+assert.equal(isVidaaFailoverMediaError(3), true);
+assert.equal(isVidaaFailoverMediaError(4), true);
+assert.equal(isVidaaFailoverMediaError(2, true), true);
+assert.equal(isVidaaFailoverMediaError(2, undefined), true);
+assert.equal(isVidaaFailoverMediaError(2, false), false);
+assert.equal(isVidaaFailoverMediaError(1), false);
+assert.equal(isVidaaFailoverMediaError(0), false);
 
 // Eligibility: only sources the auto-play logic picked, never a user's choice.
 assert.equal(

@@ -21,6 +21,15 @@ function isUntried(candidate, { currentId, failedUrls, failedIds }) {
   );
 }
 
+// A source failed to start because of the source itself (decode / unsupported format,
+// code 3/4) or the network (code 2). Code 2 while the TV is offline is not the source's
+// fault, so trying the next one would only burn through the list.
+export function isVidaaFailoverMediaError(mediaErrorCode, online = true) {
+  const code = Number(mediaErrorCode);
+  if (code === 3 || code === 4) return true;
+  return code === 2 && online !== false;
+}
+
 // Failover only replaces a source the auto-play (or auto-resume) logic picked, never one
 // the user chose on the Sources screen or in the player's Sources panel.
 // Returns "eligible" or the reason it is not.
@@ -69,11 +78,11 @@ export function pickVidaaNextAutoPlayCandidate(
       selectedAddons: settings.streamAutoPlaySelectedAddons,
       selectedPlugins: settings.streamAutoPlaySelectedPlugins
     });
-    if (ranked) {
-      return ranked;
-    }
+    // When the user's rules exclude every remaining source, stop: the first pick
+    // would not have chosen any of them either.
+    return ranked || null;
   }
-  // Nothing matches the ranking rules any more: fall back to list order after the failed one.
+  // No ranking rules given: list order after the failed one.
   const start = list.findIndex(
     (candidate) => String(candidate?.id || "") === String(currentId || "")
   );

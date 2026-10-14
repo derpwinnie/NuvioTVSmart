@@ -2,6 +2,7 @@
 import * as internals from "./playerScreenContext.js";
 import {
   getVidaaAutoPlayFailoverEligibility,
+  isVidaaFailoverMediaError,
   pickVidaaNextAutoPlayCandidate
 } from "../../../platform/vidaa/vidaaAutoPlayFailover.js";
 
@@ -243,7 +244,7 @@ export function createPlayerScreenMethods35() {
     },
     // VIDAA + automatic source selection: when a source fails to start, play the
     // next one instead of showing the error. Returns true when a retry started.
-    tryVidaaAutoPlayNextSource(failedCandidate = this.getCurrentStreamCandidate()) {
+    tryVidaaAutoPlayNextSource(failedCandidate = this.getCurrentStreamCandidate(), { mediaErrorCode = 0 } = {}) {
       const settings = PlayerSettingsStore.get();
       const autoPlayOn =
         String(settings.streamAutoPlayMode || "MANUAL").toUpperCase() !== "MANUAL" && isAutoPlayEffectivelyEnabled(settings);
@@ -260,6 +261,14 @@ export function createPlayerScreenMethods35() {
         console.info("VIDAA auto-play failover skipped", {
           reason: eligibility,
           mode: settings.streamAutoPlayMode || "MANUAL"
+        });
+        return false;
+      }
+      if (!isVidaaFailoverMediaError(mediaErrorCode, globalThis.navigator?.onLine)) {
+        console.info("VIDAA auto-play failover skipped", {
+          reason: "error-not-source-related",
+          mediaErrorCode,
+          online: globalThis.navigator?.onLine !== false
         });
         return false;
       }
@@ -293,6 +302,9 @@ export function createPlayerScreenMethods35() {
         next: next.id || "",
         attempt: this.vidaaAutoPlayFailoverAttempts
       });
+      // Like the engine switch: let the next source report its own startup error
+      // instead of having it swallowed by the 120 ms error throttle.
+      this.lastPlaybackErrorAt = 0;
       void this.playStreamCandidate(next, {
         preservePlaybackState: true,
         mountToken: this.playerMountToken
