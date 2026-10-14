@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   animateVidaaFocusScroll,
+  getVidaaCardScrollTop,
   VIDAA_FOCUS_SCROLL_DURATION_MS
 } from "../js/ui/navigation/vidaaFocusScroll.js";
 import { ScreenUtils } from "../js/ui/navigation/screen.js";
@@ -276,6 +277,26 @@ for (const platform of ["vidaa", "tizen", "webos", "browser"]) {
   assert.equal(container.style.display, "block");
   assert.equal(frames.size, platform === "vidaa" ? 1 : 0, `${platform} viewport restore frames`);
   frames.clear();
+}
+
+// Shared card scroll target: nearest edge with 20px padding, or centered.
+{
+  const cardScroller = (scrollTop) => ({
+    scrollTop,
+    clientHeight: 500,
+    getBoundingClientRect: () => ({ top: 100, bottom: 600 })
+  });
+  const card = (top, height = 100) => ({
+    getBoundingClientRect: () => ({ top, bottom: top + height, height })
+  });
+  // Card at content 300-400 is fully inside 200-700: keep position.
+  assert.equal(getVidaaCardScrollTop(cardScroller(200), card(200)), 200);
+  // Card at content 210-310 sits inside the top padding: align to top - 20.
+  assert.equal(getVidaaCardScrollTop(cardScroller(200), card(110)), 190);
+  // Card at content 650-750 crosses the bottom edge: align bottom + 20.
+  assert.equal(getVidaaCardScrollTop(cardScroller(200), card(550)), 270);
+  // Centering puts the card in the middle of the viewport.
+  assert.equal(getVidaaCardScrollTop(cardScroller(200), card(550), { center: true }), 450);
 }
 
 console.log("VIDAA continuous focus scrolling and geometry regressions passed.");
