@@ -119,6 +119,8 @@ export function createPlayerScreenMethods64() {
 
       const selectedStream = list[clamp(index, 0, Math.max(0, list.length - 1))] || null;
       if (selectedStream) {
+        // A source the user picked is never swapped for another one automatically.
+        this.vidaaUserPickedSource = true;
         await this.playStreamCandidate(selectedStream, { preservePlaybackState: true });
       }
     },

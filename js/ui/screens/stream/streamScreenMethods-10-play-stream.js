@@ -15,7 +15,8 @@ export function createStreamScreenMethods10() {
   } = internals;
 
   return {
-    async playStream(streamId) {
+    // autoPlaySelected: the auto-play/auto-resume logic picked this source, not the user.
+    async playStream(streamId, { autoPlaySelected = false } = {}) {
       this.cancelAutoPlayCountdown();
       this.cancelAutoPlaySelectionWait();
       const filtered = this.getFilteredStreams();
@@ -93,6 +94,7 @@ export function createStreamScreenMethods10() {
           selectedStreamId: selected.id || ""
         },
         returnToStreamOnBack: true,
+        autoPlaySelected: Boolean(autoPlaySelected),
         streamRouteParams: this.params ? { ...this.params } : null,
         fromDetailRoute: Boolean(this.params?.fromDetailRoute),
         nextEpisodeVideoId: this.params?.nextEpisodeVideoId || null,

@@ -10,6 +10,7 @@ console.error = originalError;
 
 const state = {
   vidaaAutoPlayFailoverAttempts: 3,
+  vidaaUserPickedSource: true,
   vidaaBufferGapArm: { until: Infinity, maxGapSeconds: 20 }
 };
 // Methods called during initialization are no-ops here.
@@ -20,5 +21,6 @@ initializePlayerMountState.call(screen, {}, "https://example.com/a.mkv");
 
 assert.equal(state.vidaaAutoPlayFailoverAttempts, 0);
 assert.equal(state.vidaaBufferGapArm, null);
+assert.equal(state.vidaaUserPickedSource, false);
 
 console.log("VIDAA player mount reset checks passed.");

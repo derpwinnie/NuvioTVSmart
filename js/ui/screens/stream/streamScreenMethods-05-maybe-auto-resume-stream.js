@@ -64,7 +64,7 @@ export function createStreamScreenMethods05() {
         identityMatch || (canReusePreferredStream ? this.streams.find((stream) => String(stream?.id || "") === preferredStreamId) : null);
       if (match?.id) {
         this.autoResumeAttempted = true;
-        void this.playStream(match.id);
+        void this.playStream(match.id, { autoPlaySelected: true });
         return;
       }
       if (!allLoaded && !this.streamSearchCompleted) {
@@ -128,7 +128,7 @@ export function createStreamScreenMethods05() {
       this.autoPlayAttempted = true;
       this.autoPlayLaunching = true;
       this.cancelAutoPlaySelectionWait();
-      void this.playStream(selected.id);
+      void this.playStream(selected.id, { autoPlaySelected: true });
     },
     cancelAutoPlaySelectionWait() {
       if (this.autoPlaySelectionWaitTimer) {
@@ -146,7 +146,7 @@ export function createStreamScreenMethods05() {
       }
       const total = Math.max(0, Math.trunc(Number(seconds) || 0));
       if (total <= 0) {
-        void this.playStream(stream.id);
+        void this.playStream(stream.id, { autoPlaySelected: true });
         return;
       }
       this.endVidaaAutoPlaySelecting();
@@ -164,7 +164,7 @@ export function createStreamScreenMethods05() {
         if (this.autoPlayCountdown.secondsLeft <= 0) {
           const targetId = this.autoPlayCountdown.streamId;
           this.cancelAutoPlayCountdown();
-          void this.playStream(targetId);
+          void this.playStream(targetId, { autoPlaySelected: true });
           return;
         }
         this.requestRender({ delayMs: 0 });

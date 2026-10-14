@@ -1,6 +1,9 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
-import { pickVidaaNextAutoPlayCandidate } from "../../../platform/vidaa/vidaaAutoPlayFailover.js";
+import {
+  getVidaaAutoPlayFailoverEligibility,
+  pickVidaaNextAutoPlayCandidate
+} from "../../../platform/vidaa/vidaaAutoPlayFailover.js";
 
 export function createPlayerScreenMethods35() {
   const {
@@ -247,9 +250,15 @@ export function createPlayerScreenMethods35() {
       if (!Environment.isVidaa()) {
         return false;
       }
-      if (!autoPlayOn || this.params?.streamRouteParams?.manualSelection) {
+      const eligibility = getVidaaAutoPlayFailoverEligibility({
+        autoPlayOn,
+        autoPlaySelected: this.params?.autoPlaySelected,
+        manualSelection: this.params?.streamRouteParams?.manualSelection,
+        userPickedSource: this.vidaaUserPickedSource
+      });
+      if (eligibility !== "eligible") {
         console.info("VIDAA auto-play failover skipped", {
-          reason: autoPlayOn ? "manual-selection" : "auto-play-off",
+          reason: eligibility,
           mode: settings.streamAutoPlayMode || "MANUAL"
         });
         return false;
@@ -307,6 +316,7 @@ export function createPlayerScreenMethods35() {
       if (!selected) {
         return;
       }
+      this.vidaaUserPickedSource = true;
       await this.playStreamCandidate(selected, { preservePlaybackState: true });
     },
     markPlaybackSourceFailed(url = this.activePlaybackUrl, streamCandidate = this.getCurrentStreamCandidate()) {
