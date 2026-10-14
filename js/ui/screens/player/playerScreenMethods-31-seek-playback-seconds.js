@@ -1,11 +1,17 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
+import { Platform } from "../../../platform/index.js";
+import { armVidaaBufferGap, VIDAA_RESUME_GAP_SECONDS, VIDAA_SEEK_GAP_SECONDS } from "../../../platform/vidaa/vidaaBufferGap.js";
 
 export function createPlayerScreenMethods31() {
   const { PlayerController, PlayerSettingsStore, t, escapeHtml, formatNextEpisodeAirDate } = internals;
 
   return {
-    seekPlaybackSeconds(seconds, { preserveSkipIntroSuppression = false } = {}) {
+    seekPlaybackSeconds(seconds, { preserveSkipIntroSuppression = false, vidaaGapMaxSeconds = VIDAA_SEEK_GAP_SECONDS } = {}) {
+      if (Platform.isVidaa()) {
+        // Allow one buffer-gap jump right after this seek (see bindVideoEvents).
+        this.vidaaBufferGapArm = armVidaaBufferGap(vidaaGapMaxSeconds);
+      }
       const currentSeconds = Number(this.getPlaybackCurrentSeconds());
       const targetSeconds = Number(seconds);
       if (Number.isFinite(currentSeconds) && Number.isFinite(targetSeconds) && targetSeconds < currentSeconds - 0.5) {
@@ -103,7 +109,9 @@ export function createPlayerScreenMethods31() {
       restore.lastAttemptAt = now;
       restore.attempts = Number(restore.attempts || 0) + 1;
 
-      const didSeek = this.seekPlaybackSeconds(targetSeconds);
+      const didSeek = this.seekPlaybackSeconds(targetSeconds, {
+        vidaaGapMaxSeconds: VIDAA_RESUME_GAP_SECONDS
+      });
       if (!didSeek && restore.attempts >= 8) {
         this.finalizePendingPlaybackRestore(restore);
       }

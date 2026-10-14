@@ -283,6 +283,7 @@ export function initializePlayerMountState(params, initialStreamUrl) {
   this.hlsManifestSubtitlePromotionUrls = new Set();
   this.activePlaybackUrl = initialStreamUrl || null;
   this.pendingPlaybackRestore = buildPendingPlaybackRestore(params);
+  this.vidaaBufferGapArm = null;
   this.trackDiscoveryToken = 0;
   this.trackDiscoveryInProgress = false;
   this.trackDiscoveryTimer = null;

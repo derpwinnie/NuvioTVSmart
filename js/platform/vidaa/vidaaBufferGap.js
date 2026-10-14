@@ -26,3 +26,28 @@ export function getVidaaBufferGapTarget(
   const next = ranges.find(([start]) => start > time && start - time <= maxGapSeconds);
   return next ? next[0] + GAP_LANDING_OFFSET_SECONDS : null;
 }
+
+// The gap jump is only safe right after we moved the position ourselves: a stall at the
+// end of a buffered range during normal playback is a real underrun, not a keyframe gap.
+export const VIDAA_BUFFER_GAP_ARM_MS = 8000;
+// A resume restore can land far in front of a keyframe; a user seek only a little.
+export const VIDAA_RESUME_GAP_SECONDS = VIDAA_MAX_BUFFER_GAP_SECONDS;
+export const VIDAA_SEEK_GAP_SECONDS = 5;
+
+export function armVidaaBufferGap(maxGapSeconds, now = Date.now()) {
+  return { until: now + VIDAA_BUFFER_GAP_ARM_MS, maxGapSeconds };
+}
+
+// Returns the time to jump to, or null when the jump is not armed (or expired), the user
+// is scrubbing, a seek is still running, or no small gap sits in front of currentTime.
+export function shouldJumpVidaaBufferGap({
+  armed,
+  now = Date.now(),
+  currentTime,
+  ranges,
+  seeking = false,
+  scrubbing = false
+}) {
+  if (!armed || !(now <= armed.until) || seeking || scrubbing) return null;
+  return getVidaaBufferGapTarget(currentTime, ranges, armed.maxGapSeconds);
+}

@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { getVidaaBufferGapTarget, timeRangesToArray } from "../js/platform/vidaa/vidaaBufferGap.js";
+import {
+  armVidaaBufferGap,
+  getVidaaBufferGapTarget,
+  shouldJumpVidaaBufferGap,
+  timeRangesToArray,
+  VIDAA_RESUME_GAP_SECONDS,
+  VIDAA_SEEK_GAP_SECONDS
+} from "../js/platform/vidaa/vidaaBufferGap.js";
 
 const near = (actual, expected) =>
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
@@ -49,5 +56,88 @@ assert.deepEqual(timeRangesToArray(timeRanges), [
   [5, 9]
 ]);
 assert.deepEqual(timeRangesToArray(null), []);
+
+// Armed jump: only right after a resume restore or a seek.
+const t0 = 1_000_000;
+const resumeArm = armVidaaBufferGap(VIDAA_RESUME_GAP_SECONDS, t0);
+const seekArm = armVidaaBufferGap(VIDAA_SEEK_GAP_SECONDS, t0);
+
+// A stall at the end of a buffered range during normal playback is a real underrun.
+assert.equal(
+  shouldJumpVidaaBufferGap({
+    armed: null,
+    now: t0,
+    currentTime: 40,
+    ranges: [
+      [0, 40],
+      [42, 50]
+    ]
+  }),
+  null
+);
+
+// Armed by a resume restore: a gap up to 20 s is stepped over.
+near(
+  shouldJumpVidaaBufferGap({
+    armed: resumeArm,
+    now: t0 + 500,
+    currentTime: 410,
+    ranges: [[429.5, 440]]
+  }),
+  429.51
+);
+
+// Armed by a user seek: only small gaps (5 s).
+near(
+  shouldJumpVidaaBufferGap({
+    armed: seekArm,
+    now: t0 + 500,
+    currentTime: 100,
+    ranges: [[104, 120]]
+  }),
+  104.01
+);
+assert.equal(
+  shouldJumpVidaaBufferGap({
+    armed: seekArm,
+    now: t0 + 500,
+    currentTime: 100,
+    ranges: [[110, 120]]
+  }),
+  null
+);
+
+// The arm expires after a few seconds.
+assert.equal(
+  shouldJumpVidaaBufferGap({
+    armed: resumeArm,
+    now: t0 + 9000,
+    currentTime: 410,
+    ranges: [[420, 440]]
+  }),
+  null
+);
+
+// Never while a seek is still running or the user is scrubbing.
+assert.equal(
+  shouldJumpVidaaBufferGap({
+    armed: resumeArm,
+    now: t0,
+    currentTime: 410,
+    ranges: [[420, 440]],
+    seeking: true
+  }),
+  null
+);
+assert.equal(
+  shouldJumpVidaaBufferGap({
+    armed: resumeArm,
+    now: t0,
+    currentTime: 410,
+    ranges: [[420, 440]],
+    scrubbing: true
+  }),
+  null
+);
 
 console.log("VIDAA buffer gap checks passed.");
