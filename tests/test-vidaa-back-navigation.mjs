@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { getVidaaPlayerBackTarget } from "../js/platform/vidaa/vidaaBackNavigation.js";
 
 // Continue Watching: Home -> Sources -> Player returns to Home.
-assert.deepEqual(getVidaaPlayerBackTarget(["home", { route: "stream", params: { itemId: "tt1" } }]), { route: "home", params: {} });
+assert.deepEqual(
+  getVidaaPlayerBackTarget(["home", { route: "stream", params: { itemId: "tt1" } }]),
+  { route: "home", params: {} }
+);
 
 // Detail -> Sources -> Player returns to the same Detail.
 assert.deepEqual(

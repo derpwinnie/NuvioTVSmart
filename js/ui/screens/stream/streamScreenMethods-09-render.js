@@ -114,9 +114,10 @@ export function createStreamScreenMethods09() {
         body = `<div class="stream-route-empty">${escapeHtml(t("sources_no_streams", {}, "No streams found"))}</div>`;
       }
 
-      const routeContent = this.autoResumeUiActive || this.vidaaAutoPlayUiActive
-        ? ""
-        : `
+      const routeContent =
+        this.autoResumeUiActive || this.vidaaAutoPlayUiActive
+          ? ""
+          : `
             <div class="stream-route-content">
               <section class="stream-route-left">
                 <div class="stream-route-left-inner">

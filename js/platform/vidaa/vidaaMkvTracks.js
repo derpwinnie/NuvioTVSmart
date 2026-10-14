@@ -155,7 +155,8 @@ function parseTrackEntry(bytes, entry) {
       case ID_AUDIO:
         readChildren(bytes, child.dataStart, child.dataEnd).forEach((audioChild) => {
           if (audioChild.id === ID_CHANNELS) track.channels = readUint(bytes, audioChild);
-          if (audioChild.id === ID_SAMPLING_FREQUENCY) track.sampleRate = Math.round(readFloat(bytes, audioChild));
+          if (audioChild.id === ID_SAMPLING_FREQUENCY)
+            track.sampleRate = Math.round(readFloat(bytes, audioChild));
         });
         break;
       default:
@@ -270,7 +271,10 @@ async function fetchRange(url, start, maxBytes, fetchImpl) {
   }
 }
 
-export async function fetchVidaaMkvAudioTracks(url, { fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
+export async function fetchVidaaMkvAudioTracks(
+  url,
+  { fetchImpl = globalThis.fetch?.bind(globalThis) } = {}
+) {
   if (!url || typeof fetchImpl !== "function") return [];
   const head = await fetchRange(url, 0, HEAD_BYTES, fetchImpl);
   const parsed = parseMatroskaHead(head);

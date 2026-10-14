@@ -6,8 +6,11 @@ import {
   parseMatroskaTracksAt
 } from "../js/platform/vidaa/vidaaMkvTracks.js";
 
-const bytes = new Uint8Array(await readFile(new URL("./fixtures/vidaa-audio-tracks.mkv", import.meta.url)));
-const summary = (tracks) => tracks.map((track) => [track.type, track.language, track.name, track.codec]);
+const bytes = new Uint8Array(
+  await readFile(new URL("./fixtures/vidaa-audio-tracks.mkv", import.meta.url))
+);
+const summary = (tracks) =>
+  tracks.map((track) => [track.type, track.language, track.name, track.codec]);
 const expected = [
   ["audio", "ger", "Deutsch DD 5.1", "AC3"],
   ["audio", "eng", "", "AAC"],
@@ -37,7 +40,10 @@ const rangedFetch = async (_url, init) => {
   requested.push([start, end]);
   return new Response(bytes.slice(start, end + 1), { status: 206 });
 };
-assert.deepEqual(summary(await fetchVidaaMkvAudioTracks("https://example.com/a.mkv", { fetchImpl: rangedFetch })), expected);
+assert.deepEqual(
+  summary(await fetchVidaaMkvAudioTracks("https://example.com/a.mkv", { fetchImpl: rangedFetch })),
+  expected
+);
 assert.deepEqual(requested, [[0, 256 * 1024 - 1]]);
 
 // 5. A server that ignores Range is not read to the end.
@@ -50,7 +56,10 @@ const fullBody = new ReadableStream({
   }
 });
 const ignoringFetch = async () => new Response(fullBody, { status: 200 });
-assert.deepEqual(await fetchVidaaMkvAudioTracks("https://example.com/a.mkv", { fetchImpl: ignoringFetch }), []);
+assert.deepEqual(
+  await fetchVidaaMkvAudioTracks("https://example.com/a.mkv", { fetchImpl: ignoringFetch }),
+  []
+);
 assert.ok(pulled <= 512 * 1024, `read ${pulled} bytes`);
 
 console.log("vidaa mkv tracks: ok");
