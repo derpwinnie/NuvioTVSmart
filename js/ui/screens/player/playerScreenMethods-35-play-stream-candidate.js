@@ -16,7 +16,8 @@ export function createPlayerScreenMethods35() {
     streamDirectPlaybackUrl,
     PlayerSettingsStore,
     isAutoPlayEffectivelyEnabled,
-    Environment
+    Environment,
+    addonRepository
   } = internals;
 
   return {
@@ -250,7 +251,13 @@ export function createPlayerScreenMethods35() {
         currentId: failedCandidate?.id || "",
         failedUrls: this.failedPlaybackUrls || new Set(),
         failedIds: this.failedPlaybackStreamIds || new Set(),
-        attempts: Number(this.vidaaAutoPlayFailoverAttempts || 0)
+        attempts: Number(this.vidaaAutoPlayFailoverAttempts || 0),
+        settings,
+        installedAddonNames: new Set(
+          (addonRepository.getCachedInstalledAddons() || [])
+            .map((addon) => String(addon?.displayName || addon?.name || "").trim())
+            .filter(Boolean)
+        )
       });
       if (!next) {
         return false;
