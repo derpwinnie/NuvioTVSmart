@@ -244,7 +244,14 @@ export function createPlayerScreenMethods35() {
       const settings = PlayerSettingsStore.get();
       const autoPlayOn =
         String(settings.streamAutoPlayMode || "MANUAL").toUpperCase() !== "MANUAL" && isAutoPlayEffectivelyEnabled(settings);
-      if (!Environment.isVidaa() || !autoPlayOn || this.params?.streamRouteParams?.manualSelection) {
+      if (!Environment.isVidaa()) {
+        return false;
+      }
+      if (!autoPlayOn || this.params?.streamRouteParams?.manualSelection) {
+        console.info("VIDAA auto-play failover skipped", {
+          reason: autoPlayOn ? "manual-selection" : "auto-play-off",
+          mode: settings.streamAutoPlayMode || "MANUAL"
+        });
         return false;
       }
       const next = pickVidaaNextAutoPlayCandidate(this.streamCandidates, {
@@ -260,6 +267,11 @@ export function createPlayerScreenMethods35() {
         )
       });
       if (!next) {
+        console.info("VIDAA auto-play failover skipped", {
+          reason: "no-other-source",
+          candidates: this.streamCandidates.length,
+          attempts: Number(this.vidaaAutoPlayFailoverAttempts || 0)
+        });
         return false;
       }
       this.vidaaAutoPlayFailoverAttempts = Number(this.vidaaAutoPlayFailoverAttempts || 0) + 1;
