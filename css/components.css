@@ -57,4 +57,7 @@
 @import url("./components-57.css");
 @import url("./components-58.css");
 @import url("./components-59.css");
+@import url("./components-60.css");
+/* Extra stylesheets load after all numbered components, matching the
+   production bundle order in scripts/build.mjs (buildCSS). */
 @import url("./components-60-vidaa.css");
