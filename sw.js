@@ -82,7 +82,8 @@ self.addEventListener("fetch", function (e) {
       if (!response || !response.ok) {
         throw new Error("App resource unavailable");
       }
-      if (response && response.status === 200) {
+      // Only cache full 200 responses; other 2xx codes (204, 206) pass through.
+      if (response.status === 200) {
         var clone = response.clone();
         return caches
           .open(CACHE_NAME)
