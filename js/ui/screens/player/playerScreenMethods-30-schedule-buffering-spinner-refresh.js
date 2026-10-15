@@ -160,11 +160,12 @@ export function createPlayerScreenMethods30() {
         })
       ) {
         if (!this.startupAudioPreferenceApplied) {
-          // A native frame can arrive before webOS publishes audio languages.
-          // Keep the bounded startup match alive until discovery settles or the
-          // gate deadline expires; fallback would otherwise latch the default.
+          // A native frame can arrive before webOS publishes audio languages, and
+          // before VIDAA has read the MKV header. Keep the bounded startup match
+          // alive until discovery settles or the gate deadline expires; fallback
+          // would otherwise latch the default over the remembered/preferred track.
           if (
-            Environment.isWebOS() &&
+            (Environment.isWebOS() || Environment.isVidaa()) &&
             Number(this.startupAudioGateDeadline || 0) > 0 &&
             !gateDeadlineExpired &&
             this.isAudioPreferenceDiscoveryPending()

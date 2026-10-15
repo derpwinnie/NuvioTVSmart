@@ -19,15 +19,16 @@ export function createPlayerScreenMethods39() {
       this.syncSubtitleDialogSession();
       const audioTrackSetSignature = this.getStartupAudioTrackSetSignature();
       if (
-        Environment.isWebOS() &&
+        (Environment.isWebOS() || Environment.isVidaa()) &&
         this.startupAudioGateActive &&
         this.startupAudioFallbackApplied &&
         this.startupAudioTrackSetSignature &&
         audioTrackSetSignature !== this.startupAudioTrackSetSignature
       ) {
         // webOS may expose the default track before the complete multi-audio
-        // list. Re-open matching only while startup still owns playback; after
-        // the gate is released, the bounded fallback remains authoritative.
+        // list (VIDAA before the MKV header is read). Re-open matching only while
+        // startup still owns playback; after the gate is released, the bounded
+        // fallback remains authoritative.
         if (this.pendingWebOsAudioSelection?.automaticFallback) {
           PlayerController.cancelWebOsAudioTrackSelection?.();
           this.pendingWebOsAudioSelection = null;
