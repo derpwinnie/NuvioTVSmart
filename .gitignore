@@ -24,6 +24,7 @@ tests/*
 !tests/test-vidaa-buffer-gap.mjs
 !tests/test-vidaa-stall-restart.mjs
 !tests/test-vidaa-audio-support.mjs
+!tests/test-vidaa-audio-support-player.mjs
 !tests/test-vidaa-back-navigation.mjs
 !tests/test-vidaa-autoplay-selecting.mjs
 !tests/test-vidaa-autoplay-failover.mjs

@@ -64,6 +64,9 @@ export function createPlayerScreenMethods40() {
         }
 
         this.lastEmbeddedTrackProbeUrl = probeUrl;
+        if (Environment.isVidaa()) {
+          this.recordVidaaAudioProbe(probeUrl, tracks);
+        }
         this.embeddedSubtitleTracks = canLoadSubtitleTracks ? this.normalizeEmbeddedSubtitleTracks(tracks) : [];
         this.embeddedAudioTracks = canLoadAudioTracks ? this.normalizeEmbeddedAudioTracks(tracks) : [];
         this.warmBitmapSubtitleSharedResources();

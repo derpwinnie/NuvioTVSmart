@@ -285,6 +285,12 @@ export function initializePlayerMountState(params, initialStreamUrl) {
   this.clearVidaaRestoreRetryTimer?.();
   this.pendingPlaybackRestore = buildPendingPlaybackRestore(params);
   this.vidaaBufferGapArm = null;
+  this.stopVidaaAudioCheck?.();
+  this.vidaaAudioCheckTimer = null;
+  this.vidaaAudioCheckState = null;
+  this.vidaaAudioCheckUrl = "";
+  this.vidaaAudioCheckDoneUrl = "";
+  this.vidaaAudioProbe = null;
   this.trackDiscoveryToken = 0;
   this.trackDiscoveryInProgress = false;
   this.trackDiscoveryTimer = null;

@@ -109,6 +109,9 @@ export function createPlayerScreenMethods30() {
       }
       this.hasPresentedPlaybackFrame = true;
       this.beginPlaybackEngineValidation();
+      if (Environment.isVidaa()) {
+        this.startVidaaAudioCheck();
+      }
       this.warmBitmapSubtitleSharedResources();
       if (!this.startupTrackPreferenceReady) {
         // Some P2P / engineFs startups expose tracks before the first real frame

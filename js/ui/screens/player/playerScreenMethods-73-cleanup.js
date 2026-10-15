@@ -59,6 +59,7 @@ export function createPlayerScreenMethods73() {
         });
         this.cancelSeekPreview({ commit: false });
         this.clearVidaaRestoreRetryTimer();
+        this.stopVidaaAudioCheck();
         this.dismissPauseOverlay();
         this.clearSubtitleDelayOverlayTimer();
         this.subtitleDelayOverlayVisible = false;

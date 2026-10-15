@@ -166,7 +166,7 @@ export function createPlayerScreenMethods64() {
 
       return false;
     },
-    showAspectToast(label) {
+    showAspectToast(label, { durationMs = 1400 } = {}) {
       const toast = this.uiRefs?.aspectToast;
       if (!toast) {
         return;
@@ -181,7 +181,7 @@ export function createPlayerScreenMethods64() {
 
       this.aspectToastTimer = setTimeout(() => {
         toast.classList.add("hidden");
-      }, 1400);
+      }, durationMs);
     },
     getAspectModeDefinition(mode = this.aspectModes?.[this.aspectModeIndex]) {
       const modeId = normalizeAspectMode(typeof mode === "object" ? mode?.id : mode);
