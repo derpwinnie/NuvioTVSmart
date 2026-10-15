@@ -6,8 +6,6 @@ import {
   areAllVidaaAudioCodecsUnsupported,
   createVidaaSilentAudioCheck,
   forgetVidaaUnsupportedAudioCodecs,
-  isVidaaAudioCounterVerified,
-  markVidaaAudioCounterVerified,
   probeVidaaAudioCounter,
   formatVidaaAudioCodecNames,
   learnVidaaUnsupportedAudioCodecs,
@@ -19,6 +17,11 @@ import {
   VIDAA_SILENT_AUDIO_CHECK_INTERVAL_MS
 } from "../../../platform/vidaa/vidaaAudioSupport.js";
 import { checkVidaaVideoPresence } from "../../../platform/vidaa/vidaaVideoSupport.js";
+import {
+  isVidaaMediaCounterVerified,
+  markVidaaMediaCounterVerified,
+  vidaaPlaybackPipeline
+} from "../../../platform/vidaa/vidaaMediaCounters.js";
 
 // VIDAA: a source whose audio or video the TV cannot decode plays without an error
 // (silent, or sound over a black picture). Check each playback once its time advances
@@ -39,9 +42,9 @@ function syncVidaaAudioMemoryOnce() {
 }
 
 function ensureVidaaAudioCounterProbe() {
-  if (counterProbe !== null || isVidaaAudioCounterVerified(LocalStore)) return;
+  if (counterProbe !== null || isVidaaMediaCounterVerified(LocalStore, "audio", "native")) return;
   counterProbe = probeVidaaAudioCounter().then((counts) => {
-    if (counts) markVidaaAudioCounterVerified(LocalStore);
+    if (counts) markVidaaMediaCounterVerified(LocalStore, "audio", "native");
     counterProbe = counts;
     return counts;
   });
@@ -83,7 +86,8 @@ export function createPlayerScreenMethods74() {
       this.vidaaVideoCheckState = createVidaaSilentAudioCheck();
       this.vidaaVideoCheckDone = false;
       this.vidaaAudioCheckTimer = setInterval(() => this.runVidaaAudioCheck(), VIDAA_SILENT_AUDIO_CHECK_INTERVAL_MS);
-      // Start the one-time counter self-test now so its result is in before a verdict.
+      // Start the one-time counter self-test (plain files) now so its result is in
+      // before a verdict.
       ensureVidaaAudioCounterProbe();
       this.runVidaaAudioCheck();
     },
@@ -131,6 +135,7 @@ export function createPlayerScreenMethods74() {
       }
       const video = PlayerController.video;
       const playback = {
+        engine: PlayerController.playbackEngine,
         currentTime: video?.currentTime,
         paused: Boolean(this.paused || video?.paused),
         seeking: Boolean(video?.seeking || this.seekOverlayVisible || this.bufferingActive)
@@ -159,6 +164,15 @@ export function createPlayerScreenMethods74() {
       }
       this.vidaaVideoCheckDone = true;
       if (presence === "ok") {
+        markVidaaMediaCounterVerified(LocalStore, "video", playback.engine);
+        return false;
+      }
+      if (!isVidaaMediaCounterVerified(LocalStore, "video", playback.engine)) {
+        // This device never reported a picture on this pipeline: 0 proves nothing.
+        console.info("VIDAA video check skipped", {
+          reason: "counter-not-verified",
+          pipeline: vidaaPlaybackPipeline(playback.engine)
+        });
         return false;
       }
       const playedSeconds = Math.round(this.vidaaVideoCheckState.playedSeconds);
@@ -176,8 +190,9 @@ export function createPlayerScreenMethods74() {
         probe
       });
       this.vidaaAudioCheckState = state;
+      const counterVerified = isVidaaMediaCounterVerified(LocalStore, "audio", playback.engine);
       if (verdict === "ok") {
-        markVidaaAudioCounterVerified(LocalStore);
+        markVidaaMediaCounterVerified(LocalStore, "audio", playback.engine);
         this.forgetVidaaCodecIfDecoding(probe, decodedBytes);
         this.vidaaAudioCheckAudioDone = true;
         return false;
@@ -189,7 +204,8 @@ export function createPlayerScreenMethods74() {
       }
       // Codecs this device already failed on: no need to wait the full time, but give
       // a short grace so a codec that decodes by now (firmware update) can prove it.
-      const remembered = probe && areAllVidaaAudioCodecsUnsupported(probe.codecIds, readVidaaUnsupportedAudioCodecs(LocalStore));
+      const remembered =
+        counterVerified && probe && areAllVidaaAudioCodecsUnsupported(probe.codecIds, readVidaaUnsupportedAudioCodecs(LocalStore));
       if (remembered && state.playedSeconds >= VIDAA_REMEMBERED_CODEC_GRACE_SECONDS) {
         this.finishVidaaAudioCheck();
         this.reportVidaaUndecodableMedia("audio", { probe, detectedBy: "remembered-codec" });
@@ -199,14 +215,17 @@ export function createPlayerScreenMethods74() {
         return false;
       }
       // verdict "unsupported": silence only counts once this device's counter has
-      // counted audio (see VIDAA_AUDIO_COUNTER_VERIFIED_KEY).
-      if (!isVidaaAudioCounterVerified(LocalStore)) {
-        ensureVidaaAudioCounterProbe();
-        if (counterProbe instanceof Promise) {
-          // The self-test is still running: check again on the next tick.
-          return false;
+      // counted audio on this pipeline (see vidaaMediaCounters.js).
+      if (!counterVerified) {
+        const pipeline = vidaaPlaybackPipeline(playback.engine);
+        if (pipeline === "native") {
+          ensureVidaaAudioCounterProbe();
+          if (counterProbe instanceof Promise) {
+            // The self-test is still running: check again on the next tick.
+            return false;
+          }
         }
-        console.info("VIDAA audio check skipped", { reason: "counter-not-verified" });
+        console.info("VIDAA audio check skipped", { reason: "counter-not-verified", pipeline });
         this.vidaaAudioCheckAudioDone = true;
         return false;
       }

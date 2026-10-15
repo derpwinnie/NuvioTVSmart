@@ -26,8 +26,11 @@ const { createPlayerScreenMethods74, resetVidaaAudioCounterProbe } =
 const { createPlayerScreenMethods75 } =
   await import("../js/ui/screens/player/playerScreenMethods-75-vidaa-source-failure.js");
 const { PlayerController } = await import("../js/ui/screens/player/playerScreenContext.js");
-const { VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY, VIDAA_AUDIO_COUNTER_VERIFIED_KEY } =
+const { VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY } =
   await import("../js/platform/vidaa/vidaaAudioSupport.js");
+const { VIDAA_MEDIA_COUNTERS_VERIFIED_KEY } =
+  await import("../js/platform/vidaa/vidaaMediaCounters.js");
+const verified = () => JSON.parse(store.get(VIDAA_MEDIA_COUNTERS_VERIFIED_KEY) || "{}");
 
 const URL_A = "https://debrid.example/token123/a.mkv";
 const DTS_TRACKS = [{ type: "audio", codec_id: "A_DTS", isDefault: true }];
@@ -115,7 +118,8 @@ video.webkitAudioDecodedByteCount = 4096;
 screen.startVidaaAudioCheck();
 screen.recordVidaaAudioProbe(URL_A, DTS_TRACKS);
 tick(screen, 1);
-assert.equal(JSON.parse(store.get(VIDAA_AUDIO_COUNTER_VERIFIED_KEY)), true);
+assert.deepEqual(verified().audio, ["native"]);
+assert.deepEqual(verified().video, ["native"], "a normal picture verifies the video check");
 video.webkitAudioDecodedByteCount = 0;
 
 // 1. Auto-picked source, silent DTS audio: fail over after 5 s and learn the codec.
@@ -257,9 +261,48 @@ screen = createScreen({ eligibility: "manual-selection" });
 screen.recordVidaaAudioProbe(URL_A, DTS_TRACKS);
 screen.startVidaaAudioCheck();
 assert.deepEqual(learned(), [], "codec list cleared");
-assert.equal(JSON.parse(store.get(VIDAA_AUDIO_COUNTER_VERIFIED_KEY)), false, "counter re-verified");
+assert.equal(verified().audio, undefined, "audio counter re-verified after the update");
 assert.ok(JSON.stringify(logs).includes("browser-changed"));
 screen.stopVidaaAudioCheck();
+
+// 9b. Counters are trusted per pipeline. A TV that never reports a picture size:
+// the black-picture check stays off.
+store.set(VIDAA_MEDIA_COUNTERS_VERIFIED_KEY, JSON.stringify({}));
+video.webkitAudioDecodedByteCount = 4096;
+video.webkitVideoDecodedByteCount = 0;
+video.videoWidth = 0;
+video.videoHeight = 0;
+screen = createScreen();
+screen.startVidaaAudioCheck();
+tick(screen, 8);
+assert.equal(screen.calls.length, 0, "unverified picture counter: no reaction");
+assert.ok(JSON.stringify(logs).includes("VIDAA video check skipped"));
+assert.equal(screen.vidaaAudioCheckTimer, null);
+video.webkitVideoDecodedByteCount = 1;
+video.videoWidth = 1920;
+video.videoHeight = 1080;
+// MSE playback (hls.js): a plain file's counter proves nothing for it.
+PlayerController.playbackEngine = "hls.js";
+video.webkitAudioDecodedByteCount = 0;
+screen = createScreen({ eligibility: "manual-selection" });
+screen.recordVidaaAudioProbe(URL_A, []);
+screen.startVidaaAudioCheck();
+tick(screen, 12);
+assert.equal(screen.calls.length, 0, "unverified hls.js counter: no reaction");
+assert.equal(screen.vidaaAudioCheckTimer, null);
+// Once an HLS source counted audio, a silent one is reported.
+video.webkitAudioDecodedByteCount = 512;
+screen = createScreen();
+screen.startVidaaAudioCheck();
+tick(screen, 1);
+assert.ok(verified().audio.includes("hls.js"));
+video.webkitAudioDecodedByteCount = 0;
+screen = createScreen({ eligibility: "manual-selection" });
+screen.recordVidaaAudioProbe(URL_A, []);
+screen.startVidaaAudioCheck();
+tick(screen, 12);
+assert.ok(kinds(screen).includes("open-sources"));
+PlayerController.playbackEngine = "native-file";
 
 // 10. A startup error on VIDAA goes to the sources list, not the card.
 screen = createScreen();
@@ -299,6 +342,10 @@ assert.equal(
   false,
   "aborted is not a source failure"
 );
+// Another source (after a failover or a manual pick) starts with a fresh budget.
+screen.activePlaybackUrl = "https://debrid.example/token123/b.mkv";
+assert.equal(screen.recoverVidaaPlaybackError({ id: "b" }, 3), true);
+assert.equal(restarts, 4);
 
 console.info = originalInfo;
 console.warn = originalWarn;

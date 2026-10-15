@@ -305,6 +305,7 @@ export function initializePlayerMountState(params, initialStreamUrl) {
   this.failedPlaybackUrls = new Set();
   this.vidaaAutoPlayFailoverAttempts = 0;
   this.vidaaStallRestarts = [];
+  this.vidaaStallRestartsUrl = "";
   this.vidaaUserPickedSource = false;
   this.failedPlaybackStreamIds = new Set();
   this.playbackStallTimer = null;

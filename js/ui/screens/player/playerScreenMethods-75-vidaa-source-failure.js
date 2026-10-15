@@ -78,6 +78,21 @@ export function createPlayerScreenMethods75() {
       this.showVidaaSourcesAlert({ message });
       return true;
     },
+    // Restarts of the same source (stalls and media errors) are bounded per source:
+    // another source starts with a fresh budget. Returns the attempt number, or 0.
+    claimVidaaPlaybackRestart(playbackUrl) {
+      const url = String(playbackUrl || "");
+      if (this.vidaaStallRestartsUrl !== url) {
+        this.vidaaStallRestartsUrl = url;
+        this.vidaaStallRestarts = [];
+      }
+      const restarts = nextVidaaStallRestarts(this.vidaaStallRestarts, Date.now());
+      if (!restarts) {
+        return 0;
+      }
+      this.vidaaStallRestarts = restarts;
+      return restarts.length;
+    },
     // A media error after playback had started. Restart the same source at its position
     // (decode errors after a seek are often one-off, shared budget with stall restarts),
     // then fail over (auto-play). Returns true when one of them started.
@@ -85,11 +100,10 @@ export function createPlayerScreenMethods75() {
       if (!Environment.isVidaa() || !isVidaaFailoverMediaError(mediaErrorCode, globalThis.navigator?.onLine)) {
         return false;
       }
-      const restarts = nextVidaaStallRestarts(this.vidaaStallRestarts, Date.now());
-      if (restarts) {
-        this.vidaaStallRestarts = restarts;
+      const attempt = this.claimVidaaPlaybackRestart(this.activePlaybackUrl);
+      if (attempt) {
         console.warn("Playback error on VIDAA; restarting the current source", {
-          attempt: restarts.length,
+          attempt,
           mediaErrorCode
         });
         this.lastPlaybackErrorAt = 0;

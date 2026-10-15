@@ -9,12 +9,17 @@ import {
   stepVidaaSilentAudioCheck,
   summarizeVidaaAudioProbe,
   syncVidaaAudioMemoryWithBrowser,
-  VIDAA_AUDIO_COUNTER_VERIFIED_KEY,
   VIDAA_AUDIO_MEMORY_BROWSER_KEY,
   VIDAA_SILENT_AUDIO_UNKNOWN_TRACKS_SECONDS,
   VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY,
   vidaaAudioCodecKey
 } from "../js/platform/vidaa/vidaaAudioSupport.js";
+import {
+  isVidaaMediaCounterVerified,
+  markVidaaMediaCounterVerified,
+  VIDAA_MEDIA_COUNTERS_VERIFIED_KEY,
+  vidaaPlaybackPipeline
+} from "../js/platform/vidaa/vidaaMediaCounters.js";
 
 const dtsProbe = summarizeVidaaAudioProbe([
   { type: "audio", codec_id: "A_DTS", isDefault: true },
@@ -139,20 +144,20 @@ assert.deepEqual([...forgetVidaaUnsupportedAudioCodecs(broken, ["A_DTS"])], []);
 {
   const memory = memoryStorage({
     [VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY]: ["A_DTS"],
-    [VIDAA_AUDIO_COUNTER_VERIFIED_KEY]: true
+    [VIDAA_MEDIA_COUNTERS_VERIFIED_KEY]: { audio: ["native"] }
   });
   // First run with this key (older build): start over once, not reported as a change.
   assert.equal(syncVidaaAudioMemoryWithBrowser(memory, "VIDAA/7"), false);
   assert.deepEqual(memory.data[VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY], []);
   memory.data[VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY] = ["A_DTS"];
-  memory.data[VIDAA_AUDIO_COUNTER_VERIFIED_KEY] = true;
+  markVidaaMediaCounterVerified(memory, "audio", "native");
   // Same browser: kept.
   assert.equal(syncVidaaAudioMemoryWithBrowser(memory, "VIDAA/7"), false);
   assert.deepEqual(memory.data[VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY], ["A_DTS"]);
   // Firmware update: both cleared.
   assert.equal(syncVidaaAudioMemoryWithBrowser(memory, "VIDAA/8"), true);
   assert.deepEqual(memory.data[VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY], []);
-  assert.equal(memory.data[VIDAA_AUDIO_COUNTER_VERIFIED_KEY], false);
+  assert.equal(isVidaaMediaCounterVerified(memory, "audio", "native"), false);
   assert.equal(memory.data[VIDAA_AUDIO_MEMORY_BROWSER_KEY], "VIDAA/8");
   assert.equal(syncVidaaAudioMemoryWithBrowser(broken, "VIDAA/8"), false);
 }
@@ -176,18 +181,25 @@ assert.deepEqual([...forgetVidaaUnsupportedAudioCodecs(broken, ["A_DTS"])], []);
 
 console.log("VIDAA audio support checks passed.");
 
-// Counter verification memory.
+// Counter verification memory: per kind and per pipeline.
 {
-  const { isVidaaAudioCounterVerified, markVidaaAudioCounterVerified } =
-    await import("../js/platform/vidaa/vidaaAudioSupport.js");
   const values = new Map();
   const fakeStore = {
     get: (key, fallback) => (values.has(key) ? values.get(key) : fallback),
     set: (key, value) => values.set(key, value)
   };
-  assert.equal(isVidaaAudioCounterVerified(fakeStore), false);
-  markVidaaAudioCounterVerified(fakeStore);
-  assert.equal(isVidaaAudioCounterVerified(fakeStore), true);
+  assert.equal(vidaaPlaybackPipeline("native-file"), "native");
+  assert.equal(vidaaPlaybackPipeline(undefined), "native");
+  assert.equal(vidaaPlaybackPipeline("hls.js"), "hls.js");
+  assert.equal(isVidaaMediaCounterVerified(fakeStore, "audio", "native-file"), false);
+  markVidaaMediaCounterVerified(fakeStore, "audio", "native-file");
+  assert.equal(isVidaaMediaCounterVerified(fakeStore, "audio", "native"), true);
+  // A plain file proves nothing for MSE playback, or for the picture.
+  assert.equal(isVidaaMediaCounterVerified(fakeStore, "audio", "hls.js"), false);
+  assert.equal(isVidaaMediaCounterVerified(fakeStore, "video", "native"), false);
+  markVidaaMediaCounterVerified(fakeStore, "audio", "hls.js");
+  markVidaaMediaCounterVerified(fakeStore, "audio", "hls.js");
+  assert.deepEqual(values.get(VIDAA_MEDIA_COUNTERS_VERIFIED_KEY), { audio: ["native", "hls.js"] });
   const broken = {
     get: () => {
       throw new Error("blocked");
@@ -196,9 +208,9 @@ console.log("VIDAA audio support checks passed.");
       throw new Error("blocked");
     }
   };
-  assert.equal(isVidaaAudioCounterVerified(broken), false);
-  markVidaaAudioCounterVerified(broken);
-  console.log("VIDAA audio counter verification checks passed.");
+  assert.equal(isVidaaMediaCounterVerified(broken, "audio", "native"), false);
+  markVidaaMediaCounterVerified(broken, "audio", "native");
+  console.log("VIDAA media counter verification checks passed.");
 }
 
 // Counter self-test with fake <audio> elements.

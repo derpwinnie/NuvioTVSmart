@@ -3,6 +3,7 @@
 // Detect that from the decoder's byte counter, remember the codec per device,
 // and skip such sources next time as soon as their header has been read.
 import { vidaaAudioCodecDisplayName } from "./vidaaMkvTracks.js";
+import { resetVidaaMediaCounters } from "./vidaaMediaCounters.js";
 
 export const VIDAA_SILENT_AUDIO_CHECK_INTERVAL_MS = 1000;
 // Seconds of real playback without a single decoded audio byte.
@@ -17,12 +18,9 @@ export const VIDAA_REMEMBERED_CODEC_GRACE_SECONDS = 1.5;
 // A larger jump between two checks is a seek, not playback.
 const MAX_ADVANCE_PER_CHECK_SECONDS = 3;
 export const VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY = "vidaaUnsupportedAudioCodecs";
-// Set once this device's decoded-byte counter has counted audio. Until then a silent
-// counter proves nothing: a TV that decodes audio outside the browser would report 0
-// for every source, and the check must not reject them all.
-export const VIDAA_AUDIO_COUNTER_VERIFIED_KEY = "vidaaAudioByteCounterVerified";
-// The browser (user agent) both entries above were learned on. A firmware update usually
-// changes it, and may change what the TV decodes, so a different one starts over.
+// The browser (user agent) the learned codecs and the verified counters
+// (vidaaMediaCounters.js) belong to. A firmware update usually changes it, and may
+// change what the TV decodes, so a different one starts over.
 export const VIDAA_AUDIO_MEMORY_BROWSER_KEY = "vidaaAudioSupportBrowser";
 
 // Forgets the learned codecs and the counter verification when the browser changed.
@@ -33,28 +31,11 @@ export function syncVidaaAudioMemoryWithBrowser(storage, userAgent) {
     const stored = storage?.get?.(VIDAA_AUDIO_MEMORY_BROWSER_KEY, null);
     if (stored === current) return false;
     storage?.set?.(VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY, []);
-    storage?.set?.(VIDAA_AUDIO_COUNTER_VERIFIED_KEY, false);
+    resetVidaaMediaCounters(storage);
     storage?.set?.(VIDAA_AUDIO_MEMORY_BROWSER_KEY, current);
     return stored !== null && stored !== undefined;
   } catch (_) {
     return false;
-  }
-}
-
-export function isVidaaAudioCounterVerified(storage) {
-  try {
-    return storage?.get?.(VIDAA_AUDIO_COUNTER_VERIFIED_KEY, false) === true;
-  } catch (_) {
-    return false;
-  }
-}
-
-export function markVidaaAudioCounterVerified(storage) {
-  try {
-    if (!isVidaaAudioCounterVerified(storage))
-      storage?.set?.(VIDAA_AUDIO_COUNTER_VERIFIED_KEY, true);
-  } catch (_) {
-    // Storage blocked: detection simply stays off on this device.
   }
 }
 

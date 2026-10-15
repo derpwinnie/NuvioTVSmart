@@ -1,6 +1,5 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
-import { nextVidaaStallRestarts } from "../../../platform/vidaa/vidaaStallRestart.js";
 
 export function createPlayerScreenMethods38() {
   const {
@@ -264,13 +263,12 @@ export function createPlayerScreenMethods38() {
         }
 
         if (Environment.isVidaa() && !skipAutomaticPlaybackRecovery) {
-          const restarts = nextVidaaStallRestarts(this.vidaaStallRestarts, Date.now());
-          if (restarts) {
-            this.vidaaStallRestarts = restarts;
+          const attempt = this.claimVidaaPlaybackRestart(this.activePlaybackUrl);
+          if (attempt) {
             const stalledPlaybackUrl = this.activePlaybackUrl;
             const sourceCandidate = this.getStreamCandidateByUrl(stalledPlaybackUrl) || this.getCurrentStreamCandidate();
             console.warn("Playback stalled on VIDAA; restarting the current source", {
-              attempt: restarts.length,
+              attempt,
               engine: PlayerController.playbackEngine
             });
             void this.playStreamByUrl(stalledPlaybackUrl, {
