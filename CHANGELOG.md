@@ -2,30 +2,30 @@
 
 ### VIDAA Improvements & Fixes
 
-- Added the VIDAA build to GitHub Pages and a launcher-tile installer (`npm run vidaa:tile`) with LAN pairing, pinned TV certificates and a dashboard to list, install, launch and remove tiles (@kvnshroom)
-- Named MKV audio tracks from the file header (language, title, codec, channels) instead of "Audio 1, 2"; browser-reported track names are now kept when no other metadata is known, which also fixes the "Audio 1" fallback on other platforms (@kvnshroom)
-- Showed a notice in the audio menu when the device lists audio tracks but cannot switch between them (@kvnshroom)
-- Fixed playback that stayed on its first frame, muted, while the startup audio-language match waited for a track switch VIDAA cannot make (@kvnshroom)
-- Fixed resumed playback staying muted and a stale audio selection holding the startup gate (@kvnshroom)
-- Kept the playback position when switching sources mid-stream, also when the new source loads slowly (e.g. a debrid link still resolving) (@kvnshroom)
-- Back from the player now returns to the screen that opened the source list (Home, Details, Library, Search), like Android (@kvnshroom)
-- With automatic source selection, the source list is no longer flashed while a source is picked; a "Finding stream source" screen is shown instead (@kvnshroom)
-- With automatic source selection, a source that cannot start (unsupported container or codec on this device) fails over to the next best source by the same ranking rules; nothing is excluded up front (@kvnshroom)
-- Turned embedded subtitles off for real when Nuvio shows none, and kept the remembered audio track at startup (@kvnshroom)
-- Hardened the legacy installer server against path traversal and fixed tile-host validation to IPv4 literals (@kvnshroom)
-- Improved VIDAA focus scrolling, Home image loading and sidebar responsiveness, and removed dead navigation code (@kvnshroom)
+- Added the VIDAA build to GitHub Pages and a launcher-tile installer (`npm run vidaa:tile`) with LAN pairing, pinned TV certificates and a dashboard to list, install, launch and remove tiles
+- Named MKV audio tracks from the file header (language, title, codec, channels) instead of "Audio 1, 2"; browser-reported track names are now kept when no other metadata is known, which also fixes the "Audio 1" fallback on other platforms
+- Showed a notice in the audio menu when the device lists audio tracks but cannot switch between them
+- Fixed playback that stayed on its first frame, muted, while the startup audio-language match waited for a track switch VIDAA cannot make
+- Fixed resumed playback staying muted and a stale audio selection holding the startup gate
+- Kept the playback position when switching sources mid-stream, also when the new source loads slowly (e.g. a debrid link still resolving)
+- Back from the player now returns to the screen that opened the source list (Home, Details, Library, Search), like Android
+- With automatic source selection, the source list is no longer flashed while a source is picked; a "Finding stream source" screen is shown instead
+- With automatic source selection, a source that cannot start (unsupported container or codec on this device) fails over to the next best source by the same ranking rules; nothing is excluded up front
+- Turned embedded subtitles off for real when Nuvio shows none, and kept the remembered audio track at startup
+- Hardened the legacy installer server against path traversal and fixed tile-host validation to IPv4 literals
+- Improved VIDAA focus scrolling, Home image loading and sidebar responsiveness, and removed dead navigation code
 
 ### Experimental (VIDAA)
 
 These work around missing or inconsistent APIs in the VIDAA browser. They are bounded and fall back to the normal behaviour, but may need tuning on other firmware versions.
 
-- **MKV header probe:** reads the Matroska `Tracks` element with ranged requests (up to 15 s for a first debrid request) to learn audio track names without a local media service; falls back to the dev server's `/tracks` endpoint (@kvnshroom)
-- **Resume keyframe-gap jump:** when a resume seek lands up to 20 s in front of the first buffered keyframe, playback jumps into the buffered range instead of waiting forever (@kvnshroom)
-- **Resume restore retry:** a dropped resume seek is retried on a timer (max. 8 attempts), only once the new source has metadata and has started loading, so the old source's last position cannot finish the restore early (@kvnshroom)
-- **Undecodable audio/video detection:** sources whose audio (e.g. DTS, TrueHD) or video the TV cannot decode play silently or over a black picture without any error. Playback is checked against the decoder byte counters and picture size; unsupported codecs are remembered per browser version and re-checked after firmware updates (@kvnshroom)
-- **Decoder counter self-test:** a short muted clip verifies once per session that this device reports decoder counters at all, per pipeline (plain file, the TV's own HLS player, MSE), so devices that decode outside the browser never reject every source (@kvnshroom)
-- **Mid-playback stall restart:** a stall (usually a slow seek in a file without a seek index) restarts the same source at its position, with a capped restart budget per source before failing over or opening the source list (@kvnshroom)
-- **Subtitle-off toggle:** VIDAA renders the first embedded subtitle while reporting it disabled; Nuvio toggles it on and off a beat later to really hide it (same workaround as Stremio's VidaaVideo) (@kvnshroom)
+- **MKV header probe:** reads the Matroska `Tracks` element with ranged requests (up to 15 s for a first debrid request) to learn audio track names without a local media service; falls back to the dev server's `/tracks` endpoint
+- **Resume keyframe-gap jump:** when a resume seek lands up to 20 s in front of the first buffered keyframe, playback jumps into the buffered range instead of waiting forever
+- **Resume restore retry:** a dropped resume seek is retried on a timer (max. 8 attempts), only once the new source has metadata and has started loading, so the old source's last position cannot finish the restore early
+- **Undecodable audio/video detection:** sources whose audio (e.g. DTS, TrueHD) or video the TV cannot decode play silently or over a black picture without any error. Playback is checked against the decoder byte counters and picture size; unsupported codecs are remembered per browser version and re-checked after firmware updates
+- **Decoder counter self-test:** a short muted clip verifies once per session that this device reports decoder counters at all, per pipeline (plain file, the TV's own HLS player, MSE), so devices that decode outside the browser never reject every source
+- **Mid-playback stall restart:** a stall (usually a slow seek in a file without a seek index) restarts the same source at its position, with a capped restart budget per source before failing over or opening the source list
+- **Subtitle-off toggle:** VIDAA renders the first embedded subtitle while reporting it disabled; Nuvio toggles it on and off a beat later to really hide it (same workaround as Stremio's VidaaVideo)
 
 ## 1.2.5
 
