@@ -246,6 +246,9 @@ export function createPlayerScreenMethods17() {
       this.renderSpeedDialog();
       this.renderEpisodePanel();
       this.renderPauseOverlay();
+      if (this.presentStartupErrorInVidaaSources()) {
+        return;
+      }
       this.renderStartupErrorOverlay();
       this.focusStartupErrorButton();
     }

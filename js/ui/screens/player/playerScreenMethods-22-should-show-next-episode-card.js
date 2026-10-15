@@ -48,7 +48,11 @@ export function createPlayerScreenMethods22() {
         typeof PlayerController.getLastPlaybackErrorCode === "function" ? Number(PlayerController.getLastPlaybackErrorCode() || 0) : 0;
       const nativeErrorCode = Number(PlayerController.video?.error?.code || 0);
       return (
-        this.isStartupErrorVisible() || Boolean(String(this.sourcesError || "").trim()) || controllerErrorCode > 0 || nativeErrorCode > 0
+        this.isStartupErrorVisible() ||
+        Boolean(String(this.sourcesError || "").trim()) ||
+        Boolean(this.sourcesAlert) ||
+        controllerErrorCode > 0 ||
+        nativeErrorCode > 0
       );
     },
     isNaturalPlaybackCompletionEligible(durationSeconds = this.getPlaybackDurationSeconds()) {

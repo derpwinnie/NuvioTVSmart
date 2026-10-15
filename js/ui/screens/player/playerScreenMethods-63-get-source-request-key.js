@@ -36,6 +36,21 @@ export function createPlayerScreenMethods63() {
       this.sourceLoadToken = Number(this.sourceLoadToken || 0) + 1;
       this.sourcesLoading = false;
     },
+    // Playback of a source failed and the user has to choose another one. VIDAA shows
+    // it as an alert on the opened sources list (see methods 75); other platforms keep
+    // the line in the list, opening the panel only when the caller asks.
+    reportPlaybackFailureToSources(message, diagnostics = {}, { openPanel = false, keepPlayback = false } = {}) {
+      if (Platform.isVidaa()) {
+        this.showVidaaSourcesAlert({ message, keepPlayback });
+        return;
+      }
+      this.sourcesError = this.formatPlaybackErrorForSources(message, diagnostics);
+      if (openPanel) {
+        this.openSourcesPanel();
+      } else {
+        this.renderSourcesPanel();
+      }
+    },
     closeSourcesPanel() {
       this.cancelSourceLoad();
       streamRepository.setLocalPluginSearchPaused(true);

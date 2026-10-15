@@ -72,6 +72,7 @@ import { createPlayerScreenMethods71 } from "./playerScreenMethods-71-on-key-dow
 import { createPlayerScreenMethods72 } from "./playerScreenMethods-72-on-key-up.js";
 import { createPlayerScreenMethods73 } from "./playerScreenMethods-73-cleanup.js";
 import { createPlayerScreenMethods74 } from "./playerScreenMethods-74-vidaa-audio-support.js";
+import { createPlayerScreenMethods75 } from "./playerScreenMethods-75-vidaa-source-failure.js";
 
 export * from "./playerScreenContext.js";
 export const PlayerScreen = {
@@ -148,5 +149,6 @@ export const PlayerScreen = {
   ...createPlayerScreenMethods71(),
   ...createPlayerScreenMethods72(),
   ...createPlayerScreenMethods73(),
-  ...createPlayerScreenMethods74()
+  ...createPlayerScreenMethods74(),
+  ...createPlayerScreenMethods75()
 };

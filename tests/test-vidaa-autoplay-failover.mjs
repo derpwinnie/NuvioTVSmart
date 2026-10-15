@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   getVidaaAutoPlayFailoverEligibility,
+  decideVidaaSourceFailureReaction,
   isVidaaFailoverMediaError,
   pickVidaaNextAutoPlayCandidate,
   VIDAA_AUTOPLAY_FAILOVER_MAX_ATTEMPTS
@@ -73,6 +74,26 @@ assert.equal(isVidaaFailoverMediaError(2, true), true);
 assert.equal(isVidaaFailoverMediaError(2, undefined), true);
 assert.equal(isVidaaFailoverMediaError(2, false), false);
 assert.equal(isVidaaFailoverMediaError(1), false);
+// A startup that stalls without an error counts like a network failure.
+assert.equal(isVidaaFailoverMediaError(0, true, { stalled: true }), true);
+assert.equal(isVidaaFailoverMediaError(0, false, { stalled: true }), false);
+assert.equal(isVidaaFailoverMediaError(0, true), false);
+assert.equal(isVidaaFailoverMediaError(1, true, { stalled: true }), false);
+
+// Reaction to a source that cannot play.
+assert.equal(
+  decideVidaaSourceFailureReaction({ eligibility: "eligible", hasNextCandidate: true }),
+  "failover"
+);
+assert.equal(
+  decideVidaaSourceFailureReaction({ eligibility: "eligible", hasNextCandidate: false }),
+  "none-left"
+);
+assert.equal(
+  decideVidaaSourceFailureReaction({ eligibility: "manual-selection", hasNextCandidate: true }),
+  "user-picked"
+);
+assert.equal(decideVidaaSourceFailureReaction({ eligibility: "auto-play-off" }), "user-picked");
 assert.equal(isVidaaFailoverMediaError(0), false);
 
 // Eligibility: only sources the auto-play logic picked, never a user's choice.

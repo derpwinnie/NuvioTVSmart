@@ -86,7 +86,7 @@ export function createPlayerScreenMethods18() {
           });
           return;
         }
-        this.sourcesError = this.formatPlaybackErrorForSources(
+        this.reportPlaybackFailureToSources(
           `${this.mediaErrorMessage(mediaErrorCode, detail, candidate)}. Choose another source manually.`,
           {
             mediaErrorCode,
@@ -97,7 +97,6 @@ export function createPlayerScreenMethods18() {
             reason: "play-after-startup"
           }
         );
-        this.renderSourcesPanel();
         console.warn("Playback failed after startup", {
           url: playbackUrl,
           mediaErrorCode,

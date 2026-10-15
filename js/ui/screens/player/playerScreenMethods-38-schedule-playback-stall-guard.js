@@ -227,6 +227,9 @@ export function createPlayerScreenMethods38() {
           this.markPlaybackSourceFailed(this.activePlaybackUrl);
           const mediaErrorCode = startupMediaErrorCode;
           const sourceCandidate = this.getStreamCandidateByUrl(this.activePlaybackUrl) || this.getCurrentStreamCandidate();
+          if (this.tryVidaaAutoPlayNextSource(sourceCandidate, { mediaErrorCode, stalled: true })) {
+            return;
+          }
           const startupErrorMessage = this.getStartupErrorMessage(mediaErrorCode, terminalHlsErrorDetail, sourceCandidate);
           this.showStartupError(startupErrorMessage, {
             mediaErrorCode,
@@ -279,26 +282,22 @@ export function createPlayerScreenMethods38() {
           }
         }
 
+        const stalledCandidate = this.getStreamCandidateByUrl(this.activePlaybackUrl) || this.getCurrentStreamCandidate();
+        const stalledErrorCode = Number(PlayerController.getLastPlaybackErrorCode?.() || 0);
+        if (Environment.isVidaa() && !skipAutomaticPlaybackRecovery) {
+          // Restarts used up: an auto-picked source is replaced like at startup.
+          this.markPlaybackSourceFailed(this.activePlaybackUrl, stalledCandidate);
+          if (this.tryVidaaAutoPlayNextSource(stalledCandidate, { mediaErrorCode: stalledErrorCode, stalled: true })) {
+            return;
+          }
+        }
+
         this.loadingVisible = false;
         this.paused = true;
         this.dismissPauseOverlay();
         this.updateLoadingVisibility();
         this.updateMediaSessionPlaybackState();
         this.setControlsVisible(true, { focus: false });
-        {
-          const sourceCandidate = this.getStreamCandidateByUrl(this.activePlaybackUrl) || this.getCurrentStreamCandidate();
-          const mediaErrorCode = Number(PlayerController.getLastPlaybackErrorCode?.() || 0);
-          this.sourcesError = this.formatPlaybackErrorForSources(
-            `${this.mediaErrorMessage(mediaErrorCode, terminalHlsErrorDetail, sourceCandidate)}. Choose another source manually.`,
-            {
-              mediaErrorCode,
-              detail: terminalHlsErrorDetail,
-              streamCandidate: sourceCandidate,
-              playbackUrl: this.activePlaybackUrl,
-              reason: "playback-stall"
-            }
-          );
-        }
         if (this.currentEngineFsStream) {
           logEngineFsDebug("EngineFS playback stalled; keeping torrent alive until player exit or source change", {
             reason: "playback-stall",
@@ -306,13 +305,17 @@ export function createPlayerScreenMethods38() {
             fileIdx: this.currentEngineFsStream.fileIdx
           });
         }
-        if (this.currentEngineFsStream) {
-          this.renderSourcesPanel();
-        } else if (this.streamCandidates.length > 1) {
-          this.openSourcesPanel();
-        } else {
-          this.renderSourcesPanel();
-        }
+        this.reportPlaybackFailureToSources(
+          `${this.mediaErrorMessage(stalledErrorCode, terminalHlsErrorDetail, stalledCandidate)}. Choose another source manually.`,
+          {
+            mediaErrorCode: stalledErrorCode,
+            detail: terminalHlsErrorDetail,
+            streamCandidate: stalledCandidate,
+            playbackUrl: this.activePlaybackUrl,
+            reason: "playback-stall"
+          },
+          { openPanel: !this.currentEngineFsStream && this.streamCandidates.length > 1 }
+        );
         this.updateUiTick();
       }, timeoutMs);
     },

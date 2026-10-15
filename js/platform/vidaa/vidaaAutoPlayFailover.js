@@ -24,10 +24,23 @@ function isUntried(candidate, { currentId, failedUrls, failedIds }) {
 // A source failed to start because of the source itself (decode / unsupported format,
 // code 3/4) or the network (code 2). Code 2 while the TV is offline is not the source's
 // fault, so trying the next one would only burn through the list.
-export function isVidaaFailoverMediaError(mediaErrorCode, online = true) {
+// A startup that stalls without any error (dead link, server never sends data) counts
+// like a network error.
+export function isVidaaFailoverMediaError(mediaErrorCode, online = true, { stalled = false } = {}) {
   const code = Number(mediaErrorCode);
   if (code === 3 || code === 4) return true;
-  return code === 2 && online !== false;
+  return (code === 2 || (stalled && !code)) && online !== false;
+}
+
+// What to do with a source that cannot play on this device (error, stall, audio or
+// video the TV cannot decode): "failover" plays the next auto-play candidate;
+// "none-left" and "user-picked" stop on the in-player sources list with an alert.
+export function decideVidaaSourceFailureReaction({
+  eligibility = "",
+  hasNextCandidate = false
+} = {}) {
+  if (eligibility !== "eligible") return "user-picked";
+  return hasNextCandidate ? "failover" : "none-left";
 }
 
 // Failover only replaces a source the auto-play (or auto-resume) logic picked, never one

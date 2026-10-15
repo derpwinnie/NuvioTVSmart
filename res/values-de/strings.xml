@@ -1956,9 +1956,15 @@
     <string name="player_error_source_invalid_content">Source error: The stream source returned invalid or unplayable content. The link may have expired or the server returned an error page instead of video.\n\nTry a different source. [%1$s]</string>
     <string name="player_error_vidaa_standalone_unsupported">Diese Quelle benötigt Netzwerkfunktionen, die auf diesem Gerät nicht verfügbar sind. Versuchen Sie eine andere Quelle.</string>
     <string name="player_vidaa_audio_unsupported_trying_next">Der Ton dieser Quelle (%1$s) wird von diesem Gerät nicht unterstützt. Nächste Quelle wird versucht…</string>
-    <string name="player_vidaa_audio_unsupported_choose_source">Der Ton dieser Quelle (%1$s) wird von diesem Gerät nicht unterstützt. Bitte eine andere Quelle wählen.</string>
-    <string name="player_vidaa_audio_unsupported_none_left">Der Ton dieser Quelle (%1$s) wird von diesem Gerät nicht unterstützt, und keine andere Quelle konnte automatisch versucht werden. Bitte eine andere Quelle wählen.</string>
     <string name="player_vidaa_audio_unsupported_title">Ton nicht unterstützt</string>
+    <string name="player_vidaa_audio_unsupported">Der Ton dieser Quelle (%1$s) wird von diesem Gerät nicht unterstützt.</string>
+    <string name="player_vidaa_audio_unsupported_unknown">Der Ton dieser Quelle wird von diesem Gerät nicht unterstützt.</string>
+    <string name="player_vidaa_audio_unsupported_unknown_trying_next">Der Ton dieser Quelle wird von diesem Gerät nicht unterstützt. Nächste Quelle wird versucht…</string>
+    <string name="player_vidaa_video_unsupported_title">Video nicht unterstützt</string>
+    <string name="player_vidaa_video_unsupported">Das Bild dieser Quelle kann auf diesem Gerät nicht angezeigt werden.</string>
+    <string name="player_vidaa_video_unsupported_trying_next">Das Bild dieser Quelle kann auf diesem Gerät nicht angezeigt werden. Nächste Quelle wird versucht…</string>
+    <string name="player_vidaa_choose_another_source">Bitte eine andere Quelle wählen.</string>
+    <string name="player_vidaa_no_source_left">Keine andere Quelle konnte automatisch versucht werden. Bitte eine andere Quelle wählen.</string>
     <string name="player_error_decoder">Decoder error</string>
     <string name="player_error_unsupported_format">This stream uses a format your device may not support. Try a different source. [%1$s]</string>
     <string name="player_error_initialize_failed">Failed to initialize player</string>

@@ -101,13 +101,17 @@ export function createPlayerScreenMethods35() {
                   resolverDetail: resolveFailureDetail
                 });
               } else {
-                this.sourcesError = this.formatPlaybackErrorForSources(fallbackError, {
-                  streamCandidate,
-                  reason: "debrid-resolve",
-                  resolverStatus: resolveFailureStatus,
-                  resolverDetail: resolveFailureDetail
-                });
-                this.renderSourcesPanel();
+                // The source playing before keeps playing.
+                this.reportPlaybackFailureToSources(
+                  fallbackError,
+                  {
+                    streamCandidate,
+                    reason: "debrid-resolve",
+                    resolverStatus: resolveFailureStatus,
+                    resolverDetail: resolveFailureDetail
+                  },
+                  { keepPlayback: true }
+                );
               }
               return;
             }
@@ -215,19 +219,22 @@ export function createPlayerScreenMethods35() {
               : canUseP2p
                 ? t("stream.p2p.failed", {}, "Could not start this torrent stream.")
                 : fallbackError || t("stream.debrid.unavailable", {}, "This Debrid source needs a configured Debrid account.");
-          this.sourcesError = this.formatPlaybackErrorForSources(sourceErrorMessage, {
-            streamCandidate,
-            reason: tizenP2pUnsupported
-              ? "tizen-p2p-unsupported"
-              : !p2pEnabled && canResolveP2p
-                ? "p2p-disabled"
-                : canUseP2p
-                  ? "p2p-resolve"
-                  : "stream-resolve",
-            resolverStatus: resolveFailureStatus,
-            resolverDetail: resolveFailureDetail
-          });
-          this.renderSourcesPanel();
+          this.reportPlaybackFailureToSources(
+            sourceErrorMessage,
+            {
+              streamCandidate,
+              reason: tizenP2pUnsupported
+                ? "tizen-p2p-unsupported"
+                : !p2pEnabled && canResolveP2p
+                  ? "p2p-disabled"
+                  : canUseP2p
+                    ? "p2p-resolve"
+                    : "stream-resolve",
+              resolverStatus: resolveFailureStatus,
+              resolverDetail: resolveFailureDetail
+            },
+            { keepPlayback: true }
+          );
           return;
         }
 
@@ -296,7 +303,7 @@ export function createPlayerScreenMethods35() {
     },
     // VIDAA + automatic source selection: when a source fails to start, play the
     // next one instead of showing the error. Returns true when a retry started.
-    tryVidaaAutoPlayNextSource(failedCandidate = this.getCurrentStreamCandidate(), { mediaErrorCode = 0 } = {}) {
+    tryVidaaAutoPlayNextSource(failedCandidate = this.getCurrentStreamCandidate(), { mediaErrorCode = 0, stalled = false } = {}) {
       if (!Environment.isVidaa()) {
         return false;
       }
@@ -308,10 +315,11 @@ export function createPlayerScreenMethods35() {
         });
         return false;
       }
-      if (!isVidaaFailoverMediaError(mediaErrorCode, globalThis.navigator?.onLine)) {
+      if (!isVidaaFailoverMediaError(mediaErrorCode, globalThis.navigator?.onLine, { stalled })) {
         console.info("VIDAA auto-play failover skipped", {
           reason: "error-not-source-related",
           mediaErrorCode,
+          stalled,
           online: globalThis.navigator?.onLine !== false
         });
         return false;

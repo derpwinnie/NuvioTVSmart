@@ -2,13 +2,16 @@ import assert from "node:assert/strict";
 import {
   areAllVidaaAudioCodecsUnsupported,
   createVidaaSilentAudioCheck,
-  decideVidaaAudioUnsupportedReaction,
+  forgetVidaaUnsupportedAudioCodecs,
   formatVidaaAudioCodecNames,
   learnVidaaUnsupportedAudioCodecs,
   readVidaaUnsupportedAudioCodecs,
   stepVidaaSilentAudioCheck,
   summarizeVidaaAudioProbe,
-  VIDAA_SILENT_AUDIO_PROBE_WAIT_SECONDS,
+  syncVidaaAudioMemoryWithBrowser,
+  VIDAA_AUDIO_COUNTER_VERIFIED_KEY,
+  VIDAA_AUDIO_MEMORY_BROWSER_KEY,
+  VIDAA_SILENT_AUDIO_UNKNOWN_TRACKS_SECONDS,
   VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY,
   vidaaAudioCodecKey
 } from "../js/platform/vidaa/vidaaAudioSupport.js";
@@ -75,14 +78,14 @@ assert.ok(
 // Stuck time (buffering) does not count either.
 assert.ok(!run(seconds(10).map(() => ({ currentTime: 42 }))).includes("unsupported"));
 
-// Video-only file: silent on purpose.
-assert.equal(run(seconds(6, { probe: { audioTrackCount: 0, codecIds: [] } }))[5], "skip");
-
-// Probe unknown: wait for it, flag once it arrives, give up when it never does.
-const unknown = run(seconds(VIDAA_SILENT_AUDIO_PROBE_WAIT_SECONDS + 2, { probe: null }));
-assert.ok(!unknown.includes("unsupported"));
-assert.equal(unknown.at(-1), "skip");
-assert.equal(run([...seconds(8, { probe: null }), { currentTime: 18 }]).at(-1), "unsupported");
+// No track info (probe not there yet, or empty for MP4 / HLS / unreadable headers):
+// silence only counts after the longer wait.
+for (const probe of [null, { audioTrackCount: 0, codecIds: [] }]) {
+  const verdicts = run(seconds(VIDAA_SILENT_AUDIO_UNKNOWN_TRACKS_SECONDS + 1, { probe }));
+  assert.equal(verdicts.indexOf("unsupported"), VIDAA_SILENT_AUDIO_UNKNOWN_TRACKS_SECONDS);
+}
+// The probe arriving later shortens the wait to the normal 5 s.
+assert.equal(run([...seconds(5, { probe: null }), { currentTime: 15 }]).at(-1), "unsupported");
 
 // --- (b) Unsupported-codec memory ---
 function memoryStorage(initial = {}) {
@@ -126,33 +129,50 @@ assert.equal(readVidaaUnsupportedAudioCodecs(null).size, 0);
 
 assert.equal(formatVidaaAudioCodecNames(["A_DTS", "A_TRUEHD", "A_DTS"]), "DTS/TrueHD");
 
-// --- (c) Reaction ---
-assert.deepEqual(
-  decideVidaaAudioUnsupportedReaction({ eligibility: "eligible", hasNextCandidate: true }),
-  {
-    action: "failover",
-    openSourcesPanel: false
-  }
-);
-assert.equal(
-  decideVidaaAudioUnsupportedReaction({ eligibility: "eligible", hasNextCandidate: false }).action,
-  "error"
-);
-assert.deepEqual(
-  decideVidaaAudioUnsupportedReaction({
-    eligibility: "manual-selection",
-    hasNextCandidate: true,
-    candidateCount: 3
-  }),
-  { action: "sources-panel", openSourcesPanel: true }
-);
-assert.deepEqual(
-  decideVidaaAudioUnsupportedReaction({ eligibility: "auto-play-off", candidateCount: 1 }),
-  {
-    action: "sources-panel",
-    openSourcesPanel: false
-  }
-);
+// A codec that decodes after all is forgotten; others stay.
+learnVidaaUnsupportedAudioCodecs(storage, ["A_TRUEHD"]);
+assert.deepEqual([...forgetVidaaUnsupportedAudioCodecs(storage, ["a_dts"])], ["A_TRUEHD"]);
+assert.deepEqual(storage.data[VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY], ["A_TRUEHD"]);
+assert.deepEqual([...forgetVidaaUnsupportedAudioCodecs(broken, ["A_DTS"])], []);
+
+// --- (c) Memory follows the browser version ---
+{
+  const memory = memoryStorage({
+    [VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY]: ["A_DTS"],
+    [VIDAA_AUDIO_COUNTER_VERIFIED_KEY]: true
+  });
+  // First run with this key (older build): start over once, not reported as a change.
+  assert.equal(syncVidaaAudioMemoryWithBrowser(memory, "VIDAA/7"), false);
+  assert.deepEqual(memory.data[VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY], []);
+  memory.data[VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY] = ["A_DTS"];
+  memory.data[VIDAA_AUDIO_COUNTER_VERIFIED_KEY] = true;
+  // Same browser: kept.
+  assert.equal(syncVidaaAudioMemoryWithBrowser(memory, "VIDAA/7"), false);
+  assert.deepEqual(memory.data[VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY], ["A_DTS"]);
+  // Firmware update: both cleared.
+  assert.equal(syncVidaaAudioMemoryWithBrowser(memory, "VIDAA/8"), true);
+  assert.deepEqual(memory.data[VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY], []);
+  assert.equal(memory.data[VIDAA_AUDIO_COUNTER_VERIFIED_KEY], false);
+  assert.equal(memory.data[VIDAA_AUDIO_MEMORY_BROWSER_KEY], "VIDAA/8");
+  assert.equal(syncVidaaAudioMemoryWithBrowser(broken, "VIDAA/8"), false);
+}
+
+// --- (d) Missing picture ---
+{
+  const { checkVidaaVideoPresence } = await import("../js/platform/vidaa/vidaaVideoSupport.js");
+  assert.equal(checkVidaaVideoPresence({ videoWidth: 1920, playedSeconds: 9 }), "ok");
+  assert.equal(checkVidaaVideoPresence({ decodedVideoBytes: 10, playedSeconds: 9 }), "ok");
+  assert.equal(
+    checkVidaaVideoPresence({ videoWidth: 0, decodedVideoBytes: 0, playedSeconds: 4 }),
+    "wait"
+  );
+  assert.equal(
+    checkVidaaVideoPresence({ videoWidth: 0, decodedVideoBytes: 0, playedSeconds: 5 }),
+    "missing"
+  );
+  // No byte counter API: the picture size alone decides.
+  assert.equal(checkVidaaVideoPresence({ videoWidth: 0, playedSeconds: 6 }), "missing");
+}
 
 console.log("VIDAA audio support checks passed.");
 

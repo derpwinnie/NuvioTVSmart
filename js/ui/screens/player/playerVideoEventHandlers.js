@@ -255,6 +255,10 @@ export function createPlayerVideoEventHandlers(video, isTizenAvPlayPlayback) {
       return;
     }
 
+    if (this.recoverVidaaPlaybackError(currentSourceCandidate, mediaErrorCode)) {
+      return;
+    }
+
     this.markPlaybackSourceFailed(this.activePlaybackUrl);
 
     this.clearPlaybackStallGuard();
@@ -265,7 +269,18 @@ export function createPlayerVideoEventHandlers(video, isTizenAvPlayPlayback) {
     this.dismissPauseOverlay();
     this.updateLoadingVisibility();
     this.setControlsVisible(true, { focus: false });
-    this.sourcesError = this.formatPlaybackErrorForSources(
+    if (this.currentEngineFsStream) {
+      logEngineFsDebug("EngineFS playback failed; keeping torrent alive until player exit or source change", {
+        reason: "playback-error",
+        infoHash: this.currentEngineFsStream.infoHash,
+        fileIdx: this.currentEngineFsStream.fileIdx
+      });
+    }
+    // Keep source switching user-initiated after an in-playback failure. Opening
+    // the panel here steals focus from the player (notably on webOS) and differs
+    // from Android TV, where fatal playback errors do not open Sources. VIDAA opens
+    // it (see reportPlaybackFailureToSources).
+    this.reportPlaybackFailureToSources(
       `${this.mediaErrorMessage(mediaErrorCode, playbackErrorDetail, currentSourceCandidate)}. Choose another source manually.`,
       {
         mediaErrorCode,
@@ -276,17 +291,6 @@ export function createPlayerVideoEventHandlers(video, isTizenAvPlayPlayback) {
         reason: "media-error"
       }
     );
-    if (this.currentEngineFsStream) {
-      logEngineFsDebug("EngineFS playback failed; keeping torrent alive until player exit or source change", {
-        reason: "playback-error",
-        infoHash: this.currentEngineFsStream.infoHash,
-        fileIdx: this.currentEngineFsStream.fileIdx
-      });
-    }
-    // Keep source switching user-initiated after an in-playback failure. Opening
-    // the panel here steals focus from the player (notably on webOS) and differs
-    // from Android TV, where fatal playback errors do not open Sources.
-    this.renderSourcesPanel();
 
     console.warn("Playback failed", {
       url: this.activePlaybackUrl,

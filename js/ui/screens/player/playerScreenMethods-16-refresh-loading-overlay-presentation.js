@@ -264,24 +264,26 @@ export function createPlayerScreenMethods16() {
           this.updateLoadingVisibility();
           this.updateMediaSessionPlaybackState();
           this.setControlsVisible(true, { focus: false });
-          this.sourcesError = this.formatPlaybackErrorForSources(message, {
+          this.reportPlaybackFailureToSources(message, {
             streamCandidate: sourceCandidate,
             playbackUrl: normalizedUrl,
             reason
           });
-          this.renderSourcesPanel();
           this.updateUiTick();
         }
       } else {
         // A user can select an already expired source while another source is
         // still playing. Keep the active playback untouched and only report the
         // rejected candidate in the source panel.
-        this.sourcesError = this.formatPlaybackErrorForSources(message, {
-          streamCandidate: sourceCandidate,
-          playbackUrl: normalizedUrl,
-          reason
-        });
-        this.renderSourcesPanel();
+        this.reportPlaybackFailureToSources(
+          message,
+          {
+            streamCandidate: sourceCandidate,
+            playbackUrl: normalizedUrl,
+            reason
+          },
+          { keepPlayback: true }
+        );
       }
 
       console.warn("Playback source URL has expired; refusing to retry it", {

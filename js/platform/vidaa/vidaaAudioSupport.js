@@ -7,8 +7,13 @@ import { vidaaAudioCodecDisplayName } from "./vidaaMkvTracks.js";
 export const VIDAA_SILENT_AUDIO_CHECK_INTERVAL_MS = 1000;
 // Seconds of real playback without a single decoded audio byte.
 export const VIDAA_SILENT_AUDIO_MIN_PLAYED_SECONDS = 5;
-// Give up waiting for the MKV header probe after this much playback.
-export const VIDAA_SILENT_AUDIO_PROBE_WAIT_SECONDS = 60;
+// Without track info (not MKV, or the header could not be read) wait longer before
+// calling a source silent. Even a quiet scene decodes audio bytes, so only a missing
+// or undecodable track keeps the counter at 0.
+export const VIDAA_SILENT_AUDIO_UNKNOWN_TRACKS_SECONDS = 10;
+// A codec remembered as unsupported still gets this much playback to prove otherwise
+// (a firmware update may have added it) before the source is rejected.
+export const VIDAA_REMEMBERED_CODEC_GRACE_SECONDS = 1.5;
 // A larger jump between two checks is a seek, not playback.
 const MAX_ADVANCE_PER_CHECK_SECONDS = 3;
 export const VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY = "vidaaUnsupportedAudioCodecs";
@@ -16,6 +21,25 @@ export const VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY = "vidaaUnsupportedAudioCodecs";
 // counter proves nothing: a TV that decodes audio outside the browser would report 0
 // for every source, and the check must not reject them all.
 export const VIDAA_AUDIO_COUNTER_VERIFIED_KEY = "vidaaAudioByteCounterVerified";
+// The browser (user agent) both entries above were learned on. A firmware update usually
+// changes it, and may change what the TV decodes, so a different one starts over.
+export const VIDAA_AUDIO_MEMORY_BROWSER_KEY = "vidaaAudioSupportBrowser";
+
+// Forgets the learned codecs and the counter verification when the browser changed.
+// Returns true when it reset anything.
+export function syncVidaaAudioMemoryWithBrowser(storage, userAgent) {
+  const current = String(userAgent || "");
+  try {
+    const stored = storage?.get?.(VIDAA_AUDIO_MEMORY_BROWSER_KEY, null);
+    if (stored === current) return false;
+    storage?.set?.(VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY, []);
+    storage?.set?.(VIDAA_AUDIO_COUNTER_VERIFIED_KEY, false);
+    storage?.set?.(VIDAA_AUDIO_MEMORY_BROWSER_KEY, current);
+    return stored !== null && stored !== undefined;
+  } catch (_) {
+    return false;
+  }
+}
 
 export function isVidaaAudioCounterVerified(storage) {
   try {
@@ -116,8 +140,24 @@ export function createVidaaSilentAudioCheck() {
   return { playedSeconds: 0, lastTime: null };
 }
 
+// Adds the playback time since the last sample to `state.playedSeconds`. Paused,
+// seeking, stuck (buffering) and jumped (seek) time does not count.
+export function advanceVidaaPlayedSeconds(
+  state,
+  { currentTime, paused = false, seeking = false } = {}
+) {
+  const previous = state || createVidaaSilentAudioCheck();
+  const time = Number(currentTime);
+  let playedSeconds = previous.playedSeconds;
+  if (Number.isFinite(time) && previous.lastTime !== null && !paused && !seeking) {
+    const delta = time - previous.lastTime;
+    if (delta > 0 && delta <= MAX_ADVANCE_PER_CHECK_SECONDS) playedSeconds += delta;
+  }
+  return { playedSeconds, lastTime: Number.isFinite(time) ? time : previous.lastTime };
+}
+
 // One check. `sample`: { decodedBytes, currentTime, paused, seeking, probe }
-// where probe is a summarizeVidaaAudioProbe result or null while unknown.
+// where probe is a summarizeVidaaAudioProbe result, or null while unknown.
 // Returns { state, verdict } with verdict "wait" (check again), "ok" (audio
 // decodes), "skip" (cannot tell, stop checking) or "unsupported".
 export function stepVidaaSilentAudioCheck(state, sample = {}) {
@@ -128,26 +168,14 @@ export function stepVidaaSilentAudioCheck(state, sample = {}) {
   if (sample.decodedBytes > 0) {
     return { state: previous, verdict: "ok" };
   }
-  const time = Number(sample.currentTime);
-  let playedSeconds = previous.playedSeconds;
-  if (Number.isFinite(time) && previous.lastTime !== null && !sample.paused && !sample.seeking) {
-    const delta = time - previous.lastTime;
-    if (delta > 0 && delta <= MAX_ADVANCE_PER_CHECK_SECONDS) playedSeconds += delta;
-  }
-  const next = { playedSeconds, lastTime: Number.isFinite(time) ? time : previous.lastTime };
-  if (playedSeconds < VIDAA_SILENT_AUDIO_MIN_PLAYED_SECONDS) {
-    return { state: next, verdict: "wait" };
-  }
-  const probe = sample.probe;
-  if (!probe) {
-    return {
-      state: next,
-      verdict: playedSeconds >= VIDAA_SILENT_AUDIO_PROBE_WAIT_SECONDS ? "skip" : "wait"
-    };
-  }
-  // A file without audio tracks is silent on purpose.
-  if (!(probe.audioTrackCount > 0)) return { state: next, verdict: "skip" };
-  return { state: next, verdict: "unsupported" };
+  const next = advanceVidaaPlayedSeconds(previous, sample);
+  // The probe only lists audio tracks it could read from an MKV header: none listed
+  // means unknown (MP4, HLS, header not readable), not a file without audio.
+  const tracksKnown = sample.probe?.audioTrackCount > 0;
+  const needed = tracksKnown
+    ? VIDAA_SILENT_AUDIO_MIN_PLAYED_SECONDS
+    : VIDAA_SILENT_AUDIO_UNKNOWN_TRACKS_SECONDS;
+  return { state: next, verdict: next.playedSeconds >= needed ? "unsupported" : "wait" };
 }
 
 // `storage` is LocalStore-like: get(key, fallback) / set(key, value).
@@ -182,6 +210,23 @@ export function learnVidaaUnsupportedAudioCodecs(storage, codecIds) {
   return known;
 }
 
+// Drops codec ids that decoded after all (e.g. after a firmware update). Returns the new set.
+export function forgetVidaaUnsupportedAudioCodecs(storage, codecIds) {
+  const known = readVidaaUnsupportedAudioCodecs(storage);
+  const before = known.size;
+  (Array.isArray(codecIds) ? codecIds : [codecIds]).forEach((id) =>
+    known.delete(String(id || "").toUpperCase())
+  );
+  if (known.size !== before) {
+    try {
+      storage?.set?.(VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY, [...known]);
+    } catch (_) {
+      // Storage blocked: the grace period still lets the source play.
+    }
+  }
+  return known;
+}
+
 // True only when the source has audio and every audio track's codec is known
 // to be unsupported. An unknown codec counts as supported.
 export function areAllVidaaAudioCodecsUnsupported(codecIds, unsupported) {
@@ -196,18 +241,4 @@ export function formatVidaaAudioCodecNames(codecIds) {
     .map(vidaaAudioCodecDisplayName)
     .filter(Boolean);
   return [...new Set(names)].join("/");
-}
-
-// What to do with a source whose audio cannot be decoded.
-// "failover": play the next auto-play candidate; "error": auto-play has no
-// candidate left; "sources-panel": the user picked it, let them choose another.
-export function decideVidaaAudioUnsupportedReaction({
-  eligibility = "",
-  hasNextCandidate = false,
-  candidateCount = 0
-} = {}) {
-  if (eligibility === "eligible") {
-    return { action: hasNextCandidate ? "failover" : "error", openSourcesPanel: false };
-  }
-  return { action: "sources-panel", openSourcesPanel: candidateCount > 1 };
 }
