@@ -19,7 +19,7 @@ console.warn = (...args) => logs.push(args);
 const { createPlayerScreenMethods74 } =
   await import("../js/ui/screens/player/playerScreenMethods-74-vidaa-audio-support.js");
 const { PlayerController } = await import("../js/ui/screens/player/playerScreenContext.js");
-const { VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY } =
+const { VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY, VIDAA_AUDIO_COUNTER_VERIFIED_KEY } =
   await import("../js/platform/vidaa/vidaaAudioSupport.js");
 
 const URL_A = "https://debrid.example/token123/a.mkv";
@@ -69,8 +69,26 @@ const tick = (screen, count) => {
   }
 };
 
-// 1. Auto-picked source, silent DTS audio: fail over after 5 s and learn the codec.
+// 0. Until this device's counter has counted audio once, silence proves nothing:
+// a TV decoding audio outside the browser would report 0 for every source.
 let screen = createScreen();
+screen.startVidaaAudioCheck();
+screen.recordVidaaAudioProbe(URL_A, DTS_TRACKS);
+tick(screen, 6);
+assert.deepEqual(screen.calls, [], "unverified counter: no reaction");
+assert.equal(store.has(VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY), false, "nothing learned");
+assert.ok(JSON.stringify(logs).includes("counter-not-verified"));
+// A source that decodes audio verifies the counter for later checks.
+screen = createScreen();
+video.webkitAudioDecodedByteCount = 4096;
+screen.startVidaaAudioCheck();
+screen.recordVidaaAudioProbe(URL_A, DTS_TRACKS);
+tick(screen, 1);
+assert.equal(JSON.parse(store.get(VIDAA_AUDIO_COUNTER_VERIFIED_KEY)), true);
+video.webkitAudioDecodedByteCount = 0;
+
+// 1. Auto-picked source, silent DTS audio: fail over after 5 s and learn the codec.
+screen = createScreen();
 screen.startVidaaAudioCheck();
 tick(screen, 3);
 assert.equal(screen.calls.length, 0, "no verdict before the probe and 5 s");

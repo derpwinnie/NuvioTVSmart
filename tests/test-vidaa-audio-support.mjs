@@ -155,3 +155,28 @@ assert.deepEqual(
 );
 
 console.log("VIDAA audio support checks passed.");
+
+// Counter verification memory.
+{
+  const { isVidaaAudioCounterVerified, markVidaaAudioCounterVerified } =
+    await import("../js/platform/vidaa/vidaaAudioSupport.js");
+  const values = new Map();
+  const fakeStore = {
+    get: (key, fallback) => (values.has(key) ? values.get(key) : fallback),
+    set: (key, value) => values.set(key, value)
+  };
+  assert.equal(isVidaaAudioCounterVerified(fakeStore), false);
+  markVidaaAudioCounterVerified(fakeStore);
+  assert.equal(isVidaaAudioCounterVerified(fakeStore), true);
+  const broken = {
+    get: () => {
+      throw new Error("blocked");
+    },
+    set: () => {
+      throw new Error("blocked");
+    }
+  };
+  assert.equal(isVidaaAudioCounterVerified(broken), false);
+  markVidaaAudioCounterVerified(broken);
+  console.log("VIDAA audio counter verification checks passed.");
+}

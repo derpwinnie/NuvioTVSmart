@@ -5,6 +5,8 @@ import {
   areAllVidaaAudioCodecsUnsupported,
   createVidaaSilentAudioCheck,
   decideVidaaAudioUnsupportedReaction,
+  isVidaaAudioCounterVerified,
+  markVidaaAudioCounterVerified,
   formatVidaaAudioCodecNames,
   learnVidaaUnsupportedAudioCodecs,
   readVidaaUnsupportedAudioCodecs,
@@ -89,6 +91,14 @@ export function createPlayerScreenMethods74() {
       });
       this.vidaaAudioCheckState = state;
       if (verdict === "wait") {
+        return;
+      }
+      if (verdict === "ok") {
+        markVidaaAudioCounterVerified(LocalStore);
+      }
+      if (verdict === "unsupported" && !isVidaaAudioCounterVerified(LocalStore)) {
+        console.info("VIDAA audio check skipped", { reason: "counter-not-verified" });
+        this.finishVidaaAudioCheck();
         return;
       }
       if (verdict !== "unsupported") {

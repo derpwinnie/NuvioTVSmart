@@ -12,6 +12,27 @@ export const VIDAA_SILENT_AUDIO_PROBE_WAIT_SECONDS = 60;
 // A larger jump between two checks is a seek, not playback.
 const MAX_ADVANCE_PER_CHECK_SECONDS = 3;
 export const VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY = "vidaaUnsupportedAudioCodecs";
+// Set once this device's decoded-byte counter has counted audio. Until then a silent
+// counter proves nothing: a TV that decodes audio outside the browser would report 0
+// for every source, and the check must not reject them all.
+export const VIDAA_AUDIO_COUNTER_VERIFIED_KEY = "vidaaAudioByteCounterVerified";
+
+export function isVidaaAudioCounterVerified(storage) {
+  try {
+    return storage?.get?.(VIDAA_AUDIO_COUNTER_VERIFIED_KEY, false) === true;
+  } catch (_) {
+    return false;
+  }
+}
+
+export function markVidaaAudioCounterVerified(storage) {
+  try {
+    if (!isVidaaAudioCounterVerified(storage))
+      storage?.set?.(VIDAA_AUDIO_COUNTER_VERIFIED_KEY, true);
+  } catch (_) {
+    // Storage blocked: detection simply stays off on this device.
+  }
+}
 
 const CODEC_IDS_BY_NAME = {
   dts: "A_DTS",
