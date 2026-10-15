@@ -34,6 +34,41 @@ export function markVidaaAudioCounterVerified(storage) {
   }
 }
 
+// Half a second of silent AAC (920 bytes). Playing it muted and hidden shows whether
+// this device's browser counts decoded audio at all, before any real source played.
+const VIDAA_AUDIO_COUNTER_PROBE_URI =
+  "data:audio/mp4;base64,AAAAHGZ0eXBNNEEgAAACAE00QSBpc29taXNvMgAAAAhmcmVlAAAASW1kYXTeAgBMYXZjNjIuMjguMTAzAAIwQA4BGCAHARggBwEYIAcBGCAHARggBwEYIAcBGCAHARggBwEYIAcBGCAHARggBwAAAyttb292AAAAbG12aGQAAAAAAAAAAAAAAAAAAAPoAAAB9AABAAABAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAACVXRyYWsAAABcdGtoZAAAAAMAAAAAAAAAAAAAAAEAAAAAAAAB9AAAAAAAAAAAAAAAAQEAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAACRlZHRzAAAAHGVsc3QAAAAAAAAAAQAAAfQAAAQAAAEAAAAAAc1tZGlhAAAAIG1kaGQAAAAAAAAAAAAAAAAAAFYiAAAvEVXEAAAAAAAtaGRscgAAAAAAAAAAc291bgAAAAAAAAAAAAAAAFNvdW5kSGFuZGxlcgAAAAF4bWluZgAAABBzbWhkAAAAAAAAAAAAAAAkZGluZgAAABxkcmVmAAAAAAAAAAEAAAAMdXJsIAAAAAEAAAE8c3RibAAAAGpzdHNkAAAAAAAAAAEAAABabXA0YQAAAAAAAAABAAAAAAAAAAAAAQAQAAAAAFYiAAAAAAA2ZXNkcwAAAAADgICAJQABAASAgIAXQBUAAAAAAF3AAAADtwWAgIAFE4hW5QAGgICAAQIAAAAgc3R0cwAAAAAAAAACAAAACwAABAAAAAABAAADEQAAABxzdHNjAAAAAAAAAAEAAAABAAAADAAAAAEAAABEc3RzegAAAAAAAAAAAAAADAAAABUAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAABRzdGNvAAAAAAAAAAEAAAAsAAAAGnNncGQBAAAAcm9sbAAAAAIAAAAB//8AAAAcc2JncAAAAAByb2xsAAAAAQAAAAwAAAABAAAAYnVkdGEAAABabWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY2Mi4xMi4xMDM=";
+const VIDAA_AUDIO_COUNTER_PROBE_WAIT_MS = 1500;
+
+// Resolves true when a muted, detached <audio> playing the probe clip makes
+// webkitAudioDecodedByteCount count; false when it stays 0 or the API is missing.
+export async function probeVidaaAudioCounter(
+  createAudio = () => document.createElement("audio"),
+  waitMs = VIDAA_AUDIO_COUNTER_PROBE_WAIT_MS
+) {
+  let audio = null;
+  try {
+    audio = createAudio();
+    if (typeof audio?.webkitAudioDecodedByteCount !== "number") return false;
+    audio.muted = true;
+    audio.preload = "auto";
+    audio.src = VIDAA_AUDIO_COUNTER_PROBE_URI;
+    await audio.play();
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    return Number(audio.webkitAudioDecodedByteCount) > 0;
+  } catch (_) {
+    return false;
+  } finally {
+    try {
+      audio?.pause?.();
+      audio?.removeAttribute?.("src");
+      audio?.load?.();
+    } catch (_) {
+      // Best effort cleanup of the probe element.
+    }
+  }
+}
+
 const CODEC_IDS_BY_NAME = {
   dts: "A_DTS",
   dca: "A_DTS",

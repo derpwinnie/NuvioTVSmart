@@ -16,7 +16,7 @@ const logs = [];
 console.info = (...args) => logs.push(args);
 console.warn = (...args) => logs.push(args);
 
-const { createPlayerScreenMethods74 } =
+const { createPlayerScreenMethods74, resetVidaaAudioCounterProbe } =
   await import("../js/ui/screens/player/playerScreenMethods-74-vidaa-audio-support.js");
 const { PlayerController } = await import("../js/ui/screens/player/playerScreenContext.js");
 const { VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY, VIDAA_AUDIO_COUNTER_VERIFIED_KEY } =
@@ -75,9 +75,13 @@ let screen = createScreen();
 screen.startVidaaAudioCheck();
 screen.recordVidaaAudioProbe(URL_A, DTS_TRACKS);
 tick(screen, 6);
+// The counter self-test cannot run here (no DOM): it resolves false, the check gives up.
+await new Promise((resolve) => setTimeout(resolve, 0));
+tick(screen, 1);
 assert.deepEqual(screen.calls, [], "unverified counter: no reaction");
 assert.equal(store.has(VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY), false, "nothing learned");
 assert.ok(JSON.stringify(logs).includes("counter-not-verified"));
+resetVidaaAudioCounterProbe();
 // A source that decodes audio verifies the counter for later checks.
 screen = createScreen();
 video.webkitAudioDecodedByteCount = 4096;

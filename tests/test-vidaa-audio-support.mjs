@@ -180,3 +180,47 @@ console.log("VIDAA audio support checks passed.");
   markVidaaAudioCounterVerified(broken);
   console.log("VIDAA audio counter verification checks passed.");
 }
+
+// Counter self-test with fake <audio> elements.
+{
+  const { probeVidaaAudioCounter } = await import("../js/platform/vidaa/vidaaAudioSupport.js");
+  const fakeAudio = (bytesAfterPlay, { rejectPlay = false, api = true } = {}) => {
+    const audio = {
+      muted: false,
+      src: "",
+      pause() {},
+      removeAttribute() {},
+      load() {},
+      play: () => {
+        if (rejectPlay) return Promise.reject(new Error("NotAllowedError"));
+        audio.webkitAudioDecodedByteCount = bytesAfterPlay;
+        return Promise.resolve();
+      }
+    };
+    if (api) audio.webkitAudioDecodedByteCount = 0;
+    return audio;
+  };
+  assert.equal(await probeVidaaAudioCounter(() => fakeAudio(65), 0), true, "counting device");
+  assert.equal(await probeVidaaAudioCounter(() => fakeAudio(0), 0), false, "silent counter");
+  assert.equal(
+    await probeVidaaAudioCounter(() => fakeAudio(65, { api: false }), 0),
+    false,
+    "no counter API"
+  );
+  assert.equal(
+    await probeVidaaAudioCounter(() => fakeAudio(65, { rejectPlay: true }), 0),
+    false,
+    "autoplay blocked"
+  );
+  assert.equal(
+    await probeVidaaAudioCounter(() => {
+      throw new Error("no DOM");
+    }, 0),
+    false,
+    "no DOM"
+  );
+  const muted = fakeAudio(65);
+  await probeVidaaAudioCounter(() => muted, 0);
+  assert.equal(muted.muted, true, "the probe plays muted");
+  console.log("VIDAA audio counter self-test checks passed.");
+}

@@ -7,6 +7,7 @@ import {
   decideVidaaAudioUnsupportedReaction,
   isVidaaAudioCounterVerified,
   markVidaaAudioCounterVerified,
+  probeVidaaAudioCounter,
   formatVidaaAudioCodecNames,
   learnVidaaUnsupportedAudioCodecs,
   readVidaaUnsupportedAudioCodecs,
@@ -18,6 +19,24 @@ import {
 // VIDAA: a source whose audio the TV cannot decode plays silently without an
 // error. Check it once per source after the first frame and fail over (auto-play)
 // or send the user to the sources panel. See vidaaAudioSupport.js.
+// One counter self-test per app session: null = not run, a Promise = running,
+// true/false = result.
+let counterProbe = null;
+
+function ensureVidaaAudioCounterProbe() {
+  if (counterProbe !== null || isVidaaAudioCounterVerified(LocalStore)) return;
+  counterProbe = probeVidaaAudioCounter().then((counts) => {
+    if (counts) markVidaaAudioCounterVerified(LocalStore);
+    counterProbe = counts;
+    return counts;
+  });
+}
+
+// Test hook: forget the session's self-test result.
+export function resetVidaaAudioCounterProbe() {
+  counterProbe = null;
+}
+
 export function createPlayerScreenMethods74() {
   const { PlayerController, Environment, t } = internals;
 
@@ -41,6 +60,8 @@ export function createPlayerScreenMethods74() {
       this.vidaaAudioCheckUrl = url;
       this.vidaaAudioCheckState = createVidaaSilentAudioCheck();
       this.vidaaAudioCheckTimer = setInterval(() => this.runVidaaAudioCheck(), VIDAA_SILENT_AUDIO_CHECK_INTERVAL_MS);
+      // Start the one-time counter self-test now so its result is in before a verdict.
+      ensureVidaaAudioCounterProbe();
       this.runVidaaAudioCheck();
     },
     stopVidaaAudioCheck() {
@@ -97,6 +118,11 @@ export function createPlayerScreenMethods74() {
         markVidaaAudioCounterVerified(LocalStore);
       }
       if (verdict === "unsupported" && !isVidaaAudioCounterVerified(LocalStore)) {
+        ensureVidaaAudioCounterProbe();
+        if (counterProbe instanceof Promise) {
+          // The self-test is still running: check again on the next tick.
+          return;
+        }
         console.info("VIDAA audio check skipped", { reason: "counter-not-verified" });
         this.finishVidaaAudioCheck();
         return;
