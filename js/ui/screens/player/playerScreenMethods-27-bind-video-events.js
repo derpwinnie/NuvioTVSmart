@@ -3,6 +3,7 @@ import { createPlayerVideoLifecycleHandlers } from "./playerVideoLifecycleHandle
 import { createPlayerVideoEventHandlers } from "./playerVideoEventHandlers.js";
 import { Platform } from "../../../platform/index.js";
 import { shouldJumpVidaaBufferGap, timeRangesToArray } from "../../../platform/vidaa/vidaaBufferGap.js";
+import { shouldDisableVidaaInitialTextTrack } from "../../../platform/vidaa/vidaaVideo.js";
 
 export function createPlayerScreenMethods27() {
   return {
@@ -78,6 +79,22 @@ export function createPlayerScreenMethods27() {
           if (!this.paused) video.play()?.catch?.(() => {});
         };
         ["waiting", "progress", "canplay", "seeked"].forEach((eventName) => bindings.push([eventName, onBufferGap]));
+
+        // VIDAA renders the first embedded subtitle track as soon as it appears, while its
+        // mode reads "disabled". When Nuvio shows no built-in subtitle, turn it off for
+        // real (setNativeTextTrack(-1) toggles it, see selectVidaaTextTrack). A track
+        // Nuvio picked itself, an addon or manifest subtitle is left alone.
+        const textTrackList = this.getVideoTextTrackList();
+        if (textTrackList && typeof textTrackList.addEventListener === "function") {
+          const onVidaaTextTrackAdded = () => {
+            setTimeout(() => {
+              if (!shouldDisableVidaaInitialTextTrack(this)) return;
+              PlayerController.setNativeTextTrack?.(-1);
+            }, 0);
+          };
+          textTrackList.addEventListener("addtrack", onVidaaTextTrackAdded);
+          this.videoListeners.push({ target: textTrackList, eventName: "addtrack", handler: onVidaaTextTrackAdded });
+        }
       }
 
       bindings.forEach(([eventName, handler]) => {

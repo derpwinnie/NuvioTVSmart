@@ -1,4 +1,5 @@
 // VIDAA requires disabling all text tracks before enabling the selected one.
+// Turning subtitles off needs a show/disable toggle (see below).
 // This keeps selection inside Nuvio's player and uses the TV's HTML media API.
 // VIDAA firmware frequently ignores an immediate re-enable or misreports the
 // modes on readback, so the switch is verified and retried once after a beat;
@@ -34,6 +35,29 @@ export function selectVidaaTextTrack(tracks, index) {
       return false;
     }
   };
+  const anyShowing = () => {
+    try {
+      return tracks.some((track) => track.mode === "showing");
+    } catch (_) {
+      return false;
+    }
+  };
+  if (targetIndex < 0 && tracks.length && !anyShowing()) {
+    // VIDAA starts with the first embedded track rendered while every mode already
+    // reads "disabled", so writing "disabled" changes nothing for the firmware.
+    // Toggle it on and off a beat later (the same workaround as Stremio's VidaaVideo).
+    try {
+      tracks[0].mode = "showing";
+    } catch (_) {
+      // Readonly mode: fall through to the plain disable below.
+    }
+    setTimeout(() => {
+      if (attempt === vidaaTextTrackAttempt) {
+        applyModes();
+      }
+    }, 0);
+    return true;
+  }
   if (!applyModes()) {
     return false;
   }
@@ -60,4 +84,17 @@ export function selectVidaaTextTrack(tracks, index) {
   // when the rendered track did change, so callers must not treat this as a
   // failure and re-run the whole selection.
   return true;
+}
+
+// True when the player shows no built-in subtitle of its own: no selected text track,
+// no embedded/addon/manifest subtitle and no mounted addon <track> elements.
+export function shouldDisableVidaaInitialTextTrack(player) {
+  return Boolean(
+    player &&
+    !(Number(player.selectedSubtitleTrackIndex) >= 0) &&
+    !(Number(player.selectedEmbeddedSubtitleTrackIndex) >= 0) &&
+    !player.selectedAddonSubtitleId &&
+    !player.selectedManifestSubtitleTrackId &&
+    !(player.externalTrackNodes?.length > 0)
+  );
 }
