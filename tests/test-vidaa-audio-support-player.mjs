@@ -110,7 +110,22 @@ screen.startVidaaAudioCheck();
 assert.equal(screen.vidaaAudioCheckTimer, null);
 assert.ok(!JSON.stringify(logs).includes("token123"), "no stream URL in logs");
 
+// 1b. A later playback of the same source (e.g. a manual switch back to it) is
+// checked again: the remembered codec reacts at the first check, without waiting.
+screen = createScreen({ eligibility: "manual-selection" });
+screen.vidaaAudioCheckDoneUrl = URL_A;
+screen.startVidaaAudioCheck();
+assert.equal(screen.vidaaAudioCheckTimer, null, "same playback: not checked twice");
+screen.resetVidaaAudioCheckForNewPlayback();
+screen.recordVidaaAudioProbe(URL_A, DTS_TRACKS);
+screen.startVidaaAudioCheck();
+assert.ok(
+  screen.calls.some(([kind]) => kind === "open-sources" || kind === "render-sources"),
+  "new playback of a known DTS source reacts right away"
+);
+
 // 2. Manually picked source with a remembered codec: sources panel without waiting.
+pauses = 0;
 screen = createScreen({ eligibility: "manual-selection" });
 screen.recordVidaaAudioProbe(URL_A, DTS_TRACKS);
 video.currentTime = 10;

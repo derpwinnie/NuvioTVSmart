@@ -72,6 +72,12 @@ export function createPlayerScreenMethods74() {
       this.vidaaAudioCheckState = null;
       this.vidaaAudioCheckUrl = "";
     },
+    // Every playback start (also a manual switch back to a source checked before) gets a
+    // fresh check; the done marker only prevents re-checking within one playback.
+    resetVidaaAudioCheckForNewPlayback() {
+      this.stopVidaaAudioCheck();
+      this.vidaaAudioCheckDoneUrl = "";
+    },
     finishVidaaAudioCheck() {
       this.vidaaAudioCheckDoneUrl = this.vidaaAudioCheckUrl;
       this.stopVidaaAudioCheck();

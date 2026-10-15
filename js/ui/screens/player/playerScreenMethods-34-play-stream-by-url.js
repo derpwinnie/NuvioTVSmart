@@ -175,7 +175,7 @@ export function createPlayerScreenMethods34() {
       }
       this.markPlaybackProgress();
       this.clearPlaybackStallGuard();
-      this.stopVidaaAudioCheck();
+      this.resetVidaaAudioCheckForNewPlayback();
       this.clearSubtitleCueStyleBindings();
       this.clearEmbeddedSubtitleCueRefreshTimers();
       if (resetSilentAudioState) {
