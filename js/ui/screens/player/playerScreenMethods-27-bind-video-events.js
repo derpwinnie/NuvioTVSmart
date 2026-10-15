@@ -54,6 +54,15 @@ export function createPlayerScreenMethods27() {
         ["dashtrackschanged", onTrackListChanged]
       ];
       if (Platform.isVidaa()) {
+        // The new source started loading: from now on timeupdate belongs to it.
+        bindings.push([
+          "loadstart",
+          () => {
+            if (this.pendingPlaybackRestore?.awaitingNewSource) {
+              this.pendingPlaybackRestore.awaitingNewSource = false;
+            }
+          }
+        ]);
         // A resume seek can leave currentTime in front of the first buffered keyframe, where
         // playback never starts. Step over that small gap and keep playing unless paused.
         // Only armed for a short while after a resume restore or a seek (see seekPlaybackSeconds).

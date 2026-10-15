@@ -2,7 +2,7 @@
 import * as internals from "./playerScreenContext.js";
 import { Platform } from "../../../platform/index.js";
 import { armVidaaBufferGap, VIDAA_RESUME_GAP_SECONDS, VIDAA_SEEK_GAP_SECONDS } from "../../../platform/vidaa/vidaaBufferGap.js";
-import { decideVidaaResumeRestore, timeRangesToArray, VIDAA_RESTORE_RETRY_MS } from "../../../platform/vidaa/vidaaResumeRestore.js";
+import { decideVidaaResumeRestore, isVidaaRestoreSeekable, timeRangesToArray, VIDAA_RESTORE_RETRY_MS } from "../../../platform/vidaa/vidaaResumeRestore.js";
 
 export function createPlayerScreenMethods31() {
   const { PlayerController, PlayerSettingsStore, t, escapeHtml, formatNextEpisodeAirDate } = internals;
@@ -82,7 +82,7 @@ export function createPlayerScreenMethods31() {
     },
     attemptPendingPlaybackRestore({ force = false } = {}) {
       const restore = this.pendingPlaybackRestore;
-      if (!restore) {
+      if (!restore || restore.awaitingNewSource) {
         return;
       }
       const isVidaa = Platform.isVidaa();
@@ -133,6 +133,12 @@ export function createPlayerScreenMethods31() {
       let seekSeconds = targetSeconds;
       if (isVidaa) {
         const video = PlayerController.video;
+        if (!isVidaaRestoreSeekable(video)) {
+          // A slow source (debrid link still resolving) has no metadata yet. Seeking
+          // now does nothing, and counting it would use up the attempts and play the
+          // new source from 0, e.g. after switching sources mid-stream.
+          return;
+        }
         const decision = decideVidaaResumeRestore({
           targetSeconds,
           ranges: timeRangesToArray(video?.buffered),

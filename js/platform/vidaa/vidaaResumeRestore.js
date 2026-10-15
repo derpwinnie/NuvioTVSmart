@@ -20,6 +20,14 @@ export function getVidaaResumeSeekTarget(targetSeconds, ranges = []) {
   return range ? Math.max(range[0] + LANDING_OFFSET_SECONDS, target) : target;
 }
 
+// HTMLMediaElement.HAVE_METADATA: before it, there is no duration to seek within.
+const HAVE_METADATA = 1;
+
+// True once the new source can take a resume seek.
+export function isVidaaRestoreSeekable(video) {
+  return Number(video?.readyState || 0) >= HAVE_METADATA;
+}
+
 // Next step for a pending resume restore that has not reached its target yet:
 // wait for a running seek, seek (again), or give up after a few attempts.
 export function decideVidaaResumeRestore({

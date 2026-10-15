@@ -167,7 +167,11 @@ export function createPlayerScreenMethods34() {
             timeSeconds: Number.isFinite(restoreTimeSeconds) ? restoreTimeSeconds : 0,
             paused: Boolean(this.paused || (!usingAvPlay && video?.paused)),
             attempts: 0,
-            lastAttemptAt: 0
+            lastAttemptAt: 0,
+            // VIDAA: the old source keeps firing timeupdate at its position until the new
+            // one starts loading, which looked like "target reached" and dropped the
+            // restore, so a mid-stream source switch restarted at 0. Wait for loadstart.
+            awaitingNewSource: Environment.isVidaa()
           };
         }
       } else if (!(preservePendingRestore && this.pendingPlaybackRestore)) {

@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import {
   decideVidaaResumeRestore,
   getVidaaResumeSeekTarget,
-  VIDAA_RESTORE_MAX_ATTEMPTS
-} from "../js/platform/vidaa/vidaaResumeRestore.js";
+  VIDAA_RESTORE_MAX_ATTEMPTS, isVidaaRestoreSeekable } from "../js/platform/vidaa/vidaaResumeRestore.js";
 
 // The hang seen in the browser: currentTime 0, data buffered only around the target.
 assert.deepEqual(
@@ -42,5 +41,13 @@ assert.equal(
   decideVidaaResumeRestore({ targetSeconds: 400, attempts: VIDAA_RESTORE_MAX_ATTEMPTS }).action,
   "give-up"
 );
+
+
+// A slow source (debrid link still resolving) has no metadata yet: wait instead of
+// spending restore attempts, or a mid-stream source switch restarts at 0.
+assert.equal(isVidaaRestoreSeekable({ readyState: 0 }), false);
+assert.equal(isVidaaRestoreSeekable(null), false);
+assert.equal(isVidaaRestoreSeekable({ readyState: 1 }), true);
+assert.equal(isVidaaRestoreSeekable({ readyState: 4 }), true);
 
 console.log("VIDAA resume restore checks passed.");
