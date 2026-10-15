@@ -120,11 +120,11 @@ screen.resetVidaaAudioCheckForNewPlayback();
 screen.recordVidaaAudioProbe(URL_A, DTS_TRACKS);
 screen.startVidaaAudioCheck();
 assert.ok(
-  screen.calls.some(([kind]) => kind === "open-sources" || kind === "render-sources"),
+  screen.calls.some(([kind]) => kind === "startup-error"),
   "new playback of a known DTS source reacts right away"
 );
 
-// 2. Manually picked source with a remembered codec: sources panel without waiting.
+// 2. Manually picked source with a remembered codec: error card without waiting.
 pauses = 0;
 screen = createScreen({ eligibility: "manual-selection" });
 screen.recordVidaaAudioProbe(URL_A, DTS_TRACKS);
@@ -132,11 +132,11 @@ video.currentTime = 10;
 screen.startVidaaAudioCheck();
 assert.deepEqual(
   screen.calls.map(([kind]) => kind),
-  ["failed", "open-sources"]
+  ["failed", "startup-error"]
 );
 assert.equal(pauses, 1);
 assert.equal(screen.paused, true);
-assert.match(screen.sourcesError, /\(DTS\).*another source/);
+assert.match(screen.calls[1][1], /\(DTS\).*another source/, "error card explains the codec");
 
 // 3. Auto-play with no candidate left: startup error.
 screen = createScreen({ next: null });

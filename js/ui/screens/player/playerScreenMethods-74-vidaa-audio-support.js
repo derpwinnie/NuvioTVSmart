@@ -196,12 +196,10 @@ export function createPlayerScreenMethods74() {
         return;
       }
 
-      // Same presentation as a stall the guard gives up on.
-      this.loadingVisible = false;
-      this.dismissPauseOverlay();
-      this.updateLoadingVisibility();
-      this.setControlsVisible(true, { focus: false });
-      this.sourcesError = this.formatPlaybackErrorForSources(
+      // A source the user picked: explain it on the player's error card (same card as any
+      // playback error, with its Go Back action to the sources) instead of a line in the
+      // sources panel that is easy to miss.
+      this.showStartupError(
         t(
           "player_vidaa_audio_unsupported_choose_source",
           { codec },
@@ -209,12 +207,6 @@ export function createPlayerScreenMethods74() {
         ),
         { streamCandidate: candidate, playbackUrl, reason: "vidaa-audio-unsupported" }
       );
-      if (reaction.openSourcesPanel) {
-        this.openSourcesPanel();
-      } else {
-        this.renderSourcesPanel();
-      }
-      this.updateUiTick();
     }
   };
 }
