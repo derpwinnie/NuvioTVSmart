@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import {
   fetchVidaaMkvAudioTracks,
   parseMatroskaHead,
-  parseMatroskaTracksAt
+  parseMatroskaTracksAt,
+  vidaaAudioCodecDisplayName
 } from "../js/platform/vidaa/vidaaMkvTracks.js";
 
 const bytes = new Uint8Array(
@@ -61,5 +62,22 @@ assert.deepEqual(
   []
 );
 assert.ok(pulled <= 512 * 1024, `read ${pulled} bytes`);
+
+// 6. Human-readable codec names for messages.
+assert.deepEqual(
+  [
+    "A_DTS",
+    "A_TRUEHD",
+    "A_EAC3",
+    "A_AC3",
+    "A_AAC",
+    "A_OPUS",
+    "A_FLAC",
+    "A_DTS/LOSSLESS",
+    "A_XYZ",
+    ""
+  ].map(vidaaAudioCodecDisplayName),
+  ["DTS", "TrueHD", "E-AC-3", "AC-3", "AAC", "Opus", "FLAC", "DTS", "XYZ", ""]
+);
 
 console.log("vidaa mkv tracks: ok");

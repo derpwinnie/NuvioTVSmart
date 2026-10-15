@@ -45,6 +45,17 @@ const CODEC_NAMES = [
   [/^A_PCM/, "PCM"]
 ];
 
+// Spelling for user-facing messages; the audio menu keeps the short names above.
+const CODEC_DISPLAY_NAMES = { EAC3: "E-AC-3", AC3: "AC-3" };
+
+// "A_DTS" -> "DTS", "A_EAC3" -> "E-AC-3". Empty for an empty codec id.
+export function vidaaAudioCodecDisplayName(codecId) {
+  const id = String(codecId || "").trim();
+  if (!id) return "";
+  const name = codecName(id);
+  return CODEC_DISPLAY_NAMES[name] || name;
+}
+
 function readVint(bytes, offset, keepMarker) {
   const first = bytes[offset];
   if (first === undefined || first === 0) return null;
