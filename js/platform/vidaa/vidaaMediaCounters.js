@@ -3,13 +3,16 @@
 // decodes outside the browser, or a playback pipeline that does not report, shows 0
 // for every source, and the checks must not reject them all. So a counter is only
 // trusted once it has counted something on this device, per kind (audio/video) and
-// per pipeline: a plain file (native) and MSE playback (hls.js, dash.js) report
-// through different paths.
+// per pipeline: a plain file (native), the TV's own HLS player (native-hls, which VIDAA
+// prefers like Stremio's VidaaVideo) and MSE playback (hls.js, dash.js) report through
+// different paths.
 export const VIDAA_MEDIA_COUNTERS_VERIFIED_KEY = "vidaaMediaCountersVerified";
+
+const SEPARATE_PIPELINES = ["native-hls", "hls.js", "dash.js"];
 
 export function vidaaPlaybackPipeline(engine) {
   const name = String(engine || "").toLowerCase();
-  return name === "hls.js" || name === "dash.js" ? name : "native";
+  return SEPARATE_PIPELINES.includes(name) ? name : "native";
 }
 
 function readVerified(storage) {

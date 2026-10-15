@@ -191,11 +191,13 @@ console.log("VIDAA audio support checks passed.");
   assert.equal(vidaaPlaybackPipeline("native-file"), "native");
   assert.equal(vidaaPlaybackPipeline(undefined), "native");
   assert.equal(vidaaPlaybackPipeline("hls.js"), "hls.js");
+  assert.equal(vidaaPlaybackPipeline("native-hls"), "native-hls");
   assert.equal(isVidaaMediaCounterVerified(fakeStore, "audio", "native-file"), false);
   markVidaaMediaCounterVerified(fakeStore, "audio", "native-file");
   assert.equal(isVidaaMediaCounterVerified(fakeStore, "audio", "native"), true);
   // A plain file proves nothing for MSE playback, or for the picture.
   assert.equal(isVidaaMediaCounterVerified(fakeStore, "audio", "hls.js"), false);
+  assert.equal(isVidaaMediaCounterVerified(fakeStore, "audio", "native-hls"), false);
   assert.equal(isVidaaMediaCounterVerified(fakeStore, "video", "native"), false);
   markVidaaMediaCounterVerified(fakeStore, "audio", "hls.js");
   markVidaaMediaCounterVerified(fakeStore, "audio", "hls.js");
