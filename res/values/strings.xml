@@ -2422,7 +2422,8 @@
     <string name="player_error_vidaa_standalone_unsupported">This source requires network features that are not available on this device. Try a different source.</string>
     <string name="player_vidaa_audio_unsupported_trying_next">This source\'s audio (%1$s) isn\'t supported on this device. Trying the next source…</string>
     <string name="player_vidaa_audio_unsupported_choose_source">This source\'s audio (%1$s) isn\'t supported on this device. Choose another source.</string>
-    <string name="player_vidaa_audio_unsupported_none_left">None of the remaining sources have audio this device can play.</string>
+    <string name="player_vidaa_audio_unsupported_none_left">This source\'s audio (%1$s) isn\'t supported on this device, and none of the other sources could be tried automatically. Choose another source.</string>
+    <string name="player_vidaa_audio_unsupported_title">Audio not supported</string>
     <string name="player_error_decoder">Decoder error</string>
     <string name="player_error_unsupported_format">This stream uses a format your device may not support. Try a different source. [%1$s]</string>
     <string name="player_error_initialize_failed">Failed to initialize player</string>

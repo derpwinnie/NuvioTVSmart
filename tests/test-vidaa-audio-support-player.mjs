@@ -40,6 +40,8 @@ function createScreen({ eligibility = "eligible", next = { id: "b" } } = {}) {
     seekOverlayVisible: false,
     bufferingActive: false,
     sourcesError: null,
+    sourcesAlert: null,
+    sourcesFocus: null,
     calls,
     getStreamCandidateByUrl: () => state.streamCandidates[0],
     getVidaaAutoPlayFailoverContext: () => ({ settings: {}, eligibility }),
@@ -48,7 +50,12 @@ function createScreen({ eligibility = "eligible", next = { id: "b" } } = {}) {
       calls.push(["failover", failed.id, candidate.id]),
     showAspectToast: (label, options) => calls.push(["toast", label, options?.durationMs]),
     showStartupError: (message) => calls.push(["startup-error", message]),
-    openSourcesPanel: () => calls.push(["open-sources"]),
+    // Like the real panel on VIDAA: focus starts on the playing source.
+    openSourcesPanel: () => {
+      calls.push(["open-sources"]);
+      state.sourcesFocus = { zone: "list", index: 0 };
+    },
+    getFilteredSources: () => state.streamCandidates,
     renderSourcesPanel: () => calls.push(["render-sources"]),
     formatPlaybackErrorForSources: (message) => message,
     markPlaybackSourceFailed: () => calls.push(["failed"])
@@ -120,11 +127,12 @@ screen.resetVidaaAudioCheckForNewPlayback();
 screen.recordVidaaAudioProbe(URL_A, DTS_TRACKS);
 screen.startVidaaAudioCheck();
 assert.ok(
-  screen.calls.some(([kind]) => kind === "startup-error"),
+  screen.calls.some(([kind]) => kind === "open-sources"),
   "new playback of a known DTS source reacts right away"
 );
 
-// 2. Manually picked source with a remembered codec: error card without waiting.
+// 2. Manually picked source with a remembered codec: the in-player sources list opens
+// with an alert on top, without waiting, and focus moves to the next source.
 pauses = 0;
 screen = createScreen({ eligibility: "manual-selection" });
 screen.recordVidaaAudioProbe(URL_A, DTS_TRACKS);
@@ -132,21 +140,25 @@ video.currentTime = 10;
 screen.startVidaaAudioCheck();
 assert.deepEqual(
   screen.calls.map(([kind]) => kind),
-  ["failed", "startup-error"]
+  ["failed", "open-sources", "render-sources"]
 );
 assert.equal(pauses, 1);
 assert.equal(screen.paused, true);
-assert.match(screen.calls[1][1], /\(DTS\).*another source/, "error card explains the codec");
+assert.equal(screen.sourcesAlert.title, "Audio not supported");
+assert.match(screen.sourcesAlert.message, /\(DTS\).*another source/, "alert explains the codec");
+assert.deepEqual(screen.sourcesFocus, { zone: "list", index: 1 }, "focus on the next source");
 
-// 3. Auto-play with no candidate left: startup error.
+// 3. Auto-play (also resume / continue watching) with no candidate left: the same
+// sources list with an alert, never the error card whose Back leaves the player.
 screen = createScreen({ next: null });
 screen.recordVidaaAudioProbe(URL_A, DTS_TRACKS);
 screen.startVidaaAudioCheck();
 assert.deepEqual(
   screen.calls.map(([kind]) => kind),
-  ["failed", "startup-error"]
+  ["failed", "open-sources", "render-sources"]
 );
-assert.match(screen.calls[1][1], /None of the remaining sources/);
+assert.match(screen.sourcesAlert.message, /\(DTS\).*none of the other sources/);
+assert.ok(!screen.calls.some(([kind]) => kind === "startup-error"));
 
 // 4. A playable track next to a remembered one, decoding audio: nothing happens.
 screen = createScreen();

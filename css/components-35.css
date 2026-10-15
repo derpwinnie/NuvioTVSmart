@@ -54,6 +54,36 @@
   word-break: break-word;
 }
 
+/* Shown above the filters when playback stopped on a source and the user has to pick
+   another one (e.g. VIDAA audio the TV can't decode). Same card style as the app's
+   other warnings, in the error colour. */
+.player-sources-alert {
+  margin-top: min(1.25vw, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: min(0.42vw, 8px);
+  padding: min(1.04vw, 20px) min(1.25vw, 24px);
+  border: min(0.104vw, 2px) solid rgba(207, 102, 121, 0.6);
+  border-left-width: min(0.42vw, 8px);
+  border-radius: min(0.83vw, 16px);
+  background: rgba(207, 102, 121, 0.18);
+}
+
+.player-sources-alert-title {
+  color: #ffb4c0;
+  font-size: min(1.46vw, 28px);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.player-sources-alert-message {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: min(1.25vw, 24px);
+  line-height: 1.35;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
 .player-source-card {
   border-radius: 12px;
   border: 1px solid transparent;

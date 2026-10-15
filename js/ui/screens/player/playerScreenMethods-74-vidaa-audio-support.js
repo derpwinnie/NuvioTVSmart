@@ -18,7 +18,7 @@ import {
 
 // VIDAA: a source whose audio the TV cannot decode plays silently without an
 // error. Check it once per source after the first frame and fail over (auto-play)
-// or send the user to the sources panel. See vidaaAudioSupport.js.
+// or open the sources panel with an alert. See vidaaAudioSupport.js.
 // One counter self-test per app session: null = not run, a Promise = running,
 // true/false = result.
 let counterProbe = null;
@@ -188,25 +188,42 @@ export function createPlayerScreenMethods74() {
       PlayerController.pause();
       this.paused = true;
       this.updateMediaSessionPlaybackState();
-      if (reaction.action === "error") {
-        this.showStartupError(
-          t("player_vidaa_audio_unsupported_none_left", {}, "None of the remaining sources have audio this device can play."),
-          { streamCandidate: candidate, playbackUrl, reason: "vidaa-audio-unsupported" }
-        );
-        return;
+      // Auto-play out of candidates, or a source the user picked: stop on the in-player
+      // sources list with an alert on top, so the next pick is one OK away.
+      const message =
+        reaction.action === "error"
+          ? t(
+              "player_vidaa_audio_unsupported_none_left",
+              { codec },
+              `This source's audio (${codec}) isn't supported on this device, and none of the other sources could be tried automatically. Choose another source.`
+            )
+          : t(
+              "player_vidaa_audio_unsupported_choose_source",
+              { codec },
+              `This source's audio (${codec}) isn't supported on this device. Choose another source.`
+            );
+      this.showVidaaSourcesAlert({
+        title: t("player_vidaa_audio_unsupported_title", {}, "Audio not supported"),
+        message
+      });
+    },
+    // Opens the in-player sources list with an alert above the filters. Unlike
+    // sourcesError it survives the list reload that opening the panel starts, and it is
+    // cleared when the panel closes (also when a new source is picked).
+    showVidaaSourcesAlert({ title = "", message = "" } = {}) {
+      this.loadingVisible = false;
+      this.dismissPauseOverlay();
+      this.updateLoadingVisibility();
+      this.setControlsVisible(true, { focus: false });
+      this.openSourcesPanel();
+      this.sourcesAlert = { title, message };
+      // Focus the source after the failed one: OK plays the next candidate.
+      const listLength = this.getFilteredSources().length;
+      if (this.sourcesFocus?.zone === "list" && this.sourcesFocus.index + 1 < listLength) {
+        this.sourcesFocus = { zone: "list", index: this.sourcesFocus.index + 1 };
       }
-
-      // A source the user picked: explain it on the player's error card (same card as any
-      // playback error, with its Go Back action to the sources) instead of a line in the
-      // sources panel that is easy to miss.
-      this.showStartupError(
-        t(
-          "player_vidaa_audio_unsupported_choose_source",
-          { codec },
-          `This source's audio (${codec}) isn't supported on this device. Choose another source.`
-        ),
-        { streamCandidate: candidate, playbackUrl, reason: "vidaa-audio-unsupported" }
-      );
+      this.renderSourcesPanel();
+      this.updateUiTick();
     }
   };
 }

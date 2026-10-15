@@ -42,6 +42,7 @@ export function createPlayerScreenMethods63() {
       this.sourcesPanelVisible = false;
       this.sourcesLastNavigationRepeatAt = 0;
       this.sourcesError = "";
+      this.sourcesAlert = null;
       this.renderSourcesPanel();
       this.updateModalBackdrop();
       if (Platform.isVidaa() && this.controlsVisible) {
@@ -204,6 +205,15 @@ export function createPlayerScreenMethods63() {
                 : this.params?.playerTitle || this.params?.itemId || ""
             )}
           </div>
+
+          ${
+            this.sourcesAlert
+              ? `<div class="player-sources-alert" role="alert">
+            ${this.sourcesAlert.title ? `<div class="player-sources-alert-title">${escapeHtml(this.sourcesAlert.title)}</div>` : ""}
+            <div class="player-sources-alert-message">${escapeHtml(this.sourcesAlert.message)}</div>
+          </div>`
+              : ""
+          }
 
           <div class="player-sources-filters">
             ${filters

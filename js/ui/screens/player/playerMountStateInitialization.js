@@ -118,6 +118,7 @@ export function initializePlayerMountState(params, initialStreamUrl) {
   this.sourcesPanelVisible = false;
   this.sourcesLoading = false;
   this.sourcesError = "";
+  this.sourcesAlert = null;
   this.sourceFilter = "all";
   this.sourcesFocus = { zone: "filter", index: 0 };
   this.sourceLoadToken = 0;
