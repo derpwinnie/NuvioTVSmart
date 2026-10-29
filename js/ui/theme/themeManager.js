@@ -6,10 +6,12 @@ import { resolveThemeName } from "./themeAccess.js";
 import { ThemeColors } from "./themeColors.js";
 import { resolveCustomThemeColors } from "../../core/util/customThemeColors.js";
 
+// The last slot is for glyph fonts (emoji, symbols) a platform may add; it
+// resolves to plain sans-serif unless --app-glyph-font-families is set.
 const FONT_STACKS = {
-  INTER: '"Inter", "Segoe UI", Arial, sans-serif',
-  DM_SANS: '"DM Sans", "Segoe UI", Arial, sans-serif',
-  OPEN_SANS: '"Open Sans", "Segoe UI", Arial, sans-serif'
+  INTER: '"Inter", "Segoe UI", Arial, var(--app-glyph-font-families, sans-serif)',
+  DM_SANS: '"DM Sans", "Segoe UI", Arial, var(--app-glyph-font-families, sans-serif)',
+  OPEN_SANS: '"Open Sans", "Segoe UI", Arial, var(--app-glyph-font-families, sans-serif)'
 };
 
 // Cached once at module load so the theme can retain its capability fallback.

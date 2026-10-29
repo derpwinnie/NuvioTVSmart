@@ -22,7 +22,7 @@
   --focus-color-rgb: 255 255 255;
   --focus-bg: #303030;
   --border-color: #333333;
-  --app-font-family: "Inter", "Segoe UI", Arial, sans-serif;
+  --app-font-family: "Inter", "Segoe UI", Arial, var(--app-glyph-font-families, sans-serif);
   --tv-safe-gutter: 32px;
   --tv-safe-gutter: clamp(28px, 3vw, 56px);
   --tv-safe-gutter-wide: 40px;

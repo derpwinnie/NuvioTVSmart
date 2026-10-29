@@ -1077,7 +1077,8 @@ html.vidaa-tv .home-screen-shell .home-poster-landscape-logo {
   unicode-range: U+2190-21FF, U+2300-23FF, U+2460-24FF, U+25A0-25FF, U+2600-27BF, U+2B00-2BFF;
 }
 
+/* Fills the glyph slot at the end of the theme's font stack (themeManager
+   sets --app-font-family inline, so the stack itself is not overridden). */
 html.vidaa-tv.vidaa-glyph-fonts {
-  --app-font-family:
-    "Inter", "Segoe UI", Arial, "Nuvio Emoji", "Nuvio Symbols", "Nuvio Symbols Extra", sans-serif;
+  --app-glyph-font-families: "Nuvio Emoji", "Nuvio Symbols", "Nuvio Symbols Extra", sans-serif;
 }
