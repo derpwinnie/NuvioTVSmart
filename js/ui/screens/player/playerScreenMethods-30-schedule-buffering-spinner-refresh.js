@@ -203,26 +203,24 @@ export function createPlayerScreenMethods30() {
           (!Environment.isWebOS() && !this.startupAudioPreferenceApplying && !this.hasAudioTracksAvailable()));
       return audioPreferenceSettled && Number.isFinite(readyState) && readyState >= 3;
     },
+    // Upstream stops the completion check once loading is hidden. On VIDAA the
+    // stall watchdog and source recovery can hide it before the presentation
+    // callback has released the startup mute, so the check keeps running while
+    // that mute is active (the language and resume checks still guard release).
+    shouldSkipLoadingCompletionCheck() {
+      if (this.isExternalFrameMode()) return true;
+      if (!Environment.isVidaa()) return !this.loadingVisible;
+      return this.isStartupErrorVisible() || (!this.loadingVisible && !PlayerController.startupPresentationAudioMuted);
+    },
     scheduleLoadingCompletionCheck(delayMs = 250, { force = false } = {}) {
       this.clearLoadingCompletionTimer();
-      // Recovery and the stall watchdog can hide loading before the normal
-      // presentation callback runs. Its audio mute still needs that callback;
-      // the startup language and resume checks below continue to guard release.
-      if (
-        (!this.loadingVisible && !PlayerController.startupPresentationAudioMuted) ||
-        this.isExternalFrameMode() ||
-        this.isStartupErrorVisible()
-      ) {
+      if (this.shouldSkipLoadingCompletionCheck()) {
         return;
       }
       this.loadingCompletionTimer = setTimeout(
         () => {
           this.loadingCompletionTimer = null;
-          if (
-            (!this.loadingVisible && !PlayerController.startupPresentationAudioMuted) ||
-            this.isExternalFrameMode() ||
-            this.isStartupErrorVisible()
-          ) {
+          if (this.shouldSkipLoadingCompletionCheck()) {
             return;
           }
           if (this.isStartupGateReleaseReady()) {

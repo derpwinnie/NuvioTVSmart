@@ -1,4 +1,4 @@
-import { normalizeStreamDisplayText } from "../../../core/streams/streamDisplayText.js";
+import { readableStreamText } from "../../../core/streams/streamDisplayText.js";
 import { Environment } from "../../../platform/environment.js";
 
 export function normalizePlaybackDisplayLineBreaks(value = "") {
@@ -6,7 +6,7 @@ export function normalizePlaybackDisplayLineBreaks(value = "") {
 }
 
 export function formatPlaybackSourceName(value = "") {
-  const readableValue = Environment.isVidaa() ? normalizeStreamDisplayText(value) : value;
+  const readableValue = readableStreamText(value, Environment);
   return normalizePlaybackDisplayLineBreaks(readableValue)
     .replace(/\r\n|\r|\n/g, " · ")
     .replace(/\s+/g, " ")

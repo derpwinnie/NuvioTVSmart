@@ -1,7 +1,7 @@
 import { saveReusableStreamLink } from "../../../core/streams/streamLinkReuse.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./streamScreen.js";
-import { normalizeStreamDisplayText } from "../../../core/streams/streamDisplayText.js";
+import { readableStreamText } from "../../../core/streams/streamDisplayText.js";
 
 export function createStreamScreenMethods08() {
   const {
@@ -180,7 +180,7 @@ export function createStreamScreenMethods08() {
     },
     renderChip(name, selected, status) {
       const label = name === "all" ? t("common.all", {}, "All") : name;
-      const readableLabel = Environment.isVidaa() ? normalizeStreamDisplayText(label) : label;
+      const readableLabel = readableStreamText(label, Environment);
       const chipStatus = String(status || "success");
       const classes = ["stream-route-chip", "focusable", selected ? "selected" : "", chipStatus !== "success" ? chipStatus : ""]
         .filter(Boolean)
@@ -217,7 +217,7 @@ export function createStreamScreenMethods08() {
       let addonIdentity = "";
       if (showAddonLogo) {
         const addonName = stream.addonName || "Addon";
-        const readableAddonName = Environment.isVidaa() ? normalizeStreamDisplayText(addonName) : addonName;
+        const readableAddonName = readableStreamText(addonName, Environment);
         const addonLogoUrl = normalizeAddonLogoUrl(stream.addonLogo) || resolveAddonLogo(stream.addonName, this.addonLogoLookup);
         const cachedAddonLogoUrl = getCachedAddonLogoDisplayUrl(addonLogoUrl);
         let displayAddonLogoUrl = cachedAddonLogoUrl || "";

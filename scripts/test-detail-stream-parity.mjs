@@ -89,8 +89,7 @@ const bundle = await build({
 let normalizeLayout;
 const fixtures = {
   LayoutPreferences: { get: () => ({ posterCardCornerRadiusDp: 12 }) },
-  // kvn fork: the VIDAA branches stay off here.
-  Environment: { isWebOS: () => false, isVidaa: () => false },
+  Environment: { isWebOS: () => false },
   renderStreamBadges: (_stream, _enabled, settings) =>
     settings?.testBadges ? "<div>TEST-BADGES</div>" : "",
   resolveStreamBadgePlacement: (settings) => settings?.badgePlacement || "BOTTOM",

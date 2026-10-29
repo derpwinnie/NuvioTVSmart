@@ -330,3 +330,19 @@ export function normalizeStreamMatchPattern(value = "") {
   }
   return normalized;
 }
+
+// The platform rule for stream labels, in one place. Callers pass their
+// platform Environment, so this module stays platform-free (and screens keep
+// taking Environment from their internals). VIDAA fonts lack styled letters,
+// small capitals, emoji and flags; other platforms show the text unchanged.
+export function readableStreamText(value = "", environment = null) {
+  const text = String(value ?? "");
+  return environment?.isVidaa?.() ? normalizeStreamDisplayText(text) : text;
+}
+
+// Headlines also keep upstream's webOS rule: decorated letters only, emoji stay.
+export function readableStreamHeadline(value = "", environment = null) {
+  const text = String(value ?? "");
+  if (environment?.isVidaa?.()) return normalizeStreamDisplayText(text);
+  return environment?.isWebOS?.() ? normalizeMathematicalAlphanumericSymbols(text) : text;
+}

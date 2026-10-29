@@ -69,7 +69,7 @@ import { localizedGenreText } from "../../../i18n/genreLabels.js";
 
 import { matchStreamBadges, normalizeStreamBadgeChipColor, normalizeStreamBadgeRules } from "../../../core/streams/streamBadgeRules.js";
 
-import { normalizeMathematicalAlphanumericSymbols, normalizeStreamDisplayText } from "../../../core/streams/streamDisplayText.js";
+import { readableStreamHeadline, readableStreamText } from "../../../core/streams/streamDisplayText.js";
 
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
 
@@ -186,7 +186,7 @@ export function mergeStreamItems(existing = [], incoming = []) {
 }
 
 export function getAddonBadgeLabel(name = "") {
-  const cleaned = (Environment.isVidaa() ? normalizeStreamDisplayText(name) : String(name || "")).trim();
+  const cleaned = readableStreamText(name || "", Environment).trim();
   if (!cleaned) {
     return "A";
   }
@@ -246,13 +246,11 @@ export function getStreamHeadline(stream = {}) {
   const primary = [stream.name, stream.title, stream.description].find((value) => String(value || "").trim());
   if (!primary) {
     const fallback = stream.addonName || "Unknown source";
-    return Environment.isVidaa() ? normalizeStreamDisplayText(fallback) : fallback;
+    return readableStreamText(fallback, Environment);
   }
-  // Upstream keeps multiline addon names. webOS only needs the decorated
-  // letters normalized; VIDAA fonts also lack emoji, flags and small capitals.
+  // Upstream keeps multiline addon names.
   const name = String(primary).trim();
-  if (Environment.isVidaa()) return normalizeStreamDisplayText(name);
-  return Environment.isWebOS() ? normalizeMathematicalAlphanumericSymbols(name) : name;
+  return readableStreamHeadline(name, Environment);
 }
 
 export function getStreamQuality(stream = {}) {
@@ -284,7 +282,7 @@ export function getStreamDescriptionLines(stream = {}) {
   if (!displayDescription || displayDescription === displayName) {
     return [];
   }
-  const readableDescription = Environment.isVidaa() ? normalizeStreamDisplayText(displayDescription) : displayDescription;
+  const readableDescription = readableStreamText(displayDescription, Environment);
   return readableDescription
     .split(/\r?\n/)
     .map((line) => line.trim())
