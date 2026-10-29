@@ -1,3 +1,5 @@
+import { EpisodeShuffleStore } from "../../../data/local/episodeShuffleStore.js";
+import { selectShuffleEpisode } from "../../../core/player/episodeShuffleSelection.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./metaDetailsScreenContext.js";
 
@@ -288,6 +290,20 @@ export function createMetaDetailsScreenMethods04() {
       return null;
     },
     getNextEpisodeAfter(episode = null) {
+      const contentId = this.params?.itemId || this.meta?.id;
+      const contentType = this.params?.itemType || this.meta?.type;
+      if (EpisodeShuffleStore.get(contentId, contentType).enabled)
+        return selectShuffleEpisode({
+          contentId,
+          contentType,
+          videos: this.episodes || [],
+          current: episode,
+          surface: "playback",
+          watched: this.watchedEpisodeKeys || new Set(),
+          progress: this.episodeProgressMap || new Map(),
+          reference: this.meta || {},
+          useLocalState: false
+        });
       if (!episode || !this.episodes?.length) {
         return null;
       }

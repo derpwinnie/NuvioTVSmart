@@ -19,6 +19,7 @@ const APP_SHELL = `
     <div id="trakt" class="screen"></div>
     <div id="supportersContributors" class="screen"></div>
     <div id="licensesAttributions" class="screen"></div>
+    <div id="watchParty" class="screen"></div>
     <div id="plugin" class="screen"></div>
     <div id="plugins" class="screen"></div>
     <div id="catalogOrder" class="screen"></div>

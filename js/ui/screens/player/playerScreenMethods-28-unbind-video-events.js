@@ -1,6 +1,8 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
+import { PartyRepository } from "../../../core/party/partyRepository.js";
+
 export function createPlayerScreenMethods28() {
   const { PlayerController, t, clamp, escapeHtml } = internals;
 
@@ -28,7 +30,7 @@ export function createPlayerScreenMethods28() {
           action: "playPause",
           label: paused ? ">" : "II",
           icon: paused ? "assets/icons/ic_player_play.svg" : "assets/icons/ic_player_pause.svg",
-          title: "Play/Pause",
+          title: paused ? t("cd_play", {}, "Play") : t("cd_pause", {}, "Pause"),
           primary: true
         }
       ];
@@ -42,21 +44,23 @@ export function createPlayerScreenMethods28() {
         });
       }
 
-      base.push({
-        action: "subtitleDialog",
-        icon: "assets/icons/ic_player_subtitles.svg",
-        title: t("subtitle_dialog_title", {}, "Subtitles")
-      });
+      if (this.hasSubtitleTracksAvailable())
+        base.push({
+          action: "subtitleDialog",
+          icon: "assets/icons/ic_player_subtitles.svg",
+          title: t("subtitle_dialog_title", {}, "Subtitles")
+        });
 
-      base.push({
-        action: "audioTrack",
-        icon:
-          this.selectedAudioTrackIndex >= 0 || this.selectedManifestAudioTrackId
-            ? "assets/icons/ic_player_audio_filled.svg"
-            : "assets/icons/ic_player_audio_outline.svg",
-        useMask: true,
-        title: t("audio_dialog_title", {}, "Audio")
-      });
+      if (this.hasAudioTracksAvailable())
+        base.push({
+          action: "audioTrack",
+          icon:
+            this.selectedAudioTrackIndex >= 0 || this.selectedManifestAudioTrackId
+              ? "assets/icons/ic_player_audio_filled.svg"
+              : "assets/icons/ic_player_audio_outline.svg",
+          useMask: true,
+          title: t("audio_dialog_title", {}, "Audio")
+        });
 
       base.push({
         action: "source",
@@ -69,6 +73,16 @@ export function createPlayerScreenMethods28() {
           action: "episodes",
           icon: "assets/icons/ic_player_episodes.svg",
           title: t("episodes_panel_title", {}, "Episodes")
+        });
+      }
+
+      if (this.isPartyButtonAvailable?.()) {
+        base.push({
+          action: "party",
+          icon: "assets/icons/ic_player_party.svg",
+          useMask: true,
+          title: t("party_title", {}, "Watch party"),
+          className: PartyRepository.getState().party ? "is-party-active" : ""
         });
       }
 
@@ -100,6 +114,7 @@ export function createPlayerScreenMethods28() {
           icon: "assets/icons/ic_player_aspect_ratio.svg",
           title: t("player_more_aspect_ratio", {}, "Aspect Ratio")
         },
+        { action: "streamInfo", label: "ⓘ", title: t("cd_stream_info", {}, "Stream info") },
         { action: "backFromMore", label: "<", title: t("player_go_back", {}, "Back") }
       ];
     },
@@ -111,7 +126,8 @@ export function createPlayerScreenMethods28() {
           control.icon || "",
           control.title || "",
           Boolean(control.primary),
-          Boolean(control.useMask)
+          Boolean(control.useMask),
+          control.className || ""
         ])
       );
     },
@@ -146,7 +162,7 @@ export function createPlayerScreenMethods28() {
         wrap.innerHTML = controls
           .map(
             (control) => `
-            <button class="player-control-btn focusable${control.primary ? " is-primary" : ""}"
+            <button class="player-control-btn focusable${control.primary ? " is-primary" : ""}${control.className ? ` ${escapeHtml(control.className)}` : ""}"
                     data-action="${control.action}"
                     title="${escapeHtml(control.title || "")}">
               ${
@@ -272,7 +288,8 @@ export function createPlayerScreenMethods28() {
         this.audioDialogVisible ||
         this.sourcesPanelVisible ||
         this.episodePanelVisible ||
-        this.speedDialogVisible
+        this.speedDialogVisible ||
+        Boolean(this.partyPanelVisible)
       );
     },
     syncPlayerOverlayLayoutState() {

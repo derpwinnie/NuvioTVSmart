@@ -1,3 +1,5 @@
+import { createStreamRedirectReporter } from "./streamRedirect.js";
+import { applyAdaptiveRequestHeaders } from "./adaptiveRequestHeaders.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerController.js";
 
@@ -178,6 +180,11 @@ export function createPlayerControllerMethods13() {
         }
       });
 
+      const reportRedirect = createStreamRedirectReporter(this, url, playToken);
+      hls.on(Hls.Events.MANIFEST_LOADED, (_, data = {}) => {
+        reportRedirect(data.networkDetails?.responseURL || data.networkDetails?.url);
+      });
+
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (!this.isPlaybackRequestActive(playToken, url)) {
           return;
@@ -231,7 +238,7 @@ export function createPlayerControllerMethods13() {
       hls.attachMedia(this.video);
       return true;
     },
-    playWithDashJs(url, playToken = null) {
+    playWithDashJs(url, playToken = null, requestHeaders = this.currentPlaybackHeaders || {}) {
       if (!this.video || !this.canUseDashJs()) {
         return false;
       }
@@ -264,6 +271,17 @@ export function createPlayerControllerMethods13() {
               enabled: false
             }
           }
+        });
+        const forwardedHeaders = this.normalizePlaybackHeaders(requestHeaders);
+        if (Object.keys(forwardedHeaders).length || String(url).includes("/proxy/")) {
+          player.addRequestInterceptor((request) => applyAdaptiveRequestHeaders(request, forwardedHeaders, url));
+        }
+        const reportRedirect = createStreamRedirectReporter(this, url, playToken);
+        player.addResponseInterceptor((response) => {
+          if (response.request?.url === url && response.status >= 200 && response.status < 300) {
+            reportRedirect(response.url);
+          }
+          return Promise.resolve(response);
         });
         player.initialize(this.video, url, true);
         const dashEvents = dashJsEngine.getEvents();

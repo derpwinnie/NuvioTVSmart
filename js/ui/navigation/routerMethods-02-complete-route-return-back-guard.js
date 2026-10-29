@@ -1,21 +1,23 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./router.js";
-import { resetVidaaNavigationActivity } from "./vidaaNavigationActivity.js";
 
 export function createRouterMethods02() {
   const {
     Platform,
     TizenCapabilities,
     LocalStore,
+    RouteStateStore,
     ROUTER_PERF_DEBUG,
     routerPerfNow,
     logRouterPerf,
     NON_BACKSTACK_ROUTES,
+    openPendingLaunchDeepLink,
     WEBOS_RESUME_ROUTE_KEY,
     WEBOS_RESUME_ROUTE_TTL_MS,
     TIZEN_ROUTE_RETURN_BACK_GUARD_MS,
     WEBOS_NON_RESTORABLE_ROUTES,
-    getStackEntryRoute
+    getStackEntryRoute,
+    resetVidaaNavigationActivity
   } = internals;
 
   return {
@@ -83,7 +85,45 @@ export function createRouterMethods02() {
         params: snapshot.params && typeof snapshot.params === "object" ? snapshot.params : {}
       };
     },
+    seedWebOsResumeBackStack() {
+      // Android keeps Home beneath restored content; seed it without mounting an extra screen.
+      if (!Platform.isWebOS() || this.historyInitialized || !window?.history) {
+        return false;
+      }
+      const homeState = { route: "home", params: {}, previousRoute: null };
+      if (typeof window.history.replaceState !== "function" || typeof window.history.pushState !== "function") {
+        return false;
+      }
+      window.history.replaceState(homeState, "");
+      // The restored route replaces this second entry, leaving Home underneath.
+      window.history.pushState(homeState, "");
+      this.historyInitialized = true;
+      // Let the first Home mount arm its own native Back guard for overlays.
+      if (!this.stack.length) {
+        this.stack.push({ route: "home", params: {} });
+      }
+      return true;
+    },
+
     async navigate(routeName, params = {}, options = {}) {
+      if (routeName === "detail" && params?.itemType === "collection") {
+        const ref = String(params.itemId || "").match(/^server:([^:]+):([^:]+)$/);
+        if (ref) {
+          try {
+            routeName = "catalogSeeAll";
+            params = {
+              addonBaseUrl: `nuvio-server://${decodeURIComponent(ref[1])}`,
+              catalogId: `collection-${decodeURIComponent(ref[2])}`,
+              type: "mixed",
+              catalogName: params.fallbackTitle || params.itemTitle || "",
+              addonName: params.addonName || "",
+              supportsSkip: true
+            };
+          } catch (_) {
+            return;
+          }
+        }
+      }
       if (routeName === "plugins" && Platform.isTizen() && !TizenCapabilities.canUsePlugins()) {
         return;
       }
@@ -103,7 +143,7 @@ export function createRouterMethods02() {
       }
       // A held arrow belongs to the previous screen. A missed firmware keyup
       // must not keep the newly opened screen's loading paused for one second.
-      if (Platform.isVidaa()) resetVidaaNavigationActivity();
+      if (Platform.isVidaa?.()) resetVidaaNavigationActivity();
 
       const bootGuard = globalThis.NuvioBootGuard;
       if (bootGuard && typeof bootGuard.stage === "function") {
@@ -127,6 +167,11 @@ export function createRouterMethods02() {
         this.routes[this.current].cleanup?.();
       }
 
+      // Android recreates Search when entering profile selection; keep only same-session snapshots.
+      if (routeName === "profileSelection" && String(targetParams.mode || "selection").toLowerCase() !== "management") {
+        RouteStateStore.clear("route:search");
+      }
+
       this.current = routeName;
       this.currentParams = targetParams;
       const navigationContext = this.resolveNavigationContext(routeName, this.currentParams, {
@@ -134,7 +179,12 @@ export function createRouterMethods02() {
         previousRoute
       });
 
-      await Screen.mount(this.currentParams, navigationContext);
+      this.pendingMountParams = targetParams;
+      try {
+        await Screen.mount(this.currentParams, navigationContext);
+      } finally {
+        if (this.pendingMountParams === targetParams) this.pendingMountParams = null;
+      }
       this.completeRouteReturnBackGuard(routeReturnBackGuardNavigationId);
       logRouterPerf("navigate", {
         ms: Number((routerPerfNow() - navigationStart).toFixed(2)),
@@ -180,6 +230,8 @@ export function createRouterMethods02() {
         }
       }
       this.persistWebOsResumeRoute(this.current, this.currentParams);
+      // A title deep link from a webOS launch opens here, once navigation is past startup (sign-in, profiles, setup).
+      await openPendingLaunchDeepLink(this, NON_BACKSTACK_ROUTES);
     },
     navigateFromPostPlayRecommendation(routeName, params = {}, options = {}) {
       const targetRoute = String(routeName || "").trim();

@@ -1,3 +1,4 @@
+import { MediaServerRepository, isMediaServerBase } from "../mediaserver/mediaServerRepository.js";
 import { safeApiCall } from "../../core/network/safeApiCall.js";
 import { selectCatalogEntries } from "../../core/util/catalogEntryMapper.js";
 import { CatalogApi } from "../remote/api/catalogApi.js";
@@ -22,6 +23,15 @@ class CatalogRepository {
     supportsSkip = false,
     signal = null
   }) {
+    if (isMediaServerBase(addonBaseUrl))
+      return MediaServerRepository.catalog({
+        addonBaseUrl,
+        catalogId,
+        type,
+        skip,
+        extraArgs,
+        signal
+      });
     const normalizedSkipStep = this.normalizeSkipStep(skipStep);
     const cacheKey = this.buildCacheKey({
       addonBaseUrl,

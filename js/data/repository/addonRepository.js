@@ -1,3 +1,4 @@
+import { MediaServerRepository } from "../mediaserver/mediaServerRepository.js";
 import { safeApiCall } from "../../core/network/safeApiCall.js";
 import { LocalStore } from "../../core/storage/localStore.js";
 import { ProfileManager } from "../../core/profile/profileManager.js";
@@ -33,6 +34,8 @@ class AddonRepository {
     this.manifestErrorCache = new Map();
     this.manifestRequests = new Map();
     this.manifestRefreshRequests = new Map();
+    this.lastManifestRefreshAttemptAt = 0;
+    this.backgroundManifestRefreshRequest = null;
     this.manifestCachePersistTimer = null;
     this.installedAddonsCache = null;
     this.installedAddonsCacheKey = "";
@@ -76,6 +79,11 @@ class AddonRepository {
       addon &&
       typeof addon === "object" &&
       this.canonicalizeUrl(addon.baseUrl) === baseUrl &&
+      !(
+        baseUrl === "https://v3-cinemeta.strem.io" &&
+        addon.id === "org.cinemeta" &&
+        addon.version === "fallback"
+      ) &&
       Array.isArray(addon.catalogs) &&
       Array.isArray(addon.resources)
     );
@@ -133,10 +141,13 @@ class AddonRepository {
     return didDelete;
   }
 
-  isManifestCacheStale(baseUrl) {
-    const cleanBaseUrl = this.canonicalizeUrl(baseUrl);
-    const cachedAtMs = Number(this.manifestCacheTimestamps.get(cleanBaseUrl) || 0);
-    return !cachedAtMs || Date.now() - cachedAtMs >= MANIFEST_CACHE_TTL_MS;
+  isManifestCacheStale() {
+    // Android revalidates disk snapshots in each new process and spaces refresh
+    // attempts within that session, including attempts that fail while offline.
+    return (
+      !this.lastManifestRefreshAttemptAt ||
+      Date.now() - this.lastManifestRefreshAttemptAt > MANIFEST_CACHE_TTL_MS
+    );
   }
 
   canonicalizeUrl(url) {
@@ -547,13 +558,6 @@ class AddonRepository {
         return { status: "success", data: this.withDisplayNameOverride(cached) };
       }
 
-      const fallback = this.getBuiltinFallbackManifest(cleanBaseUrl);
-      if (fallback) {
-        this.setManifestCacheEntry(cleanBaseUrl, fallback);
-        this.manifestErrorCache.delete(cleanBaseUrl);
-        return { status: "success", data: this.withDisplayNameOverride(fallback) };
-      }
-
       this.manifestErrorCache.set(cleanBaseUrl, result);
       return result;
     })();
@@ -643,6 +647,10 @@ class AddonRepository {
   }
 
   async getInstalledAddons(options = {}) {
+    if (options.includeMediaServers) {
+      const addons = await this.getInstalledAddons({ ...options, includeMediaServers: false });
+      return [...addons, ...MediaServerRepository.addons()];
+    }
     const includeDisabled = Boolean(options?.includeDisabled);
     const allUrls = this.getInstalledAddonUrls();
     const enabledStates = this.getAddonEnabledStates();
@@ -660,18 +668,28 @@ class AddonRepository {
     const timeoutMs = options?.timeoutMs;
 
     if (staleWhileRevalidate && !force) {
-      const refreshUrls = urls.filter(
-        (url) =>
-          !this.manifestCache.has(this.canonicalizeUrl(url)) || this.isManifestCacheStale(url)
-      );
+      const missingUrls = urls.filter((url) => !this.manifestCache.has(this.canonicalizeUrl(url)));
+      const refreshCached = !this.backgroundManifestRefreshRequest && this.isManifestCacheStale();
+      const refreshUrls = refreshCached ? urls : missingUrls;
       if (refreshUrls.length) {
-        void this.refreshInstalledAddons({
+        // Record the attempt before starting IO so repeated Home loads cannot
+        // launch another sweep. Cache misses remain eligible independently.
+        if (refreshCached) this.lastManifestRefreshAttemptAt = Date.now();
+        const request = this.refreshInstalledAddons({
           urls: refreshUrls,
           includeDisabled,
           timeoutMs
-        }).catch((error) => {
-          console.warn("Background addon manifest refresh failed", error);
         });
+        if (refreshCached) this.backgroundManifestRefreshRequest = request;
+        void request
+          .catch((error) => {
+            console.warn("Background addon manifest refresh failed", error);
+          })
+          .finally(() => {
+            if (this.backgroundManifestRefreshRequest === request) {
+              this.backgroundManifestRefreshRequest = null;
+            }
+          });
       }
       return this.getCachedInstalledAddons(urls, { includeDisabled });
     }
@@ -1116,42 +1134,6 @@ class AddonRepository {
       /https?:\/\/cinemeta-v3\.strem\.io/i,
       "https://v3-cinemeta.strem.io"
     );
-  }
-
-  getBuiltinFallbackManifest(baseUrl) {
-    if (this.canonicalizeUrl(baseUrl) !== "https://v3-cinemeta.strem.io") {
-      return null;
-    }
-
-    return {
-      id: "org.cinemeta",
-      name: "Cinemeta",
-      displayName: "Cinemeta",
-      version: "fallback",
-      description: "Fallback Cinemeta manifest",
-      logo: null,
-      baseUrl: "https://v3-cinemeta.strem.io",
-      types: ["movie", "series"],
-      rawTypes: ["movie", "series"],
-      resources: [
-        { name: "catalog", types: ["movie", "series"], idPrefixes: null },
-        { name: "meta", types: ["movie", "series"], idPrefixes: null }
-      ],
-      catalogs: [
-        {
-          id: "top",
-          name: "Top Movies",
-          apiType: "movie",
-          extra: [{ name: "search" }]
-        },
-        {
-          id: "top",
-          name: "Top Series",
-          apiType: "series",
-          extra: [{ name: "search" }]
-        }
-      ]
-    };
   }
 }
 

@@ -108,6 +108,7 @@ export function createHomeScreenMethods21() {
 
       const addons = refreshManifests
         ? await addonRepository.getInstalledAddons({
+            includeMediaServers: true,
             staleWhileRevalidate: true,
             timeoutMs: HOME_ADDON_MANIFEST_TIMEOUT_MS
           })

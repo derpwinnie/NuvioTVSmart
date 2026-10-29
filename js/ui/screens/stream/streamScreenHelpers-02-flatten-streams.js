@@ -1,3 +1,4 @@
+import { canResolveMediaServerStream } from "../../../data/mediaserver/mediaServerRepository.js";
 import { Router } from "../../navigation/routerState.js";
 
 import { ScreenUtils } from "../../navigation/screen.js";
@@ -149,6 +150,7 @@ export function flattenStreams(streamResult) {
         raw: stream
       };
       if (
+        canResolveMediaServerStream(entry) ||
         DirectDebridResolver.shouldListStream(entry) ||
         WebOsEngineFsResolver.canResolveStream(entry) ||
         TizenStreamingServerResolver.canResolveStream(entry)
@@ -245,9 +247,8 @@ export function getStreamHeadline(stream = {}) {
   if (!primary) {
     return stream.addonName || "Unknown source";
   }
-  const firstLine = String(primary).split(/\r?\n/)[0].trim();
-  const displayLine = Environment.isWebOS() ? normalizeMathematicalAlphanumericSymbols(firstLine) : firstLine;
-  return displayLine || stream.addonName || "Unknown source";
+  const name = String(primary).trim();
+  return Environment.isWebOS() ? normalizeMathematicalAlphanumericSymbols(name) : name;
 }
 
 export function getStreamQuality(stream = {}) {
@@ -282,6 +283,5 @@ export function getStreamDescriptionLines(stream = {}) {
   return displayDescription
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 12);
+    .filter(Boolean);
 }

@@ -43,7 +43,6 @@ export function renderPlaybackSubtitleBody(model) {
               subtitle: t("sub_show_only_preferred_languages_desc", {}, "Hide all other subtitles languages from selection list"),
               checked: Boolean(model.player.subtitleStyle?.showOnlyPreferredLanguages)
             })}
-            ${this.renderActionRow({ focusKey: "playback:subtitleStartupMode", title: t("sub_startup_mode_title", {}, "Subtitle startup mode"), subtitle: t("sub_startup_mode_all_desc", {}, "Choose how addon subtitles are loaded at startup"), value: t(model.player.addonSubtitleStartupMode === "FAST_STARTUP" ? "sub_startup_mode_fast" : model.player.addonSubtitleStartupMode === "PREFERRED_ONLY" ? "sub_startup_mode_preferred" : "sub_startup_mode_all") })}
             ${this.renderActionRow({
               focusKey: "playback:subtitleSize",
               title: t("settings.playback.subtitleSize.title", {}, "Subtitle size"),
@@ -63,6 +62,12 @@ export function renderPlaybackSubtitleBody(model) {
                 clampSubtitleOffset(model.player.subtitleStyle?.verticalOffset ?? SUBTITLE_VERTICAL_OFFSET_DEFAULT),
                 `${SUBTITLE_VERTICAL_OFFSET_DEFAULT}%`
               )
+            })}
+            ${this.renderToggleRow({
+              focusKey: "playback:subtitleStripSdh",
+              title: t("sub_strip_sdh", {}, "Strip SDH subtitles"),
+              subtitle: t("sub_strip_sdh_desc", {}, "Hide sound descriptions and speaker labels from text subtitles"),
+              checked: Boolean(model.player.subtitleStyle?.stripSdh)
             })}
             ${this.renderToggleRow({
               focusKey: "playback:subtitleBold",

@@ -6,6 +6,18 @@ export function createPlayerScreenMethods73() {
 
   return {
     cleanup() {
+      this.closeStreamInfo({ restore: false });
+      // Android stopAndRelease(): read the position before playback is torn down.
+      if (this.hasPresentedPlaybackFrame && !this.postPlayNaturalCompletionPrepared && TrackingScrobbleService.isEnabled()) {
+        TrackingScrobbleService.stop(this.buildScrobbleContext());
+      }
+      try {
+        this.leavePartyPlayback();
+      } catch (error) {
+        console.warn("[party] leaving playback failed", error);
+      }
+      this.unbindParty();
+      this.partyPanelVisible = false;
       try {
         this.cancelSourceLoad();
         streamRepository.setLocalPluginSearchPaused(true);
@@ -108,6 +120,7 @@ export function createPlayerScreenMethods73() {
         this.clearPlaybackStallGuard();
         this.bufferingActive = false;
         this.clearBufferingSpinnerTimer();
+        this.stopSeekLoadingWatchdog();
         // The loading-completion poll self-reschedules; without this it
         // survives the route change and janks the next menu on Tizen.
         if (this.loadingCompletionTimer) {

@@ -449,7 +449,9 @@ export function createPlayerScreenMethods52() {
         isWebOsNative: usingWebOsNative,
         rendererMode,
         supportsExternalDelay: PlayerController.supportsAvPlayExternalSubtitleDelay?.() === true,
-        preserveAssStyles: assStylesManaged
+        preserveAssStyles: assStylesManaged,
+        supportsAssPlacement: this.assSubtitleRenderer?.supportsPlacement === true,
+        bitmap: Boolean(this.bitmapSubtitleTrack || selectedEmbeddedTrack?.bitmapSubtitle)
       });
       const unavailableValue = assStylesManaged
         ? t("subtitle_style_preserves_ass", {}, "ASS/SSA styles are preserved")
@@ -466,6 +468,11 @@ export function createPlayerScreenMethods52() {
           id: "fontSize",
           label: t("subtitle_style_font_size", {}, "Font Size"),
           value: `${normalizeSubtitleFontSize(style.fontSize)}%`
+        },
+        {
+          id: "stripSdh",
+          label: t("sub_strip_sdh", {}, "Strip SDH subtitles"),
+          value: style.stripSdh ? t("subtitle_style_on", {}, "On") : t("subtitle_style_off", {}, "Off")
         },
         {
           id: "bold",

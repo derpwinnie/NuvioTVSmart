@@ -76,8 +76,6 @@ import { StreamBadgeSettingsStore } from "../../../data/local/streamBadgeSetting
 
 import { TorrentSettingsStore } from "../../../data/local/torrentSettingsStore.js";
 
-import { WebOsAudioCompatibilityStore } from "../../../data/local/webOsAudioCompatibilityStore.js";
-
 import { matchStreamBadges } from "../../../core/streams/streamBadgeRules.js";
 
 import { hasReleaseToken } from "../../../core/streams/releaseToken.js";
@@ -302,6 +300,10 @@ export const LANGUAGE_CODE_ALIASES = {
   slo: "sk",
   slv: "sl",
   spa: "es",
+  spn: "es",
+  sp: "es",
+  esp: "es",
+  spl: "es-419",
   sqi: "sq",
   srp: "sr",
   swa: "sw",

@@ -1,10 +1,17 @@
+import { customPosterForItem, posterFallbackAttributes } from "../../../core/poster/customPoster.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./metaDetailsScreenContext.js";
+import { watchedItemsRepository } from "../../../data/repository/watchedItemsRepository.js";
+import { watchedTitleStateRepository } from "../../../data/repository/watchedTitleStateRepository.js";
+import { posterItemFromNode } from "../../components/posterOptionsMenu.js";
+import { buildWatchedTitleIdSet, isTitleItemWatched, renderTitleWatchedBadge } from "../../components/watchedTitleBadge.js";
 
 export function createMetaDetailsScreenMethods16() {
   const {
     Router,
     ScreenUtils,
+    NuvioDialog,
+    LayoutPreferences,
     t,
     detailImageLoadingMode,
     isSeriesDetailMeta,
@@ -24,6 +31,32 @@ export function createMetaDetailsScreenMethods16() {
   const RAIL_EXTEND_AHEAD = 6;
 
   return {
+    openSynopsis() {
+      if (this.synopsisDialog) return;
+      const text = document.createElement("div");
+      text.className = "detail-synopsis-full-text";
+      text.tabIndex = -1;
+      text.textContent = this.meta?.description || "";
+      const close = () => {
+        this.synopsisDialog?.destroy();
+        this.synopsisDialog = null;
+        this.focusDetailDescriptor({ selector: ".series-detail-description" });
+      };
+      this.synopsisDialog = new NuvioDialog({
+        title: this.meta?.name || "",
+        subtitle: t("hero_synopsis_dismiss_hint"),
+        widthVw: 100,
+        panelClassName: "detail-synopsis-dialog",
+        content: () => text,
+        onVerticalNavigate: (direction) => {
+          this.animateScroll(text, "y", text.scrollTop + direction * 260);
+          return true;
+        },
+        onDismiss: close
+      });
+      this.synopsisDialog.mount(document.body);
+      text.focus({ preventScroll: true });
+    },
     renderCommentsSection() {
       if (this.commentsLoading) {
         const cards = Array.from({ length: 3 })
@@ -100,7 +133,7 @@ export function createMetaDetailsScreenMethods16() {
       return { list: list.slice(0, shown), offset: 0 };
     },
     renderPreviewCard(rawItem, fallbackType = "movie") {
-      const item = normalizePreviewItem(rawItem, fallbackType);
+      const item = customPosterForItem(normalizePreviewItem(rawItem, fallbackType), "details", "landscape");
       const year = extractPreviewYear(item.releaseInfo);
       const primaryImage = item.landscapePoster || item.poster || "";
       const fallbackImage = item.poster && item.poster !== primaryImage ? item.poster : "";
@@ -115,7 +148,7 @@ export function createMetaDetailsScreenMethods16() {
             <div class="detail-morelike-poster-wrap">
               ${
                 primaryImage
-                  ? `<img class="detail-morelike-poster-image" src="${escapeHtml(primaryImage)}" alt="${escapeHtml(item.name || "content")}" loading="${detailImageLoadingMode()}" decoding="async"${fallbackImage ? ` data-fallback-src="${escapeHtml(fallbackImage)}"` : ""} onerror="var next=this.dataset.fallbackSrc||''; if(next && this.src !== next){ this.src = next; this.dataset.fallbackSrc=''; return; } this.hidden = true; var placeholder = this.nextElementSibling; if(placeholder){ placeholder.hidden = false; }" />`
+                  ? `<img class="detail-morelike-poster-image"${posterFallbackAttributes(item, true)} src="${escapeHtml(primaryImage)}" alt="${escapeHtml(item.name || "content")}" loading="${detailImageLoadingMode()}" decoding="async"${fallbackImage ? ` data-fallback-src="${escapeHtml(fallbackImage)}"` : ""} onerror="var next=this.dataset.fallbackSrc||''; if(next && this.src !== next){ this.src = next; this.dataset.fallbackSrc=''; return; } this.hidden = true; var placeholder = this.nextElementSibling; if(placeholder){ placeholder.hidden = false; }" />`
                   : ""
               }
               <div class="detail-morelike-poster placeholder"${primaryImage ? " hidden" : ""}></div>
@@ -190,6 +223,7 @@ export function createMetaDetailsScreenMethods16() {
       }
       windowState.shown = nextShown;
       track.insertAdjacentHTML("beforeend", html);
+      void this.refreshPreviewWatchedBadges();
       return true;
     },
     renderPreviewRail(items = [], fallbackType = "movie", railKey = "morelike") {
@@ -250,8 +284,64 @@ export function createMetaDetailsScreenMethods16() {
           </section>
         `;
     },
+    async refreshPreviewWatchedBadges() {
+      const token = this.detailLoadToken;
+      const request = (this.previewWatchedRequest || 0) + 1;
+      this.previewWatchedRequest = request;
+      const container = this.container;
+      const cards = Array.from(container?.querySelectorAll(".detail-morelike-card") || []);
+      if (!cards.length) return;
+      // Use the exact identities and title projection consumed by the hold menu.
+      const items = cards.map((card) => posterItemFromNode(card, this.params?.itemType || "movie"));
+      const baseWatchedItems = await watchedItemsRepository.getAll(2000).catch(() => []);
+      if (token !== this.detailLoadToken || request !== this.previewWatchedRequest || container !== this.container) return;
+      const watchedItems = await watchedTitleStateRepository
+        .getTitleWatchedItems(items, { baseWatchedItems, limit: 2000 })
+        .catch(() => baseWatchedItems);
+      if (token !== this.detailLoadToken || request !== this.previewWatchedRequest || container !== this.container) return;
+      const watchedTitleIds = buildWatchedTitleIdSet(watchedItems);
+      cards.forEach((card, index) => {
+        if (!container.contains(card)) return;
+        const wrap = card.querySelector(".detail-morelike-poster-wrap");
+        if (!wrap || !items[index]) return;
+        const badge = wrap.querySelector(".title-watched-badge");
+        if (isTitleItemWatched(items[index], watchedTitleIds)) {
+          if (!badge) wrap.insertAdjacentHTML("beforeend", renderTitleWatchedBadge());
+        } else if (badge) {
+          wrap.removeChild(badge);
+        }
+      });
+    },
     bindDetailChrome() {
+      this.container
+        ?.querySelector(".series-detail-shell")
+        ?.style.setProperty(
+          "--detail-episode-radius",
+          `${Math.max(0, Number(LayoutPreferences.get().posterCardCornerRadiusDp ?? 12)) * 2}px`
+        );
+      const logo = this.container?.querySelector(".series-detail-logo");
+      if (logo) {
+        logo.onerror = () => {
+          const title = document.createElement("h1");
+          title.className = "series-detail-title";
+          title.textContent = logo.alt;
+          logo.replaceWith(title);
+        };
+        if (logo.complete && !logo.naturalWidth) logo.onerror();
+      }
+      void this.refreshPreviewWatchedBadges();
       this.observeEpisodeThumbnails();
+      const description = this.container?.querySelector(".series-detail-description");
+      const preview = description?.querySelector(".detail-synopsis-preview");
+      if (preview) {
+        const truncated = preview.scrollHeight > preview.clientHeight + 1;
+        description.classList.toggle("focusable", truncated);
+        if (truncated) description.setAttribute("role", "button");
+        else description.removeAttribute("role");
+        description.tabIndex = -1;
+        description.querySelector(".detail-synopsis-more").hidden = !truncated;
+        this._detailFocusListCache = null;
+      }
       const content = this.container?.querySelector(".series-detail-content");
       if (!content) {
         return;
@@ -339,7 +429,7 @@ export function createMetaDetailsScreenMethods16() {
             return;
           }
           if (!isSeriesDetailMeta(this.meta, this.episodes) && tab !== this.movieInsightTab) {
-            this.movieInsightTab = ["cast", "ratings", "morelike", "trailer", "collection"].includes(tab) ? tab : "cast";
+            this.movieInsightTab = ["cast", "morelike", "trailer", "collection"].includes(tab) ? tab : "cast";
             this.updateRenderedDetailSections(this.meta);
           }
           return;

@@ -1,4 +1,7 @@
+import * as internals from "./playerController.js";
+
 export function createPlayerControllerMethods03() {
+  const { logTizenAvPlayDebug } = internals;
   return {
     startAvPlayTickTimer() {
       this.stopAvPlayTickTimer();
@@ -32,6 +35,8 @@ export function createPlayerControllerMethods03() {
       }
       try {
         const gated = Boolean(this.startupAudioGateActive || this.startupPresentationAudioMuted);
+        // A pending conversion reload must restore the latest startup mute state.
+        if (this.webOsDtsAudioState) this.webOsDtsAudioState.originalMuted = gated;
         this.video.muted = gated;
         this.video.defaultMuted = gated;
         if (!gated && (!Number.isFinite(Number(this.video.volume)) || Number(this.video.volume) <= 0)) {
@@ -123,7 +128,9 @@ export function createPlayerControllerMethods03() {
         return;
       }
       if (this.isUsingAvPlay()) {
-        if (this.avplayReady) {
+        // A startup resume seek clears avplayReady while it is in flight;
+        // startPreparedAvPlayPlayback() queues the start until it settles.
+        if (this.avplayReady || this.avplaySeekInFlight) {
           this.startPreparedAvPlayPlayback();
         }
         return;
@@ -136,6 +143,14 @@ export function createPlayerControllerMethods03() {
       const avplay = this.getAvPlay();
       if (!avplay || !this.isUsingAvPlay()) {
         return false;
+      }
+      if (this.avplaySeekInFlight) {
+        // Samsung forbids other AVPlay calls until seekTo() reports back.
+        // Calling play() here (resume seek issued from the prepared events)
+        // left the native player rejecting later seeks with INVALID_STATE.
+        this.avplayStartAfterSeek = { syncTracks };
+        logTizenAvPlayDebug("Tizen AVPlay seek in flight; delaying playback start until it settles");
+        return true;
       }
       try {
         avplay.play?.();

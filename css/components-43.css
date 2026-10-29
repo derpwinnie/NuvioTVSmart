@@ -234,6 +234,10 @@
   transition: transform 180ms ease;
 }
 
+.detail-morelike-card > .detail-morelike-poster-wrap {
+  position: relative;
+}
+
 .detail-morelike-poster-wrap {
   width: 100%;
   height: clamp(170px, 11vw, 210px);

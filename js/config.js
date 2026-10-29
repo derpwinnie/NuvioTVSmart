@@ -23,6 +23,7 @@ export const IMDB_TAPFRAME_API_BASE_URL = String(
 export const MDBLIST_API_BASE_URL = String(
   runtimeEnv.MDBLIST_API_BASE_URL || "https://api.mdblist.com/"
 ).trim();
+export const MDBLIST_CLIENT_ID = String(runtimeEnv.MDBLIST_CLIENT_ID || "").trim();
 export const AVATAR_PUBLIC_BASE_URL = String(runtimeEnv.AVATAR_PUBLIC_BASE_URL || "").trim();
 export const UNIQUE_CONTRIBUTIONS_BASE_URL = String(
   runtimeEnv.UNIQUE_CONTRIBUTIONS_BASE_URL || ""

@@ -46,11 +46,18 @@ export function createHomeScreenMethods13() {
           if (!data || typeof data !== "object" || data.source !== "nuvio-youtube-proxy") {
             return;
           }
+          if (data.type === "ended" || data.type === "error") {
+            frame.dataset.ambientTrailerPlaying = "false";
+          }
           if (data.type === "firstFrame") {
+            frame.dataset.ambientTrailerPlaying = "true";
             reveal(150);
             return;
           }
           const state = data.type === "state" && data.state && typeof data.state === "object" ? data.state : null;
+          if (state) {
+            frame.dataset.ambientTrailerPlaying = String(state.paused === false && state.loading === false);
+          }
           if (state && Number(state.currentTime || 0) > 0 && state.paused === false) {
             reveal(150);
           } else if (state && state.controllable === false && state.loading === false) {

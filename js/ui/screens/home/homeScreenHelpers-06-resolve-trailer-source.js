@@ -379,6 +379,7 @@ export function normalizeEpisodeEntry(video = {}) {
     title: String(video?.title || video?.name || "").trim(),
     thumbnail: firstNonEmpty(video?.thumbnail, video?.thumbnailUrl, video?.still, video?.stillUrl, video?.image, video?.poster),
     overview: firstNonEmpty(video?.overview, video?.description),
+    imdbRating: video?.imdbRating ?? video?.imdb_rating ?? video?.rating ?? null,
     released: firstNonEmpty(video?.released, video?.releaseInfo),
     runtimeMinutes: parseRuntimeMinutes(video?.runtimeMinutes ?? video?.runtime ?? 0),
     available: typeof video?.available === "boolean" ? video.available : null

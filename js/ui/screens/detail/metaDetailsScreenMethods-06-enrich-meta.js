@@ -26,34 +26,38 @@ export function createMetaDetailsScreenMethods06() {
       }
 
       try {
-        const tmdbId = await TmdbService.ensureTmdbId(meta.id, meta.type);
+        const lookupOptions = { fallbackImdbId: meta.imdbId };
+        const tmdbId =
+          (await TmdbService.ensureTmdbId(meta.id, meta.type, lookupOptions)) ||
+          (await TmdbService.ensureTmdbId(this.params?.itemId, this.params?.itemType, lookupOptions));
         if (!tmdbId) {
           return meta;
         }
-        const enrichment = await TmdbMetadataService.fetchEnrichment({
-          tmdbId,
-          contentType: meta.type,
-          language: settings.language
-        });
-        if (!enrichment) {
-          return meta;
-        }
         const isSeries = isSeriesDetailMeta(meta, meta?.videos || this.episodes);
-        const episodeMap =
+        const [enrichment, episodeMap] = await Promise.all([
+          TmdbMetadataService.fetchEnrichment({
+            tmdbId,
+            contentType: meta.type,
+            language: settings.language
+          }).catch((error) => {
+            console.warn("Meta TMDB enrichment failed", error);
+            return null;
+          }),
           settings.useEpisodes && isSeries
-            ? await TmdbMetadataService.fetchEpisodeEnrichment({
+            ? TmdbMetadataService.fetchEpisodeEnrichment({
                 tmdbId,
                 seasonNumbers: (Array.isArray(meta.videos) ? meta.videos : [])
-                  .map((video) => Number(video?.season || 0))
-                  .filter((season) => season > 0),
+                  .map((video) => Number(video?.season ?? NaN))
+                  .filter((season) => Number.isInteger(season) && season >= 0),
                 language: settings.language
               })
-            : new Map();
+            : new Map()
+        ]);
         const videos =
           episodeMap.size && Array.isArray(meta.videos)
             ? meta.videos.map((video) => {
                 const key =
-                  Number(video?.season || 0) > 0 && Number(video?.episode || 0) > 0
+                  Number(video?.season ?? NaN) >= 0 && Number(video?.episode || 0) > 0
                     ? `${Number(video.season)}:${Number(video.episode)}`
                     : "";
                 const episode = key ? episodeMap.get(key) : null;
@@ -64,12 +68,15 @@ export function createMetaDetailsScreenMethods06() {
                   ...video,
                   title: episode.title || video.title,
                   overview: episode.overview || video.overview,
-                  released: settings.useReleaseDates ? episode.airDate || video.released : video.released,
                   thumbnail: episode.thumbnail || video.thumbnail,
                   runtime: episode.runtime || video.runtime
                 };
               })
             : meta.videos;
+
+        if (!enrichment) {
+          return { ...meta, videos };
+        }
 
         return {
           ...meta,
@@ -81,14 +88,8 @@ export function createMetaDetailsScreenMethods06() {
           // languages are available; show the localized text title in that case.
           logo: settings.useArtwork ? enrichment.logo : meta.logo,
           genres: settings.useBasicInfo ? mergeGenreLists(meta.genres, enrichment.genres) : meta.genres,
-          releaseInfo: settings.useReleaseDates
-            ? isSeries
-              ? enrichment.releaseInfo || meta.releaseInfo
-              : meta.releaseInfo || enrichment.releaseInfo
-            : meta.releaseInfo,
-          released: settings.useReleaseDates
-            ? meta.released || meta.releaseDate || meta.release_date || enrichment.released || null
-            : meta.released || meta.releaseDate || meta.release_date || null,
+          // Preserve addon dates, matching Android's TMDB enrichment policy.
+          released: meta.released || meta.releaseDate || meta.release_date || null,
           runtime: settings.useDetails ? enrichment.runtime || meta.runtime : meta.runtime,
           country: settings.useDetails ? enrichment.country || meta.country : meta.country,
           language: settings.useDetails ? enrichment.language || meta.language : meta.language,
@@ -97,15 +98,18 @@ export function createMetaDetailsScreenMethods06() {
           tmdbRating:
             settings.useBasicInfo && typeof enrichment.rating === "number" ? Number(enrichment.rating.toFixed(1)) : meta.tmdbRating || null,
           credits: settings.useCredits ? enrichment.credits || meta.credits || null : meta.credits || null,
-          companies: settings.useProductions && Array.isArray(enrichment.companies) ? enrichment.companies : meta.companies || [],
+          companies:
+            settings.useProductions && Array.isArray(enrichment.companies) && enrichment.companies.length
+              ? enrichment.companies
+              : meta.companies || [],
           productionCompanies:
-            settings.useProductions && Array.isArray(enrichment.productionCompanies)
+            settings.useProductions && Array.isArray(enrichment.productionCompanies) && enrichment.productionCompanies.length
               ? enrichment.productionCompanies
               : Array.isArray(meta.productionCompanies)
                 ? meta.productionCompanies
                 : [],
           networks:
-            settings.useNetworks && Array.isArray(enrichment.networks)
+            settings.useNetworks && Array.isArray(enrichment.networks) && enrichment.networks.length
               ? enrichment.networks
               : Array.isArray(meta.networks)
                 ? meta.networks
@@ -193,9 +197,9 @@ export function createMetaDetailsScreenMethods06() {
       const fallbackCast = extractCast({ credits: enrichment?.credits || null });
       return Array.isArray(fallbackCast) ? fallbackCast : [];
     },
-    async fetchSeriesRatingsBySeason(meta) {
+    async fetchSeriesRatingsBySeason(meta, episodes = this.episodes) {
       try {
-        if (!meta?.id || !this.episodes?.length) {
+        if (!meta?.id || !episodes?.length) {
           return {};
         }
         const imdbId = resolveMetaImdbId(meta, this.params);

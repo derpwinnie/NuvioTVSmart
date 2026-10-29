@@ -29,6 +29,13 @@ export function createPlayerControllerMethods20() {
         return this.flushCloudLibraryProgress(positionMs, durationMs, clear, active);
       }
 
+      // Like Android's hasMarkedCurrentEpisodeCompleted, keep completion sticky
+      // for this playback. Capture the session in the context so an old async
+      // flush cannot latch completion in a newly opened episode or replay.
+      const session = active.progressSession || (this.watchProgressSession ||= { completedKeys: new Set() });
+      const progressKey = this.buildProgressSnapshotKey(active);
+      if (!clear && session.completedKeys.has(progressKey)) return false;
+
       const safePosition = Number(positionMs || 0);
       const safeDuration = Number(durationMs || 0);
       if (isShortPlaceholderDuration(safeDuration)) {
@@ -52,6 +59,7 @@ export function createPlayerControllerMethods20() {
       }
 
       if (isCompleted) {
+        session.completedKeys.add(progressKey);
         // Playback scrobbling owns provider history, matching Android's
         // broadcastTrackingHistory = false completion path. Keep this local
         // completion from duplicating the provider history write.

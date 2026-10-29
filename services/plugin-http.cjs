@@ -1182,6 +1182,32 @@ function createPluginHttpServer({ port = 2711, logger = console, trace } = {}) {
       response.end();
       return;
     }
+    if (request.url === "/poster-config" && request.method === "POST") {
+      readBody(request, function (bodyError, payload) {
+        if (bodyError) return send(response, 400, { returnValue: false });
+        try {
+          var config = require("./custom-poster-config.cjs");
+          if (payload.action === "start") {
+            config.start(payload).then(
+              function (result) {
+                send(response, 200, Object.assign({ returnValue: true }, result));
+              },
+              function () {
+                send(response, 503, { returnValue: false });
+              }
+            );
+          } else if (payload.action === "read") {
+            var state = config.read(payload.token);
+            send(response, state ? 200 : 410, state || { returnValue: false });
+          } else if (payload.action === "stop") {
+            send(response, 200, { returnValue: config.stop(payload.token) });
+          } else send(response, 400, { returnValue: false });
+        } catch (_) {
+          send(response, 503, { returnValue: false });
+        }
+      });
+      return;
+    }
     if (request.url === "/health" && request.method === "GET") {
       var memory = memoryUsage();
       send(response, 200, {

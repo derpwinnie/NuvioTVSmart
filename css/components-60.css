@@ -200,6 +200,19 @@
   line-clamp: 5 !important;
 }
 
+/* Episode/preview thumbs and cast avatars already draw their own focus ring.
+   Keep the fast path from adding a second ring around the outer card. */
+.performance-constrained .series-episode-card.focused,
+.performance-constrained .detail-morelike-card.focused,
+.performance-constrained .movie-cast-card.focused,
+.performance-constrained .series-cast-card.focused,
+.legacy-tizen .series-episode-card.focused,
+.legacy-tizen .detail-morelike-card.focused,
+.legacy-tizen .movie-cast-card.focused,
+.legacy-tizen .series-cast-card.focused {
+  box-shadow: none !important;
+}
+
 .performance-constrained .detail-comment-card.focused p {
   -webkit-line-clamp: 5 !important;
   line-clamp: 5 !important;

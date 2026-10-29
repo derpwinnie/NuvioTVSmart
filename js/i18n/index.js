@@ -721,6 +721,19 @@ export const I18n = {
     return interpolate(options?.fallback ?? key, params);
   },
 
+  getQuantityString(key, count, params = [count]) {
+    const locale = this.getLocale();
+    let category = Number(count) === 1 ? "one" : "other";
+    try {
+      if (typeof globalThis.Intl?.PluralRules === "function")
+        category = new Intl.PluralRules(locale).select(Number(count));
+    } catch (_) {
+      /* Fall back to the available one/other forms on older TVs. */
+    }
+    const selected = `${key}_${category}`;
+    return this.t(typeof activeMessages[selected] === "string" ? selected : `${key}_other`, params);
+  },
+
   apply() {
     const locale = this.getLocale();
     if (typeof document !== "undefined" && document?.documentElement) {

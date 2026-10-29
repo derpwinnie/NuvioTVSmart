@@ -1,3 +1,5 @@
+import { filenameMatches } from "./filenameEpisodeMatcher.js";
+import { canResolveMediaServerStream } from "../../data/mediaserver/mediaServerRepository.js";
 // Auto stream selection, ported from the Android TV app's StreamAutoPlaySelector
 // and StreamAutoPlayPolicy so the two clients behave the same. Given the list of
 // streams shown in the picker and the user's auto-play settings, it returns the
@@ -80,7 +82,8 @@ function isPlayableStream(stream = {}) {
   }
   return Boolean(
     stream &&
-    (stream.url ||
+    (canResolveMediaServerStream(stream) ||
+      stream.url ||
       stream.ytId ||
       stream.infoHash ||
       resolve.infoHash ||
@@ -146,6 +149,30 @@ export function selectAutoPlayStream(streams, options = {}) {
   const list = Array.isArray(streams) ? streams.filter(Boolean) : [];
   if (!list.length) {
     return null;
+  }
+  const filename = (stream) =>
+    stream?.behaviorHints?.filename || stream?.raw?.behaviorHints?.filename;
+  const preciseCandidates = list.filter(
+    (stream) => !stream.externalUrl && !stream.raw?.externalUrl && isPlayableStream(stream)
+  );
+  const group = String(options.preferredBingeGroup || "").trim();
+  if (options.filenameOnlyFallback && options.preferredFilename) {
+    const match = preciseCandidates.find((stream) =>
+      filenameMatches(filename(stream), options.preferredFilename)
+    );
+    if (match) return match;
+  }
+  if (options.preferBingeGroupInSelection && group) {
+    const sameGroup = preciseCandidates.filter((stream) => streamBingeGroup(stream) === group);
+    const match =
+      sameGroup.find((stream) => filenameMatches(filename(stream), options.preferredFilename)) ||
+      (options.preferredInfoHash &&
+        sameGroup.find(
+          (stream) =>
+            String(stream.infoHash || stream.raw?.infoHash || "").toLowerCase() ===
+            String(options.preferredInfoHash).toLowerCase()
+        ));
+    if (match) return match;
   }
   const mode = normalizeMode(options.mode);
   const source = normalizeSource(options.source);

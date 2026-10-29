@@ -1,3 +1,9 @@
+import { watchedItemsShareIdentity } from "../../../data/repository/watchedIdentity.js";
+import { EpisodeShuffleStore } from "../../../data/local/episodeShuffleStore.js";
+import { selectShuffleEpisode } from "../../../core/player/episodeShuffleSelection.js";
+import { episodeKey } from "../../../core/player/episodeShuffle.js";
+import { ProfileManager } from "../../../core/profile/profileManager.js";
+import { resolveContinueWatchingEpisodeRating } from "./continueWatchingEpisodeRating.js";
 import * as internals from "./homeScreenContext.js";
 
 export function createHomeScreenMethods26() {
@@ -30,6 +36,8 @@ export function createHomeScreenMethods26() {
 
   return {
     async buildNextUpItems({ allProgress = [], inProgressItems = [], nextUpProgressCandidates = [], watchedItems = [] } = {}) {
+      const shuffleProfileId = ProfileManager.getActiveProfileId();
+      const shuffleVisit = this.shuffleVisit;
       const resolvedCandidates =
         Array.isArray(nextUpProgressCandidates) && nextUpProgressCandidates.length
           ? nextUpProgressCandidates
@@ -45,7 +53,7 @@ export function createHomeScreenMethods26() {
       const dismissedNextUpKeys = new Set(ContinueWatchingPreferences.getDismissedNextUpKeys());
       const activeCandidates = resolvedCandidates.filter((entry) => {
         const contentId = String(entry?.contentId || "").trim();
-        return contentId && !dismissedNextUpKeys.has(contentId);
+        return contentId && !dismissedNextUpKeys.has(contentId) && !watchProgressRepository.isHiddenForContinueWatching?.(contentId);
       });
       if (!activeCandidates.length) {
         return [];
@@ -73,10 +81,31 @@ export function createHomeScreenMethods26() {
             return null;
           }
           const watchedEpisodeKeys = watchedEpisodeIndex.get(contentId) || new Set();
-          const resolvedNextEpisode = this.resolveNextUpEpisode(meta, progressEntry, allProgress, watchedEpisodeKeys, {
-            showUnairedNextUp: this.layoutPrefs?.showUnairedNextUp
-          });
-          if (!resolvedNextEpisode) {
+          if (ProfileManager.getActiveProfileId() !== shuffleProfileId || this.shuffleVisit !== shuffleVisit) return null;
+          const shuffleSettings = EpisodeShuffleStore.get(contentId, contentType, shuffleProfileId);
+          const resolvedNextEpisode = shuffleSettings.enabled
+            ? selectShuffleEpisode({
+                contentId,
+                contentType,
+                videos: meta.videos || [],
+                surface: "home",
+                watched: new Set(
+                  watchedItems
+                    .filter((p) => p.season != null && p.episode != null && watchedItemsShareIdentity(p, { ...meta, contentId }))
+                    .map(episodeKey)
+                ),
+                progress: new Map(
+                  allProgress.filter((p) => watchedItemsShareIdentity(p, { ...meta, contentId })).map((p) => [episodeKey(p), p])
+                ),
+                useLocalState: false,
+                visit: shuffleVisit || 0,
+                reference: meta,
+                profileId: shuffleProfileId
+              })
+            : this.resolveNextUpEpisode(meta, progressEntry, allProgress, watchedEpisodeKeys, {
+                showUnairedNextUp: this.layoutPrefs?.showUnairedNextUp
+              });
+          if (!resolvedNextEpisode || watchProgressRepository.isHiddenForContinueWatching?.(contentId, resolvedNextEpisode.season)) {
             return null;
           }
 
@@ -95,6 +124,7 @@ export function createHomeScreenMethods26() {
             return null;
           }
           if (
+            !shuffleSettings.enabled &&
             !watchProgressRepository.isTrackedAsWatching(contentId) &&
             !shouldSurfaceNextUpForUntrackedSeries({
               seedUpdatedAt: progressEntry?.updatedAt,
@@ -125,6 +155,7 @@ export function createHomeScreenMethods26() {
             seedUpdatedAt: Number(progressEntry?.updatedAt || 0) || 0,
             seedSeason: Number(progressEntry?.season || 0) || null,
             isNextUp: true,
+            shufflePlayback: shuffleSettings.enabled,
             ...releaseState,
             title: meta.name || prettyId(contentId),
             landscapePoster: firstNonEmpty(
@@ -145,6 +176,10 @@ export function createHomeScreenMethods26() {
             released: firstNonEmpty(nextEpisode.released),
             releaseInfo: firstNonEmpty(nextEpisode.released, meta.releaseInfo),
             imdbRating: resolveImdbRating(meta),
+            episodeImdbRating: await resolveContinueWatchingEpisodeRating(
+              { ...progressEntry, contentId, season: nextEpisode.season, episode: nextEpisode.episode },
+              nextEpisode.imdbRating
+            ),
             genres: Array.isArray(meta.genres) ? meta.genres : [],
             runtimeMinutes: Number(meta.runtimeMinutes ?? meta.runtime ?? 0) || 0,
             ageRating: firstNonEmpty(meta.ageRating, meta.age_rating),
@@ -209,7 +244,7 @@ export function createHomeScreenMethods26() {
           null
         ).catch(() => null);
         const episodeMapPromise =
-          isSeries && (settings.useEpisodes || settings.useReleaseDates) && item.season != null && Number(item.season) >= 0
+          isSeries && settings.useEpisodes && item.season != null && Number(item.season) >= 0
             ? withTimeout(
                 TmdbMetadataService.fetchEpisodeEnrichment({
                   tmdbId,
@@ -242,7 +277,6 @@ export function createHomeScreenMethods26() {
                   ...video,
                   title: settings.useEpisodes ? episode.title || video.title : video.title,
                   overview: settings.useEpisodes ? episode.overview || video.overview : video.overview,
-                  released: settings.useReleaseDates ? episode.airDate || video.released : video.released,
                   thumbnail: settings.useEpisodes ? episode.thumbnail || video.thumbnail : video.thumbnail,
                   runtime: settings.useEpisodes ? episode.runtime || video.runtime : video.runtime
                 };
@@ -259,8 +293,6 @@ export function createHomeScreenMethods26() {
           thumbnail: settings.useArtwork ? showEnrichment.poster || meta.thumbnail : meta.thumbnail,
           logo: settings.useArtwork ? showEnrichment.logo || meta.logo : meta.logo,
           genres: settings.useBasicInfo && showEnrichment.genres?.length ? showEnrichment.genres : meta.genres,
-          releaseInfo: settings.useReleaseDates ? showEnrichment.releaseInfo || meta.releaseInfo : meta.releaseInfo,
-          released: settings.useReleaseDates ? showEnrichment.released || meta.released : meta.released,
           runtime: settings.useDetails ? showEnrichment.runtime || meta.runtime : meta.runtime,
           country: settings.useDetails ? showEnrichment.country || meta.country : meta.country,
           language: settings.useDetails ? showEnrichment.language || meta.language : meta.language,

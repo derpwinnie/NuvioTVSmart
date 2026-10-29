@@ -1,3 +1,5 @@
+import { MdbListAccount } from "../../../data/repository/mdbListAccount.js";
+import { registerMdbListAccountActions } from "./settingsMdbListAccount.js";
 import { MDBLIST_PROVIDER_SETTINGS } from "../../../data/local/mdbListSettingsStore.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./settingsScreenContext.js";
@@ -5,6 +7,7 @@ import * as internals from "./settingsScreenContext.js";
 export function renderMdblistIntegrationDetail(model) {
   const { MdbListSettingsStore, mdbListRepository, t, maskValue } = internals;
 
+  registerMdbListAccountActions.call(this);
   const toggleMdbListSetting = (field) => {
     MdbListSettingsStore.set({ [field]: !MdbListSettingsStore.get()[field] });
   };
@@ -86,6 +89,10 @@ export function renderMdblistIntegrationDetail(model) {
               subtitle: t("settings.integration.backToIntegrations.subtitle"),
               icon: "back"
             })}
+            ${this.renderActionRow({ focusKey: "integration:mdblist:account", title: "MDBList", subtitle: MdbListAccount.connected() ? t("mdblist_connected_as", [MdbListAccount.user()?.name || t("mdblist_account_fallback")]) : t("mdblist_status_enter_code"), value: MdbListAccount.connected() ? t("debrid_disconnect") : t("servers_connect"), disabled: !MdbListAccount.configured() && !MdbListAccount.connected() })}
+            ${!MdbListAccount.configured() ? `<p>${internals.escapeHtml(t("mdblist_missing_client"))}</p>` : ""}
+            ${this.mdbListAccountMessage ? `<p>${internals.escapeHtml(this.mdbListAccountMessage)}</p>` : ""}
+            ${MdbListAccount.connected() ? this.renderActionRow({ focusKey: "integration:mdblist:lists", title: t("mdblist_library_lists"), subtitle: t("mdblist_library_lists_description") }) : ""}
             ${this.renderToggleRow({
               focusKey: "integration:mdblist:enabled",
               title: t("settings.integration.mdblist.enable.title"),

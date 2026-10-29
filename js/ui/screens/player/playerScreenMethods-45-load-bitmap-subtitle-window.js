@@ -1,3 +1,4 @@
+import { stripSubtitleSdh } from "../../../core/player/subtitleSdhFilter.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
@@ -202,27 +203,34 @@ export function createPlayerScreenMethods45() {
       if (!node) {
         return;
       }
-      const cueKey = activeCues
-        .map(
-          (cue) =>
-            `${cue.start}-${cue.end}-${cue.line ?? "default"}-${cue.position ?? "default"}-${cue.align || "center"}-${cue.size ?? "default"}-${cue.text}`
-        )
-        .join("|");
+      this.htmlSubtitleLastActiveCues = activeCues;
+      const cueKey =
+        String(Boolean(this.subtitleStyleSettings?.stripSdh)) +
+        activeCues
+          .map(
+            (cue) =>
+              `${cue.start}-${cue.end}-${cue.line ?? "default"}-${cue.position ?? "default"}-${cue.align || "center"}-${cue.size ?? "default"}-${cue.text}`
+          )
+          .join("|");
       const hasRenderedActiveCue =
         activeCues.length > 0 &&
         !node.classList.contains("hidden") &&
         node.getAttribute("aria-hidden") === "false" &&
         node.childNodes.length > 0;
-      const hasRenderedEmptyCue = activeCues.length === 0 && node.classList.contains("hidden") && node.childNodes.length === 0;
+      const hasRenderedEmptyCue =
+        (activeCues.length === 0 || this.htmlSubtitleRenderedEmpty) && node.classList.contains("hidden") && node.childNodes.length === 0;
       if (cueKey === this.htmlSubtitleActiveCueKey && (hasRenderedActiveCue || hasRenderedEmptyCue)) {
         return;
       }
       this.htmlSubtitleActiveCueKey = cueKey;
+      if (this.subtitleStyleSettings?.stripSdh)
+        activeCues = activeCues.map((cue) => ({ ...cue, text: stripSubtitleSdh(cue.text || "") })).filter((cue) => cue.text.trim());
       if (typeof node.replaceChildren === "function") {
         node.replaceChildren();
       } else {
         node.innerHTML = "";
       }
+      this.htmlSubtitleRenderedEmpty = activeCues.length === 0;
       if (!activeCues.length) {
         node.classList.add("hidden");
         node.setAttribute("aria-hidden", "true");
@@ -231,7 +239,7 @@ export function createPlayerScreenMethods45() {
       const cueGroups = new Map();
       activeCues.forEach((cue) => {
         const rawLine = cue?.line == null ? NaN : Number(cue.line);
-        const normalizedLine = Number.isFinite(rawLine) ? clamp(rawLine, 0, 100) : null;
+        const normalizedLine = Number.isFinite(rawLine) && rawLine < 60 ? clamp(rawLine, 0, 100) : null;
         const rawPosition = cue?.position == null ? NaN : Number(cue.position);
         const position = Number.isFinite(rawPosition) ? clamp(rawPosition, 0, 100) : null;
         const align = ["start", "end", "center"].includes(cue?.align) ? cue.align : "center";

@@ -2,7 +2,6 @@
 import * as internals from "./settingsScreenContext.js";
 import { renderPlaybackGeneralBody } from "./settingsScreenPlaybackMarkup-01-general.js";
 import { renderPlaybackAudioBody } from "./settingsScreenPlaybackMarkup-02-audio.js";
-import { renderPlaybackAudioCompatibilityBody } from "./settingsScreenPlaybackMarkup-03-audio-compatibility.js";
 import { renderPlaybackSubtitleBody } from "./settingsScreenPlaybackMarkup-04-subtitles.js";
 import { renderPlaybackP2pBody } from "./settingsScreenPlaybackMarkup-05-p2p.js";
 
@@ -16,7 +15,6 @@ export function renderPlaybackSectionMarkup(model) {
     : t("settings_p2p_subtitle");
   const generalBody = renderPlaybackGeneralBody.call(this, model);
   const audioBody = renderPlaybackAudioBody.call(this, model);
-  const audioCompatibilityBody = renderPlaybackAudioCompatibilityBody.call(this, model);
   const subtitleBody = renderPlaybackSubtitleBody.call(this, model);
   const p2pBody = renderPlaybackP2pBody.call(this, model, {
     torrentSettings,
@@ -41,21 +39,6 @@ export function renderPlaybackSectionMarkup(model) {
                 expanded: Boolean(expanded.audio),
                 bodyHtml: audioBody
               })}
-              ${
-                Platform.isWebOS()
-                  ? this.renderCollapsibleRow({
-                      focusKey: "playback:toggle:audioCompatibility",
-                      title: t("settings.playback.groups.audioCompatibility.title", {}, "Advanced audio compatibility"),
-                      subtitle: t(
-                        "settings.playback.groups.audioCompatibility.subtitle",
-                        {},
-                        "Automatic detection is used first. Override only when a rooted TV has a working decoder."
-                      ),
-                      expanded: Boolean(expanded.audioCompatibility),
-                      bodyHtml: audioCompatibilityBody
-                    })
-                  : ""
-              }
               ${this.renderCollapsibleRow({
                 focusKey: "playback:toggle:subtitles",
                 title: t("settings.playback.groups.subtitles.title"),

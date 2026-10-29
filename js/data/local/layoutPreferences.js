@@ -8,6 +8,16 @@ import {
 const KEY = "layoutPreferences";
 
 const DEFAULTS = {
+  customPosterUrlPattern: "",
+  customPosterEnabledScreens: [
+    "home",
+    "continue_watching",
+    "collections",
+    "library",
+    "search",
+    "details",
+    "tv_recommendations"
+  ],
   hasChosenLayout: false,
   homeLayout: "modern",
   continueWatchingCardStyle: "card",
@@ -40,6 +50,7 @@ const DEFAULTS = {
   detailPageTrailerButtonEnabled: true,
   preferExternalMetaAddonDetail: true,
   blurUnwatchedEpisodes: false,
+  randomEpisodeEnabled: false,
   collapseSidebar: false,
   modernSidebar: false,
   modernSidebarBlur: false,
@@ -121,7 +132,9 @@ function normalizeLayoutPreferences(value = {}) {
         ? "expanded_card"
         : "hero_media",
     posterCardWidthDp: Math.max(72, Number(merged.posterCardWidthDp ?? 126) || 126),
-    posterCardCornerRadiusDp: Math.max(0, Number(merged.posterCardCornerRadiusDp ?? 12) || 12),
+    posterCardCornerRadiusDp: Number.isFinite(Number(merged.posterCardCornerRadiusDp ?? 12))
+      ? Math.max(0, Number(merged.posterCardCornerRadiusDp ?? 12))
+      : 12,
     fastHorizontalNavigationEnabled: Boolean(
       value?.fastHorizontalNavigationEnabled ??
       LocalStore.get("fastHorizontalNavigationEnabled", false)
@@ -148,6 +161,7 @@ function normalizeLayoutPreferences(value = {}) {
     showFullReleaseDate: merged.showFullReleaseDate !== false,
     detailPageTrailerButtonEnabled: Boolean(merged.detailPageTrailerButtonEnabled),
     blurUnwatchedEpisodes: Boolean(merged.blurUnwatchedEpisodes),
+    randomEpisodeEnabled: Boolean(merged.randomEpisodeEnabled),
     useEpisodeThumbnailsInCw: merged.useEpisodeThumbnailsInCw !== false,
     blurContinueWatchingNextUp: Boolean(merged.blurContinueWatchingNextUp),
     continueWatchingEnabled: merged.continueWatchingEnabled !== false,
@@ -155,6 +169,16 @@ function normalizeLayoutPreferences(value = {}) {
     nextUpFromFurthestEpisode: merged.nextUpFromFurthestEpisode !== false,
     continueWatchingSortMode: normalizeContinueWatchingSortMode(merged.continueWatchingSortMode),
     homeImdbRatingsVisibility: normalizeHomeImdbRatingsVisibility(merged.homeImdbRatingsVisibility),
+    customPosterUrlPattern: String(merged.customPosterUrlPattern || "").trim(),
+    customPosterEnabledScreens: Array.isArray(merged.customPosterEnabledScreens)
+      ? [
+          ...new Set(
+            merged.customPosterEnabledScreens.filter((key) =>
+              DEFAULTS.customPosterEnabledScreens.includes(key)
+            )
+          )
+        ]
+      : DEFAULTS.customPosterEnabledScreens,
     detailImdbRatingsVisibility: normalizeDetailImdbRatingsVisibility(
       merged.detailImdbRatingsVisibility
     ),

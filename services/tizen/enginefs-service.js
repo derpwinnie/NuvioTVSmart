@@ -30,18 +30,16 @@ function patchTizenMediaRuntimeCode(code, filename) {
     return source;
   }
 
-  // The app-side proxy URL builder encodes each header value once before
-  // placing it in the route. The vendored EngineFS HLS rewriter serializes
-  // those propagated headers again for every child URL, so normalize one
-  // existing URI-encoding layer before serializing them or Referer/Origin
-  // values accumulate an extra layer on cross-host requests.
+  // The router decodes the path and then the query options. Child URLs need
+  // the same two encoding layers as the original app-side URL. At this point
+  // header values are already decoded; literal percent escapes must survive.
   // The same runtime also concatenates url.parse(...).search while rewriting
   // absolute media URLs. Node's legacy parser returns null for a URL without
   // a query string, so that concatenation produces a literal `null` suffix
   // (for example, `segment.tsnull`) and sends malformed HLS segment URLs.
   if (
     source.indexOf("function normalizeProxyHeaderString(") >= 0 &&
-    source.indexOf("decodeURIComponent(parsed[1])") >= 0 &&
+    source.indexOf("encodeURIComponent(parsed[1])") >= 0 &&
     source.indexOf('lineUrl.pathname+(lineUrl.search||"")') >= 0 &&
     source.indexOf('urlJoin([virtualRoot,lineUrl.pathname])+(lineUrl.search||"")') >= 0
   ) {
@@ -70,11 +68,11 @@ function patchTizenMediaRuntimeCode(code, filename) {
   }
 
   var helperReplacement =
-    'function parseHeaderString(headerString){var headerArray=headerString.split(":");return[headerArray.shift(),headerArray.join(":")]}function normalizeProxyHeaderString(headerString){var parsed=parseHeaderString(headerString);try{parsed[1]=decodeURIComponent(parsed[1])}catch(_){ }return parsed[0]+":"+parsed[1]}function stringifyProxyOptions(options,cfgOpts){var serialized=Object.assign({},options);serialized[cfgOpts.DestinationHeader]=ensureArray(serialized[cfgOpts.DestinationHeader]).map(normalizeProxyHeaderString);return querystring.stringify(serialized)}function urlJoin(segments){';
+    'function parseHeaderString(headerString){var headerArray=headerString.split(":");return[headerArray.shift(),headerArray.join(":")]}function normalizeProxyHeaderString(headerString){var parsed=parseHeaderString(headerString);return parsed[0]+":"+encodeURIComponent(parsed[1])}function stringifyProxyOptions(options,cfgOpts){var serialized=Object.assign({},options);serialized[cfgOpts.DestinationHeader]=ensureArray(serialized[cfgOpts.DestinationHeader]).map(normalizeProxyHeaderString);return querystring.stringify(serialized)}function urlJoin(segments){';
   source = source.replace(helperTarget, helperReplacement);
   source = source.replace(
     childTarget,
-    '"/proxy/"+stringifyProxyOptions(newOpts,cfgOpts)+lineUrl.pathname+(lineUrl.search||"")'
+    '"/proxy/"+querystring.stringify(newOpts)+lineUrl.pathname+(lineUrl.search||"")'
   );
   source = source.replace(
     sameHostTarget,

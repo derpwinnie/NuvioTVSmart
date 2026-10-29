@@ -1,3 +1,4 @@
+import { buildNextFilename } from "../../../core/streams/filenameEpisodeMatcher.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
@@ -169,7 +170,7 @@ export function createPlayerScreenMethods23() {
       return streamItems;
     },
     getCurrentStreamBingeGroup() {
-      const currentStream = this.getStreamCandidateByUrl(this.activePlaybackUrl) || this.getCurrentStreamCandidate();
+      const currentStream = this.getCurrentStreamCandidate() || this.getStreamCandidateByUrl(this.activePlaybackUrl);
       return String(currentStream?.behaviorHints?.bingeGroup || currentStream?.raw?.behaviorHints?.bingeGroup || "").trim();
     },
     async selectNextEpisodeStreamByAutoPlayPolicy(streamItems = [], settings = PlayerSettingsStore.get(), options = {}) {
@@ -182,7 +183,7 @@ export function createPlayerScreenMethods23() {
       const shouldAutoSelectInManualMode = mode === "MANUAL" && (Boolean(settings.autoplayNextEpisode) || preferBingeGroup);
       const preferredBingeGroup = preferBingeGroup ? this.getCurrentStreamBingeGroup() : "";
       const bingeGroupOnlyManualMode = shouldAutoSelectInManualMode && preferBingeGroup;
-      if (bingeGroupOnlyManualMode && !preferredBingeGroup) {
+      if (bingeGroupOnlyManualMode && !preferredBingeGroup && options.bingeGroupOnly) {
         return null;
       }
       const installedAddonNames =
@@ -193,8 +194,16 @@ export function createPlayerScreenMethods23() {
                 .map((addon) => String(addon?.displayName || addon?.name || "").trim())
                 .filter(Boolean)
             );
+      const current = this.getCurrentStreamCandidate();
+      const filename = current?.behaviorHints?.filename || current?.raw?.behaviorHints?.filename || "";
+      const next = options.nextEpisode || this.resolveNextEpisodeInfo();
+      const expectedFilename = next
+        ? buildNextFilename(filename, this.params?.season, this.params?.episode ?? 0, next.season, next.episode ?? 0) || filename
+        : filename;
       return selectAutoPlayStream(streamItems, {
-        mode: shouldAutoSelectInManualMode ? "FIRST_STREAM" : mode,
+        preferredFilename: expectedFilename,
+        filenameOnlyFallback: !options.bingeGroupOnly,
+        mode: shouldAutoSelectInManualMode && (!bingeGroupOnlyManualMode || preferredBingeGroup) ? "FIRST_STREAM" : mode,
         source: shouldAutoSelectInManualMode ? "ALL_SOURCES" : String(settings.streamAutoPlaySource || "ALL_SOURCES"),
         regexPattern: shouldAutoSelectInManualMode ? "" : String(settings.streamAutoPlayRegex || ""),
         installedAddonNames,
@@ -239,7 +248,8 @@ export function createPlayerScreenMethods23() {
       const trySelect = async (bingeGroupOnly) => {
         const selected = await this.selectNextEpisodeStreamByAutoPlayPolicy(latestStreams, settings, {
           bingeGroupOnly,
-          installedAddonNames
+          installedAddonNames,
+          nextEpisode
         });
         if (selected) {
           finish(selected);
@@ -255,7 +265,8 @@ export function createPlayerScreenMethods23() {
           if (timeoutElapsed) {
             finish(
               await this.selectNextEpisodeStreamByAutoPlayPolicy(latestStreams, settings, {
-                installedAddonNames
+                installedAddonNames,
+                nextEpisode
               })
             );
           }
@@ -268,7 +279,8 @@ export function createPlayerScreenMethods23() {
           timeoutElapsed = true;
           if (latestStreams.length) {
             void this.selectNextEpisodeStreamByAutoPlayPolicy(latestStreams, settings, {
-              installedAddonNames
+              installedAddonNames,
+              nextEpisode
             }).then((selected) => finish(selected));
           }
         }, timeoutSeconds * 1000);
@@ -287,7 +299,8 @@ export function createPlayerScreenMethods23() {
           latestStreams = Array.isArray(streams) ? streams : latestStreams;
           finish(
             await this.selectNextEpisodeStreamByAutoPlayPolicy(latestStreams, settings, {
-              installedAddonNames
+              installedAddonNames,
+              nextEpisode
             })
           );
         })

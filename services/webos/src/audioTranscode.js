@@ -5,11 +5,13 @@ var fs = require("fs"),
   root = path.resolve(__dirname, "../runtime/dts"),
   t = require("./bitmapSubtitles").matroska,
   mkv = require("./audioTranscodeMatroska"),
-  prepare = require("./audioTranscodeSource").prepare;
+  prepare = require("./audioTranscodeSource").prepare,
+  createUnits = require("./audioTranscodeUnits").createUnits;
 var source = null,
   meta = null,
   header = null,
   cues = [],
+  units = null,
   sessionId = "",
   requestContext = null,
   creation = 0;
@@ -31,12 +33,29 @@ const wait = () =>
   });
 const fetchRange = (start, end, ctx) =>
   t.requestRange(source.url, start, end, 8 * 1024 * 1024, 0, ctx || requestContext);
+async function unitFor(s, index) {
+  if (s.units.has(index)) return s.units.get(index);
+  if (index === 0) return null;
+  const previous = await unitFor(s, index - 1);
+  if (!previous || previous.end >= meta.cuesOffset) return null;
+  if (!s.unitLoads.has(index))
+    s.unitLoads.set(
+      index,
+      units.at(previous.end, s.requestContext).then((unit) => {
+        if (s.cancelled) throw Error("cancelled");
+        s.units.set(index, unit);
+        return unit;
+      })
+    );
+  return s.unitLoads.get(index);
+}
 async function context(s, index) {
   if (s.contexts.has(index)) return s.contexts.get(index);
-  if (index >= cues.length) return null;
-  const end = (cues[index + 1]?.start ?? meta.cuesOffset) - 1;
-  if (end - cues[index].start + 1 > 8 * 1024 * 1024) throw Error("cluster-limit");
-  const bytes = end - cues[index].start + 1;
+  const unit = await unitFor(s, index);
+  if (!unit) return null;
+  if (s.contexts.has(index)) return s.contexts.get(index);
+  const end = unit.end - 1;
+  const bytes = unit.end - unit.start;
   while (
     Array.from(s.contexts.values()).reduce((n, c) => n + c.bytes, 0) +
       Array.from(s.cache.values()).reduce((n, b) => n + b.length, 0) +
@@ -52,14 +71,14 @@ async function context(s, index) {
     24 * 1024 * 1024
   )
     throw Error("buffer-budget");
-  const promise = fetchRange(cues[index].start, end, s.requestContext).then((r) =>
-    mkv.parse(r.buffer, cues[index].start, s.trackNumber, source.format)
+  const promise = fetchRange(unit.start, end, s.requestContext).then((r) =>
+    mkv.parse(r.buffer, unit.start, s.trackNumber, source.format)
   );
   promise.bytes = bytes;
   s.contexts.set(index, promise);
   return promise;
 }
-function createGeneration(index) {
+function createGeneration(unit) {
   if (session) {
     session.cancelled = true;
     t.cancelRequestContext(session.requestContext);
@@ -67,14 +86,17 @@ function createGeneration(index) {
   session = {
     requestContext: { cancelled: false, requests: new Set() },
     g: ++generation,
-    index,
-    nextInput: index,
+    index: 0,
+    nextInput: 0,
+    units: new Map([[0, unit]]),
+    unitLoads: new Map(),
     contexts: new Map(),
     raw: [],
     rawCursor: 0,
     frames: [],
     partial: Buffer.alloc(0),
     frameIndex: 0,
+    wanted: 0,
     anchor: null,
     cancelled: false,
     inputBytes: 0,
@@ -132,20 +154,28 @@ async function input(s) {
 async function buildConverted(s, index) {
   if (s.cache.has(index)) return s.cache.get(index);
   if (index !== s.index) throw Error("noncontiguous");
-  while (!s.cancelled && cues[index].timeMs / 1000 > playhead + 8) await wait();
+  const unit = await unitFor(s, index);
+  if (!unit) throw Error("cluster-boundary");
+  while (!s.cancelled && unit.timeMs / 1000 > playhead + 8) await wait();
   const ctx = await context(s, index);
   while (!s.cancelled) {
     if (s.error) throw Error(s.error);
     if (s.anchor !== null) {
       const wanted = Math.max(0, Math.ceil((ctx.last - s.anchor - 0.5) / 32) - s.frameIndex);
+      // /output must keep accepting frames until this unit's demand is met.
+      if (wanted * 2560 > 8 * 1024 * 1024) throw Error("frame-budget");
+      s.wanted = wanted;
       if (s.frames.length >= wanted) {
         const converted = mkv.project(ctx, s.frames.slice(0, wanted), s.anchor, s.frameIndex);
         if (converted.used !== wanted) throw Error("slot-capacity");
         s.frames.splice(0, converted.used);
         s.frameIndex += converted.used;
+        s.wanted = 0;
         s.cache.set(index, converted.out);
         while (s.cache.size > 2) s.cache.delete(s.cache.keys().next().value);
         s.contexts.delete(index);
+        s.unitLoads.delete(index);
+        if (index >= 4) s.units.delete(index - 4);
         s.processed++;
         s.index++;
         wake();
@@ -221,7 +251,7 @@ async function handleRequest(req, res) {
         req.on("end", r);
         req.on("error", j);
       });
-      while (!s.cancelled && s.frames.length > 96) await wait();
+      while (!s.cancelled && s.frames.length > Math.max(96, s.wanted)) await wait();
       if (s.cancelled) throw Error("cancelled");
       const b = Buffer.concat([s.partial, ...parts]);
       let p = 0;
@@ -283,16 +313,32 @@ async function handleRequest(req, res) {
       }
       return res.end();
     }
-    let index = 0;
-    for (let i = 0; i < cues.length && cues[i].start <= pos; i++) index = i;
     let s = session;
-    if (!s || s.cancelled || (!s.cache.has(index) && s.index !== index))
-      s = createGeneration(index);
+    let index = s
+      ? (Array.from(s.units).find(([, unit]) => pos >= unit.start && pos < unit.end)?.[0] ?? -1)
+      : -1;
+    if (!s || s.cancelled || index < 0 || (!s.cache.has(index) && s.index !== index)) {
+      const ctx = requestContext,
+        resolver = units;
+      const unit = await resolver.at(pos, ctx);
+      if (ctx.cancelled || requestContext !== ctx) throw Error("cancelled");
+      // Header discovery awaits I/O; another request may have created the same
+      // generation meanwhile. Reuse it rather than cancelling its encoder.
+      s = session;
+      index = s
+        ? (Array.from(s.units).find(([, entry]) => pos >= entry.start && pos < entry.end)?.[0] ??
+          -1)
+        : -1;
+      if (!s || s.cancelled || index < 0 || (!s.cache.has(index) && s.index !== index)) {
+        s = createGeneration(unit);
+        index = 0;
+      }
+    }
     operationSession = s;
-    while (pos <= end && !closed && index < cues.length) {
+    while (pos <= end && !closed && pos < meta.cuesOffset) {
       const b = await converted(s, index);
       if (closed) break;
-      const offset = pos - cues[index].start;
+      const offset = pos - s.units.get(index).start;
       if (offset < 0 || offset > b.length) throw Error("offset");
       const len = Math.min(b.length - offset, end - pos + 1);
       await write(b.subarray(offset, offset + len));
@@ -340,6 +386,7 @@ function stop(id) {
   meta = null;
   header = null;
   cues = [];
+  units = null;
   sessionId = "";
   return true;
 }
@@ -365,6 +412,7 @@ async function createSession(options) {
   meta = prepared.meta;
   header = prepared.header;
   cues = prepared.cues;
+  units = createUnits(cues, meta.cuesOffset, fetchRange);
   sessionId = crypto.randomBytes(16).toString("hex");
   playhead = 0;
   return {

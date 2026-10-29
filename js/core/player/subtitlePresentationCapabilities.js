@@ -2,6 +2,7 @@ const SUBTITLE_STYLE_CONTROL_IDS = [
   "delay",
   "fontSize",
   "bold",
+  "stripSdh",
   "textColor",
   "textOpacity",
   "outlineEnabled",
@@ -25,15 +26,20 @@ export function resolveSubtitleStyleControlAvailability({
   isWebOsNative = false,
   rendererMode = "none",
   supportsExternalDelay = false,
-  preserveAssStyles = false
+  preserveAssStyles = false,
+  supportsAssPlacement = false,
+  bitmap = false
 } = {}) {
   const availability = Object.fromEntries(
     SUBTITLE_STYLE_CONTROL_IDS.map((controlId) => [controlId, true])
   );
+  if (bitmap || (isWebOsNative && !["html", "html-callback"].includes(rendererMode)))
+    availability.stripSdh = false;
   if (preserveAssStyles) {
     ASS_STYLE_CONTROL_IDS.forEach((controlId) => {
       availability[controlId] = false;
     });
+    availability.verticalOffset = supportsAssPlacement === true;
   }
   if (isWebOsNative && !["html", "html-callback"].includes(rendererMode)) {
     availability.textOpacity = false;

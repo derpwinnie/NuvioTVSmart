@@ -115,7 +115,6 @@ export const player_settings = {
       osd_clock_enabled: settings.osdClockEnabled !== false,
       subtitle_show_only_preferred_languages: Boolean(settings.subtitleStyle?.showOnlyPreferredLanguages),
       auto_skip_segment_types: Array.isArray(settings.autoSkipSegmentTypes) ? settings.autoSkipSegmentTypes : [],
-      addon_subtitle_startup_mode: String(settings.addonSubtitleStartupMode || "ALL_SUBTITLES"),
       skip_intro_enabled: Boolean(settings.skipIntroEnabled),
       stream_auto_play_next_episode_enabled: Boolean(settings.autoplayNextEpisode),
       stream_auto_play_prefer_bingegroup_next_episode: Boolean(settings.streamAutoPlayPreferBingeGroupForNextEpisode),
@@ -309,8 +308,6 @@ export const player_settings = {
       if (booleanOrNull(raw[key]) != null) partial[field] = Boolean(raw[key]);
     });
     if (Array.isArray(raw.auto_skip_segment_types)) partial.autoSkipSegmentTypes = raw.auto_skip_segment_types;
-    if (stringOrNull(raw.addon_subtitle_startup_mode))
-      partial.addonSubtitleStartupMode = String(raw.addon_subtitle_startup_mode).toUpperCase();
     if (booleanOrNull(raw.stream_auto_play_next_episode_enabled) != null) {
       partial.autoplayNextEpisode = Boolean(raw.stream_auto_play_next_episode_enabled);
     }

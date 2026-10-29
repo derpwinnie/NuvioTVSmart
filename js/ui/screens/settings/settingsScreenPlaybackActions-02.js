@@ -58,16 +58,7 @@ export function registerPlaybackActionsPart02(model) {
   this.actionMap.set("playback:showOnlyPreferredSubtitleLanguages", () => {
     const currentSettings = PlayerSettingsStore.get();
     const enabled = !currentSettings.subtitleStyle?.showOnlyPreferredLanguages;
-    const currentStartupMode = currentSettings.addonSubtitleStartupMode || "ALL_SUBTITLES";
-    const autoPreferred = Boolean(currentSettings.addonSubtitleStartupModeAutoPreferred);
     PlayerSettingsStore.set({
-      addonSubtitleStartupMode:
-        enabled && currentStartupMode === "ALL_SUBTITLES"
-          ? "PREFERRED_ONLY"
-          : !enabled && autoPreferred && currentStartupMode === "PREFERRED_ONLY"
-            ? "ALL_SUBTITLES"
-            : currentStartupMode,
-      addonSubtitleStartupModeAutoPreferred: enabled && currentStartupMode === "ALL_SUBTITLES",
       subtitleStyle: {
         ...currentSettings.subtitleStyle,
         showOnlyPreferredLanguages: enabled
@@ -118,23 +109,6 @@ export function registerPlaybackActionsPart02(model) {
         })
     });
   });
-  this.actionMap.set("playback:subtitleStartupMode", () =>
-    this.openOptionDialog({
-      title: t("sub_startup_mode_title", {}, "Subtitle startup mode"),
-      options: [
-        { id: "FAST_STARTUP", labelKey: "sub_startup_mode_fast" },
-        { id: "PREFERRED_ONLY", labelKey: "sub_startup_mode_preferred" },
-        { id: "ALL_SUBTITLES", labelKey: "sub_startup_mode_all" }
-      ],
-      selectedId: model.player.addonSubtitleStartupMode || "ALL_SUBTITLES",
-      returnFocusKey: "playback:subtitleStartupMode",
-      onSelect: (option) =>
-        PlayerSettingsStore.set({
-          addonSubtitleStartupMode: option.id,
-          addonSubtitleStartupModeAutoPreferred: false
-        })
-    })
-  );
   this.actionMap.set("playback:renderMode", () => {
     this.openOptionDialog({
       title: t("settings.dialogs.subtitleRenderMode"),
@@ -176,6 +150,9 @@ export function registerPlaybackActionsPart02(model) {
         updateSubtitleStyle({ verticalOffset: clampSubtitleOffset(option.id) });
       }
     });
+  });
+  this.actionMap.set("playback:subtitleStripSdh", () => {
+    updateSubtitleStyle({ stripSdh: !PlayerSettingsStore.get().subtitleStyle?.stripSdh });
   });
   this.actionMap.set("playback:subtitleBold", () => {
     updateSubtitleStyle({ bold: !PlayerSettingsStore.get().subtitleStyle?.bold });

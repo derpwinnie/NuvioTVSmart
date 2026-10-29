@@ -1,3 +1,5 @@
+import { escapeMediaServerText } from "./settingsMediaServersSection.js";
+import { createTrackingSettingsMethods } from "./trackingSettingsMethods.js";
 /* global __NUVIO_APP_VERSION__ */
 import { createSettingsScreenMethods01 } from "./settingsScreenMethods-01-get-current-rail-scroll-top.js";
 import { createSettingsScreenMethods02 } from "./settingsScreenMethods-02-render-action-row.js";
@@ -17,6 +19,7 @@ import { createSettingsScreenMethods15 } from "./settingsScreenMethods-15-cleanu
 
 export * from "./settingsScreenContext.js";
 export const SettingsScreen = {
+  escapeMediaServerText,
   ...createSettingsScreenMethods01(),
   ...createSettingsScreenMethods02(),
   ...createSettingsScreenMethods03(),
@@ -31,5 +34,6 @@ export const SettingsScreen = {
   ...createSettingsScreenMethods12(),
   ...createSettingsScreenMethods13(),
   ...createSettingsScreenMethods14(),
-  ...createSettingsScreenMethods15()
+  ...createSettingsScreenMethods15(),
+  ...createTrackingSettingsMethods()
 };

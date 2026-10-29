@@ -84,6 +84,10 @@ export function createMetaDetailsScreenMethods27() {
       }
     },
     cleanup() {
+      this.synopsisDialog?.destroy();
+      this.synopsisDialog = null;
+      this.shuffleDialog?.destroy();
+      this.shuffleDialog = null;
       this.detailLoadToken = (this.detailLoadToken || 0) + 1;
       this.cancelTraktCommentsRequest();
       if (this.seasonSwitchTimer) {

@@ -1,3 +1,4 @@
+import { ambient_mode_settings } from "./profileSettingsSyncFeature-ambient-mode-settings.js";
 import { LocalStore } from "../storage/localStore.js";
 
 import { AuthManager } from "../auth/authManager.js";
@@ -104,6 +105,7 @@ import { track_preference } from "./profileSettingsSyncFeature-track-preference.
 import { debrid_settings } from "./profileSettingsSyncFeature-debrid-settings.js";
 
 export const FEATURE_ADAPTERS = {
+  ambient_mode_settings,
   theme_settings,
   layout_settings,
   experience_settings,

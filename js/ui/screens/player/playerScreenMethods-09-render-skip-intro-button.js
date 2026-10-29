@@ -1,3 +1,4 @@
+import { syncHtmlSubtitleClearance } from "./subtitleOverlayClearance.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
@@ -39,6 +40,7 @@ export function createPlayerScreenMethods09() {
       if (!shouldShow) {
         button.innerHTML = "";
         this.skipIntroRenderedKey = renderKey;
+        syncHtmlSubtitleClearance(this);
         return;
       }
       if (this.skipIntroRenderedKey !== renderKey || !button.querySelector(".player-skip-intro-btn")) {
@@ -67,6 +69,7 @@ export function createPlayerScreenMethods09() {
         this.skipIntroRenderedKey = renderKey;
       }
       this.syncSkipIntroButtonProgress();
+      syncHtmlSubtitleClearance(this);
       const focusTarget = this.uiRefs?.skipIntro?.querySelector(".player-skip-intro-btn");
       if (focusTarget) {
         if (!focusTarget.dataset.skipIntroThemeBound) {
@@ -145,13 +148,27 @@ export function createPlayerScreenMethods09() {
         return false;
       }
       const interval = this.activeSkipInterval;
-      const targetTime = getSkipIntervalTargetSeconds(interval, this.skipIntervals, this.getPlaybackDurationSeconds());
-      if (!Number.isFinite(targetTime)) {
+      const durationSeconds = this.getPlaybackDurationSeconds();
+      const intervalTarget = getSkipIntervalTargetSeconds(interval, this.skipIntervals, durationSeconds);
+      if (!Number.isFinite(intervalTarget)) {
         return false;
+      }
+      // Match Android: never seek past the media duration reported by the player.
+      const requestedTime = durationSeconds > 0 ? Math.min(intervalTarget, durationSeconds) : intervalTarget;
+      let targetTime = requestedTime;
+      if (this.isPartyControlLocked?.()) {
+        const partyTargetMs = this.ownSeekTarget(Math.round(requestedTime * 1000));
+        if (partyTargetMs == null) {
+          return false;
+        }
+        targetTime = partyTargetMs / 1000;
       }
       this.skipIntroSuppressedKey = getSkipIntervalKey(interval);
       this.skipIntroSuppressedUntil = Date.now() + SKIP_INTERVAL_SEEK_SUPPRESSION_MS;
+      // Match Android: transfer focus before the focused skip button disappears.
+      if (this.controlsVisible) this.focusFirstControl();
       this.seekPlaybackSeconds(targetTime, { preserveSkipIntroSuppression: true });
+      this.publishPartyPlayback?.({ positionMs: Math.round(targetTime * 1000) });
       this.skipIntervalDismissed = true;
       this.activeSkipInterval = null;
       this.skipIntroAutoHidden = false;

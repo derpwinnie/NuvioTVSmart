@@ -1,14 +1,21 @@
+import { syncHtmlSubtitleClearance } from "./subtitleOverlayClearance.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 import { Platform } from "../../../platform/index.js";
 import { armVidaaBufferGap, VIDAA_RESUME_GAP_SECONDS, VIDAA_SEEK_GAP_SECONDS } from "../../../platform/vidaa/vidaaBufferGap.js";
-import { decideVidaaResumeRestore, isVidaaRestoreSeekable, timeRangesToArray, VIDAA_RESTORE_RETRY_MS } from "../../../platform/vidaa/vidaaResumeRestore.js";
+import {
+  decideVidaaResumeRestore,
+  isVidaaRestoreSeekable,
+  timeRangesToArray,
+  VIDAA_RESTORE_RETRY_MS
+} from "../../../platform/vidaa/vidaaResumeRestore.js";
 
 export function createPlayerScreenMethods31() {
   const { PlayerController, PlayerSettingsStore, t, escapeHtml, formatNextEpisodeAirDate } = internals;
 
   return {
     seekPlaybackSeconds(seconds, { preserveSkipIntroSuppression = false, vidaaGapMaxSeconds = VIDAA_SEEK_GAP_SECONDS } = {}) {
+      if (this.isLivePlayback()) return false;
       if (Platform.isVidaa()) {
         // Allow one buffer-gap jump right after this seek (see bindVideoEvents).
         this.vidaaBufferGapArm = armVidaaBufferGap(vidaaGapMaxSeconds);
@@ -25,15 +32,25 @@ export function createPlayerScreenMethods31() {
       this.seekLoadingBaselineSeconds = this.getPlaybackCurrentSeconds();
       this.seekLoadingTargetSeconds = Number(seconds || 0);
       this.seekLoadingSettled = false;
+      this.seekLoadingVisualComplete = false;
       this.seekLoadingProgressSeconds = null;
+      this.seekLoadingProgressAt = 0;
+      this.seekLoadingStartedAt = Date.now();
       this.seekLoading = true;
       this.updateLoadingVisibility();
       this.prepareBitmapSubtitleForSeek(this.seekLoadingTargetSeconds);
       this.prepareWebOsEmbeddedTextSubtitleForSeek(this.seekLoadingTargetSeconds);
       if (typeof PlayerController.seekToSeconds === "function") {
-        const didSeek = Boolean(PlayerController.seekToSeconds(seconds));
+        const didSeek = Boolean(
+          PlayerController.seekToSeconds(seconds, {
+            exact: Boolean(this.isPartySynced?.()),
+            paused: this.getPlaybackControlPaused?.() ?? Boolean(this.paused)
+          })
+        );
         if (!didSeek) {
           this.clearSeekLoading();
+        } else {
+          this.startSeekLoadingWatchdog();
         }
         return didSeek;
       }
@@ -171,19 +188,15 @@ export function createPlayerScreenMethods31() {
         this.finalizePendingPlaybackRestore(restore);
       }
     },
-    // The startup overlay mutes playback until presentStartedPlayback() unmutes it,
-    // but a resume can hide the overlay through the seek/stall paths instead, which
-    // left the whole session muted. Unmute once startup has really finished.
-    unmuteStartupPresentationIfSettled() {
-      if (this.loadingVisible || this.startupAudioGateActive || !this.hasPresentedPlaybackFrame) {
-        return;
-      }
-      if (PlayerController.startupPresentationAudioMuted) {
-        PlayerController.setStartupPresentationAudioMuted?.(false);
-      }
-    },
     updateLoadingVisibility() {
       if (this.isBufferingForPauseOverlay()) this.dismissPauseOverlay();
+      if (!this.loadingVisible && !this.isStartupErrorVisible() && !this.isExternalFrameMode()) {
+        if (this.isStartupGateReleaseReady()) this.releaseStartupAudioGate();
+        // Post-first-frame buffering can hide loading before the completion timer runs.
+        if (PlayerController.startupPresentationAudioMuted && this.isStartupLogoDismissReady()) {
+          PlayerController.setStartupPresentationAudioMuted(false);
+        }
+      }
       const overlay = this.uiRefs?.loadingOverlay;
       const bufferingSpinner = this.uiRefs?.bufferingSpinner;
       if (!overlay) {
@@ -191,7 +204,6 @@ export function createPlayerScreenMethods31() {
           if (this.isStartupGateReleaseReady()) {
             this.releaseStartupAudioGate();
           }
-          this.unmuteStartupPresentationIfSettled();
           this.clearBufferingSpinnerTimer();
         }
         this.renderSkipIntroButton();
@@ -252,7 +264,6 @@ export function createPlayerScreenMethods31() {
         if (this.isStartupGateReleaseReady()) {
           this.releaseStartupAudioGate();
         }
-        this.unmuteStartupPresentationIfSettled();
         if (this.paused) {
           this.schedulePauseOverlay();
         }
@@ -274,6 +285,7 @@ export function createPlayerScreenMethods31() {
       const hidden = !this.isNextEpisodeCardVisible();
 
       card.classList.toggle("hidden", hidden);
+      if (hidden) syncHtmlSubtitleClearance(this);
       if (hidden) {
         card.innerHTML = "";
         this.nextEpisodeCardRenderedKey = "";
@@ -338,6 +350,7 @@ export function createPlayerScreenMethods31() {
         this.nextEpisodeCardRenderedKey = renderKey;
       }
       this.syncNextEpisodeCardFocusState();
+      syncHtmlSubtitleClearance(this);
     }
   };
 }

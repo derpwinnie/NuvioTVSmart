@@ -2,6 +2,13 @@ import { Router } from "./routerState.js";
 import { Platform } from "../../platform/index.js";
 import { noteVidaaNavigationKeyDown, noteVidaaNavigationKeyUp } from "./vidaaNavigationActivity.js";
 
+// Hold detection must use when the key was pressed/released, not when a busy main thread got to the
+// event: a late keyup would otherwise turn a short OK press into a long press (Android uses key events too).
+function keyEventTime(event) {
+  const timeStamp = Number(event?.timeStamp);
+  return Number.isFinite(timeStamp) && timeStamp > 0 ? timeStamp : 0;
+}
+
 function buildNormalizedEvent(event) {
   const normalizedKey = Platform.normalizeKey(event);
   const normalizedCode = Number(normalizedKey.keyCode || 0);
@@ -171,10 +178,13 @@ export const FocusEngine = {
           normalizedEvent.repeat = true;
         }
         if (!keyIsHeld) {
-          this.activeKeyDownStartedAt.set(keyIdentity, now);
+          this.activeKeyDownStartedAt.set(keyIdentity, { at: now, timeStamp: keyEventTime(event) });
         }
       } else if (!normalizedEvent.repeat || !this.activeKeyDownStartedAt.has(keyIdentity)) {
-        this.activeKeyDownStartedAt.set(keyIdentity, Date.now());
+        this.activeKeyDownStartedAt.set(keyIdentity, {
+          at: Date.now(),
+          timeStamp: keyEventTime(event)
+        });
       }
     }
 
@@ -267,8 +277,16 @@ export const FocusEngine = {
     }
 
     if (keyIdentity) {
-      const startedAt = Number(this.activeKeyDownStartedAt.get(keyIdentity) || 0);
-      normalizedEvent.keyDownDurationMs = startedAt > 0 ? Math.max(0, Date.now() - startedAt) : 0;
+      const started = this.activeKeyDownStartedAt.get(keyIdentity);
+      const releasedAt = keyEventTime(event);
+      normalizedEvent.keyDownDurationMs = started
+        ? Math.max(
+            0,
+            started.timeStamp && releasedAt
+              ? releasedAt - started.timeStamp
+              : Date.now() - started.at
+          )
+        : 0;
       this.activeKeyDownStartedAt.delete(keyIdentity);
       this.vidaaLastKeyDownAt.delete(keyIdentity);
     }

@@ -212,10 +212,9 @@ export function normalizeCollectionFolderItem(item, collectionMeta = null) {
   const hideTitle = Boolean(item.hideTitle);
   const tileShape = normalizeCollectionPosterShape(item.tileShape || item.posterShape);
   const coverEmoji = firstNonEmpty(item.coverEmoji);
-  const cardImage =
-    isVidaa || focusGifEnabled
-      ? artwork(coverImageUrl, collectionMeta?.backdropImageUrl)
-      : firstNonEmpty(focusGifUrl, coverImageUrl, collectionMeta?.backdropImageUrl);
+  // Upstream #1149: the card never falls back to the focus GIF. artwork() also
+  // drops GIF sources on VIDAA.
+  const cardImage = artwork(coverImageUrl, collectionMeta?.backdropImageUrl);
   const heroBackdrop = artwork(item.heroBackdropUrl, coverImageUrl, collectionMeta?.backdropImageUrl);
   return {
     ...item,

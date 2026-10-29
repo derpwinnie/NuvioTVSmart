@@ -76,8 +76,6 @@ import { StreamBadgeSettingsStore } from "../../../data/local/streamBadgeSetting
 
 import { TorrentSettingsStore } from "../../../data/local/torrentSettingsStore.js";
 
-import { WebOsAudioCompatibilityStore } from "../../../data/local/webOsAudioCompatibilityStore.js";
-
 import { matchStreamBadges } from "../../../core/streams/streamBadgeRules.js";
 
 import { hasReleaseToken } from "../../../core/streams/releaseToken.js";
@@ -389,10 +387,13 @@ export function clamp(value, min, max) {
 }
 
 export function hasExplicitSubtitleVerticalPosition(snapshot) {
+  if (snapshot?.vertical) return true;
   const rawLine = snapshot?.line;
   if (rawLine == null || String(rawLine).trim().toLowerCase() === "auto") {
     return false;
   }
   const line = Number(rawLine);
-  return Number.isFinite(line) && line !== -1;
+  if (!Number.isFinite(line)) return false;
+  // Android preserves top/middle placements, normalizing only bottom cues.
+  return snapshot?.snapToLines === false ? line < 60 : line >= 0;
 }

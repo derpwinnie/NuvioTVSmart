@@ -50,8 +50,6 @@ export {
 
 export { TorrentSettingsStore } from "../../../data/local/torrentSettingsStore.js";
 
-export { WebOsAudioCompatibilityStore } from "../../../data/local/webOsAudioCompatibilityStore.js";
-
 export { LayoutPreferences } from "../../../data/local/layoutPreferences.js";
 
 export { ExperienceModeStore } from "../../../data/local/experienceModeStore.js";

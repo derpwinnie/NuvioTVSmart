@@ -27,6 +27,65 @@ These work around missing or inconsistent APIs in the VIDAA browser. They are bo
 - **Mid-playback stall restart:** a stall (usually a slow seek in a file without a seek index) restarts the same source at its position, with a capped restart budget per source before failing over or opening the source list
 - **Subtitle-off toggle:** VIDAA renders the first embedded subtitle while reporting it disabled; Nuvio toggles it on and off a beat later to really hide it (same workaround as Stremio's VidaaVideo)
 
+### Improvements & Fixes
+
+- Snap Home camera and detail-rail scrolling on LG webOS while preserving poster animations and image-loading budgets (#1153) (@malkstar)
+
+## 1.2.10
+
+### Improvements & Fixes
+
+- Reduced Home artwork memory growth and released poster observers and buffers when they are no longer needed (@malkstar, @WhiteGiso)
+- Improved Back navigation on webOS by retaining Home under restored routes and preserving focus and scroll state (@malkstar, @WhiteGiso)
+- Refined Home, Search and Discover focus scrolling while keeping immediate scrolling scoped to runtimes that require it (@malkstar, @WhiteGiso)
+- Added webOS title deep links from launch parameters, aligned with Android TV (@WhiteGiso)
+- Added MDBList watched-state tracking and scrobbling, including tracking-source selection and account authorization improvements (@WhiteGiso)
+- Added SDH text-subtitle filtering using Android TV rules (@WhiteGiso)
+- Improved live-player controls, remote focus and accessibility, and fixed direct playback startup and unmuting outside webOS (@WhiteGiso)
+- Preserved multiline addon stream names and reported the actual HTTP status when playback fails (@WhiteGiso)
+- Restored unfinished detail enrichment after returning from streams and refreshed Continue Watching metadata (@WhiteGiso)
+- Improved collection pagination and GIF source selection; regular covers now remain in use when Focus GIF is disabled (@WhiteGiso)
+- Improved profile data isolation and removal, reset Search at profile selection, and aligned supporter avatar fallbacks with Android TV (@WhiteGiso)
+- Improved Tizen embedded-audio metadata handling and webOS audio-track selection recovery (@WhiteGiso)
+- Exposed native webOS network-service errors in Console debug to support diagnosis of TMDB and provider failures (@WhiteGiso)
+
+## 1.2.8
+
+### Improvements & Fixes
+
+- Revalidated cached addon manifests at each app session so addon updates are picked up without reinstalling (@WhiteGiso)
+- Kept Library filter and sort selections when returning to the screen, per profile, aligned with Android TV (@WhiteGiso)
+- Discarded stale Discover results when changing filters quickly, aligned with Android TV (@WhiteGiso)
+- Fixed audio transcoding stalls on webOS when the player requests frames beyond the buffer limit (@WhiteGiso)
+
+## 1.2.7
+
+### Improvements & Fixes
+
+- Fixed seeking and resume on Samsung Tizen AVPlay: addon redirect sources now play directly instead of through the local proxy, resume seeks wait until the player is prepared, and the seek spinner no longer gets stuck (@Riccardo1451, @WhiteGiso)
+- Made Watch Party seeks land exactly on the requested position with the webOS native file player (@WhiteGiso)
+- Kept an episode marked as watched for the rest of the playback after it completes, aligned with Android TV (@WhiteGiso)
+- Kept the player layout in place while browsing the Watch Party panel (@WhiteGiso)
+- Prevented Skip Intro from seeking past the end of the video (@WhiteGiso)
+- Added AVPlay seek and source diagnostics to Console Debug on Tizen (@Riccardo1451)
+
+## 1.2.6
+
+### Improvements & Fixes
+
+- Added Watch Party with realtime sync, QR invites, a party preview before joining, host-only control, member catch-up, shared streams and episode switching, aligned with Android TV (@WhiteGiso)
+- Added Ambient mode with idle slideshow, blocked during trailer playback and closing open dialogs when it starts (@WhiteGiso)
+- Added episode shuffle on detail and player screens with persisted history (@WhiteGiso)
+- Added MDBList account sign-in and library lists, including liked, dynamic and external lists with release-date sorting (@WhiteGiso)
+- Added custom poster configuration from the phone companion page with profile sync (@WhiteGiso)
+- Added media server watched-state import and sync, mixed movie/show libraries and server-watched notices (@WhiteGiso)
+- Improved playback with ASS subtitle placement, subtitles kept clear of player controls, a stream info overlay on the Info key, filename-based episode matching and stream link reuse (@WhiteGiso)
+- Preserved playback proxy headers across HLS/DASH redirects and child playlists on webOS (@WhiteGiso)
+- Improved Trakt and Simkl tracking with activity-gated refreshes, Continue Watching kept when progress requests fail, restored tracking sources after signing back in and tracking error messages (@WhiteGiso)
+- Kept post-play recommendations available when watched-state lookups fail (@WhiteGiso)
+- Removed settings not present on Android TV (effects mode, minimal buffering UI, webOS audio compatibility) and the built-in Cinemeta fallback manifest (@WhiteGiso)
+- Updated and refined Hungarian translations (@ToxicLand)
+
 ## 1.2.5
 
 ### Improvements & Fixes

@@ -73,7 +73,6 @@ async function reload(controller, state, url) {
     position,
     duration: Number(controller.getDurationSeconds?.() || video.duration || 0)
   };
-  const muted = state.originalMuted;
   state.presentationBaseline = position;
   setBuffering(controller, state, true);
   video.muted = true;
@@ -87,7 +86,7 @@ async function reload(controller, state, url) {
     };
     const failed = () => {
       cleanup();
-      if (active(controller, state)) video.muted = muted;
+      if (active(controller, state)) video.muted = state.originalMuted;
       reject(new Error("Audio conversion playback failed"));
     };
     const loaded = () => {
@@ -101,7 +100,7 @@ async function reload(controller, state, url) {
         if (controller.startupAudioGateActive) video.play()?.catch(() => {});
         else controller.resume();
       } else video.pause();
-      video.muted = muted;
+      video.muted = state.originalMuted;
       controller.emitVideoEvent("webosaudioconversionchanged", {});
       resolve();
     };
@@ -115,17 +114,29 @@ async function reload(controller, state, url) {
   });
 }
 function select(controller, state) {
+  const converted = Boolean(state.id && !state.fallingBack);
+  const convertedIndex = converted
+    ? controller
+        .nativeAudioTrackListToArray()
+        .findIndex((track) => String(track.id) === String(state.targetIndex))
+    : -1;
+  // Persist the same native position used by HTML so Luna reapply cannot undo it.
+  const targetIndex = convertedIndex >= 0 ? convertedIndex : state.targetIndex;
   return controller.requestConfirmedWebOsAudioTrackSelection({
-    targetTrackIndex: state.targetIndex,
+    targetTrackIndex: targetIndex,
     selectedTrackIndex: state.selectedIndex,
     selectionKind: state.kind,
     applySelection: () => {
       const tracks = controller.nativeAudioTrackListToArray();
-      // LG omits unsupported tracks from audioTracks but retains their media ids.
+      // Source indices and native IDs are distinct; retain the existing HTML resolution.
       const identifiedIndex = tracks.findIndex(
         (track) => String(track.id) === String(state.targetIndex)
       );
-      const selectedIndex = identifiedIndex >= 0 ? identifiedIndex : state.targetIndex;
+      const selectedIndex = converted
+        ? targetIndex
+        : identifiedIndex >= 0
+          ? identifiedIndex
+          : state.targetIndex;
       tracks.forEach((track, index) => {
         try {
           if ("enabled" in track) track.enabled = index === selectedIndex;

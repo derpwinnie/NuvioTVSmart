@@ -291,11 +291,13 @@ export function createPlayerScreenMethods06() {
     rememberSelectedStreamPreference(streamCandidate) {
       const prefContentId = String(this.params?.itemId || "").trim();
       const prefVideoId = String(this.params?.videoId || this.params?.itemId || "").trim();
-      if (!streamCandidate?.id || !prefContentId) {
+      if (!streamCandidate?.id || !prefContentId || streamCandidate.partyShared || streamCandidate.raw?.partyShared) {
         return;
       }
       StreamPreferencesStore.set(prefContentId, prefVideoId, streamCandidate.id, {
         bingeGroup: streamCandidate?.behaviorHints?.bingeGroup || streamCandidate?.raw?.behaviorHints?.bingeGroup || "",
+        filename: streamCandidate?.behaviorHints?.filename || streamCandidate?.raw?.behaviorHints?.filename || null,
+        infoHash: streamCandidate?.infoHash || streamCandidate?.raw?.infoHash || null,
         resumeIdentity: buildStreamResumeIdentity(streamCandidate)
       });
     }

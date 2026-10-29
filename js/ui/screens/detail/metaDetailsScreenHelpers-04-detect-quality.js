@@ -292,6 +292,7 @@ export function renderWatchedGlyph(isWatched = false) {
 
 export function ratingToneClass(value) {
   const num = Number(value || 0);
+  if (num >= 9.7) return "exceptional";
   if (num >= 9) return "excellent";
   if (num >= 8) return "great";
   if (num >= 7.5) return "good";

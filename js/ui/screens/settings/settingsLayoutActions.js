@@ -1,6 +1,5 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./settingsScreenContext.js";
-import { getTvPerformanceMode, setTvPerformanceMode } from "../../../platform/tvRuntimePerformance.js";
 
 export function registerLayoutActions(model) {
   const { HomeCatalogStore, LayoutPreferences, HOME_LAYOUT_OPTIONS, t } = internals;
@@ -22,22 +21,6 @@ export function registerLayoutActions(model) {
   this.actionMap.set("layout:toggle:cardAppearance", () => {
     this.toggleExpandedSection("layout", "cardAppearance");
   });
-  this.actionMap.set("layout:performanceMode", () => {
-    this.openOptionDialog({
-      title: t("layout_animations_effects", {}, "Animations & effects"),
-      options: [
-        { id: "auto", labelKey: "layout_perf_auto" },
-        { id: "reduced", labelKey: "layout_perf_reduced" },
-        { id: "full", labelKey: "layout_perf_full" }
-      ],
-      selectedId: getTvPerformanceMode(),
-      returnFocusKey: "layout:performanceMode",
-      onSelect: (option) => {
-        setTvPerformanceMode(option.id);
-      }
-    });
-  });
-
   HOME_LAYOUT_OPTIONS.forEach((option) => {
     this.actionMap.set(`layout:layout:${option.id}`, () => {
       LayoutPreferences.set({ homeLayout: option.id });
@@ -275,6 +258,9 @@ export function registerLayoutActions(model) {
       detailPageTrailerButtonEnabled: !LayoutPreferences.get().detailPageTrailerButtonEnabled
     });
   });
+  this.actionMap.set("layout:detail:shuffle", () =>
+    LayoutPreferences.set({ randomEpisodeEnabled: !LayoutPreferences.get().randomEpisodeEnabled })
+  );
   this.actionMap.set("layout:detail:blurUnwatched", () => {
     LayoutPreferences.set({
       blurUnwatchedEpisodes: !LayoutPreferences.get().blurUnwatchedEpisodes

@@ -1,9 +1,8 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./router.js";
-import { resetVidaaNavigationActivity } from "./vidaaNavigationActivity.js";
 
 export function createRouterMethods03() {
-  const { Platform, getStackEntryRoute, getStackEntryParams } = internals;
+  const { Platform, getStackEntryRoute, getStackEntryParams, resetVidaaNavigationActivity } = internals;
 
   return {
     async back(options = {}) {
@@ -24,7 +23,7 @@ export function createRouterMethods03() {
         Platform.exitApp();
         return;
       }
-      if (Platform.isVidaa()) resetVidaaNavigationActivity();
+      if (Platform.isVidaa?.()) resetVidaaNavigationActivity();
 
       if (!options?.skipHistory && window?.history && typeof window.history.back === "function" && this.historyInitialized) {
         if (options?.skipConsume) {

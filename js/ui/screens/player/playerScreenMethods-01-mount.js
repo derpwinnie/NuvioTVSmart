@@ -1,3 +1,5 @@
+import { loadPlayerShuffleWatched } from "./playerEpisodeShuffle.js";
+import { activeStreamLinkProfile } from "../../../data/local/streamLinkCacheStore.js";
 /* global __NUVIO_APP_VERSION__ */
 import * as internals from "./playerScreenContext.js";
 import { initializePlayerMountState } from "./playerMountStateInitialization.js";
@@ -11,7 +13,6 @@ export function createPlayerScreenMethods01() {
     onWebOsImageProxyReady,
     streamRepository,
     PlayerSettingsStore,
-    WebOsAudioCompatibilityStore,
     Environment,
     DirectDebridResolver,
     WebOsEngineFsResolver,
@@ -34,13 +35,15 @@ export function createPlayerScreenMethods01() {
   } = internals;
 
   return {
-    async mount(params = {}) {
+    async mount(params = {}, navigationContext = {}) {
       streamRepository.setLocalPluginSearchPaused(false);
       this.container = document.getElementById("player");
       this.container.style.display = "block";
       this.container.classList.toggle("player-platform-webos", Environment.isWebOS());
       const mountToken = Number(this.playerMountToken || 0) + 1;
       this.playerMountToken = mountToken;
+      this.shuffleNextCache = null;
+      this.shuffleRemoteWatched = new Set();
       this.playerRouteActive = true;
       this.webOsClockLocaleInfo = null;
       this.webOsClockSettingsSubscription?.cancel?.();
@@ -71,14 +74,12 @@ export function createPlayerScreenMethods01() {
         }
       }
       this.params = params;
+      this.streamLinkCacheProfileId = activeStreamLinkProfile();
       this.trackPreferenceContentId = this.getTrackPreferenceContentId();
       this.subtitleDelayPreferenceVideoId = this.getSubtitleDelayPreferenceVideoId();
       this.rememberedAudioTrackPreference = TrackPreferencesStore.getAudio(this.trackPreferenceContentId);
       this.rememberedSubtitleTrackPreference = TrackPreferencesStore.getSubtitle(this.trackPreferenceContentId);
       if (Environment.isWebOS()) {
-        const legacyForceAll = Boolean(PlayerSettingsStore.get().forceDtsTrueHdAudio);
-        const audioCompatibility = WebOsAudioCompatibilityStore.get({ legacyForceAll });
-        PlayerController.setWebOsAudioCodecOverrides?.(audioCompatibility);
         void PlayerController.refreshWebOsDeviceInfo?.();
       }
       this.contentLanguage = resolveRouteContentLanguage(params);
@@ -130,6 +131,7 @@ export function createPlayerScreenMethods01() {
       if (this.currentStreamIndex < 0) {
         this.currentStreamIndex = 0;
       }
+      this.initialFilenameStreamCandidate = this.streamCandidates[this.currentStreamIndex] || null;
       // Remember the stream that actually plays so the stream list can focus it on
       // the next visit. Only persist when the caller provided a real candidate list
       // (this skips trailers and synthetic single-url playback).
@@ -171,6 +173,10 @@ export function createPlayerScreenMethods01() {
 
       this.renderPlayerUi();
       this.bindPlayerExitCleanup();
+      if (!this.isExternalFrameMode()) {
+        this.bindParty(navigationContext);
+        this.loadPartyProfile();
+      }
       this.pauseOverlayMeta = this.buildPauseOverlayMeta();
       if (!this.isExternalFrameMode()) {
         this.bindVideoEvents();
@@ -180,6 +186,7 @@ export function createPlayerScreenMethods01() {
         void this.fetchParentalGuide();
         void this.fetchSkipIntervals();
         void this.hydratePauseOverlayMeta();
+        void loadPlayerShuffleWatched(this, mountToken);
         void this.loadPostPlayEpisodeMetadata(mountToken);
       }
       this.renderEpisodePanel();

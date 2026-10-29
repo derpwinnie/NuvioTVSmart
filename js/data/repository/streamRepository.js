@@ -1,3 +1,4 @@
+import { MediaServerRepository, isMediaServerBase } from "../mediaserver/mediaServerRepository.js";
 import { safeApiCall } from "../../core/network/safeApiCall.js";
 import { addonRepository } from "./addonRepository.js";
 import { StreamApi } from "../remote/api/streamApi.js";
@@ -62,6 +63,7 @@ function buildStreamSourceConfiguration(installedAddons) {
         id: addon?.id,
         baseUrl: addon?.baseUrl,
         displayName: addon?.displayName,
+        version: addon?.version,
         logo: addon?.logo,
         types: addon?.types,
         resources: addon?.resources
@@ -163,6 +165,8 @@ class StreamRepository {
   }
 
   async getStreamsFromAddon(baseUrl, type, videoId, { signal = null } = {}) {
+    if (isMediaServerBase(baseUrl))
+      return MediaServerRepository.streams(baseUrl, type, videoId, signal);
     const url = this.buildStreamUrl(baseUrl, type, videoId);
     const result = await safeApiCall(() =>
       StreamApi.getStreams(url, { timeoutMs: STREAM_SOURCE_REQUEST_TIMEOUT_MS, signal })
@@ -176,7 +180,9 @@ class StreamRepository {
   }
 
   async getStreamsFromAllAddons(type, videoId, options = {}) {
-    const installedAddons = (await addonRepository.getInstalledAddons()).map((addon, index) => ({
+    const installedAddons = (
+      await addonRepository.getInstalledAddons({ includeMediaServers: true })
+    ).map((addon, index) => ({
       ...addon,
       orderIndex: index
     }));
@@ -213,10 +219,12 @@ class StreamRepository {
   async fetchStreamsFromAllSources(type, videoId, options = {}, sourceAddons = null) {
     const installedAddons = Array.isArray(sourceAddons)
       ? sourceAddons
-      : (await addonRepository.getInstalledAddons()).map((addon, index) => ({
-          ...addon,
-          orderIndex: index
-        }));
+      : (await addonRepository.getInstalledAddons({ includeMediaServers: true })).map(
+          (addon, index) => ({
+            ...addon,
+            orderIndex: index
+          })
+        );
     const onAddon = typeof options?.onAddon === "function" ? options.onAddon : null;
 
     const onChunk = typeof options?.onChunk === "function" ? options.onChunk : null;

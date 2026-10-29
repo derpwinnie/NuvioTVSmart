@@ -134,7 +134,7 @@ function parse(b, start, track, format = "dts") {
         previousSlot.e = { ...previousSlot.e, declaredDataEnd: e.declaredDataEnd };
         previousSlot.end = pts + duration;
       } else {
-        previousSlot = { e, clock, pts, end: pts + duration };
+        previousSlot = { e, clock, pts, end: pts + duration, cluster: c.start };
         slots.push(previousSlot);
       }
       if (format === "truehd") p.frames.forEach((f, i) => inputPts.push(pts + (i * 40) / 48));
@@ -148,26 +148,74 @@ function parse(b, start, track, format = "dts") {
 }
 function project(ctx, frames, anchor, firstFrame) {
   const out = ctx.b;
+  const groups = new Map();
+  for (const slot of ctx.slots) {
+    if (slot.drop || slot.crc) continue;
+    if (!groups.has(slot.cluster)) groups.set(slot.cluster, []);
+    groups.get(slot.cluster).push(slot);
+  }
+  // Plan before touching the source bytes. A 32 ms AC3 frame need not fit in
+  // the original 10.67 ms DTS block; its timestamp is relative to the Cluster,
+  // so another audio slot in that same Cluster can hold it at the original PTS.
+  const assignments = new Map();
   let used = 0;
-  for (const s of ctx.slots) {
-    const { e } = s;
-    if (s.drop || s.crc) {
+  for (const slots of groups.values()) {
+    const first = used;
+    const end = slots[slots.length - 1].end;
+    let target = first;
+    while (target < frames.length && anchor + (firstFrame + target) * 32 < end - 0.5) target++;
+    for (const slot of slots) {
+      const capacity = Math.max(0, Math.floor((slot.e.declaredDataEnd - slot.e.start - 2) / 2567));
+      let count = 0;
+      while (
+        used < target &&
+        count < capacity &&
+        anchor + (firstFrame + used) * 32 < slot.end - 0.5
+      ) {
+        used++;
+        count++;
+      }
+      assignments.set(slot, { first: used - count, count });
+    }
+    if (used < target) {
+      // A small final slot may require spare space earlier in the Cluster.
+      // Repack only this Cluster, retaining frame order and original timestamps.
+      used = first;
+      for (const slot of slots) {
+        const capacity = Math.max(
+          0,
+          Math.floor((slot.e.declaredDataEnd - slot.e.start - 2) / 2567)
+        );
+        const count = Math.min(capacity, target - used);
+        assignments.set(slot, { first: used, count });
+        used += count;
+      }
+      if (used !== target) throw Error("slot-capacity");
+    }
+    for (const slot of slots) {
+      const assignment = assignments.get(slot);
+      for (let i = 0; i < assignment.count; i++) {
+        const relative = Math.round(anchor + (firstFrame + assignment.first + i) * 32 - slot.clock);
+        if (relative < -32768 || relative > 32767) throw Error("slot-timestamp");
+        if (frames[assignment.first + i].length !== 2560) throw Error("ac3-frame-size");
+      }
+    }
+  }
+  for (const slot of ctx.slots) {
+    const { e } = slot;
+    if (slot.drop || slot.crc) {
       voidPad(e.declaredDataEnd - e.start).copy(out, e.start);
       continue;
     }
-    const parts = [];
-    const capacity =
-      ctx.format === "truehd" ? Math.floor((e.declaredDataEnd - e.start - 2) / 2567) : Infinity;
-    while (
-      used < frames.length &&
-      parts.length < capacity &&
-      anchor + (firstFrame + used) * 32 < s.end - 0.5
-    ) {
-      const block = Buffer.alloc(4);
+    const assignment = assignments.get(slot),
+      parts = [];
+    for (let i = 0; i < assignment.count; i++) {
+      const index = assignment.first + i,
+        block = Buffer.alloc(4);
       block[0] = 0x80 | ctx.trackNumber;
-      block.writeInt16BE(Math.round(anchor + (firstFrame + used) * 32 - s.clock), 1);
+      block.writeInt16BE(Math.round(anchor + (firstFrame + index) * 32 - slot.clock), 1);
       block[3] = 128;
-      parts.push(Buffer.concat([Buffer.from([0xa3]), size(2564), block, frames[used++]]));
+      parts.push(Buffer.concat([Buffer.from([0xa3]), size(2564), block, frames[index]]));
     }
     const payload = Buffer.concat(parts);
     const remaining = e.declaredDataEnd - e.start - payload.length;

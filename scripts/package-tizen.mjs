@@ -7,6 +7,7 @@ import JSZip from "jszip";
 import { readAppMetadata, syncVersionFiles } from "./appMetadata.mjs";
 import { compatibilityPolicy } from "./compatibilityPolicy.mjs";
 import { writeRuntimeEnvScriptFile } from "./envProperties.mjs";
+import { pruneCssFileForPlatform } from "./pruneCssForPlatform.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -289,6 +290,10 @@ async function stageTizenPluginService() {
       path.join(stagingDir, tizenPluginServiceRelativePath)
     ),
     cp(
+      path.join(rootDir, "services/custom-poster-config.cjs"),
+      path.join(stagingDir, "services/custom-poster-config.cjs")
+    ),
+    cp(
       path.join(rootDir, tizenPluginServiceSourceRelativePath),
       path.join(stagingDir, tizenPluginServiceSourceRelativePath)
     )
@@ -351,6 +356,7 @@ async function stagePackage({
       "utf8"
     )
   ]);
+  await pruneCssFileForPlatform(path.join(stagingDir, "css", "bundle.css"), "tizen");
   if (includeEngineFsService) {
     await stageTizenEngineFsService();
   }
@@ -596,6 +602,7 @@ function requiredTizenServiceFiles({
           tizenEngineFsServiceRelativePath,
           `${tizenEngineFsRuntimeDirRelativePath}/media-http.cjs`,
           `${tizenEngineFsRuntimeDirRelativePath}/playback-proxy-patch.cjs`,
+          `${tizenEngineFsRuntimeDirRelativePath}/proxy-redirect-report-patch.cjs`,
           `${tizenEngineFsRuntimeDirRelativePath}/tx3g-subtitle-parser.cjs`,
           `${tizenEngineFsRuntimeDirRelativePath}/tx3g-subtitle-service.cjs`,
           `${tizenEngineFsRuntimeDirRelativePath}/embedded-text-subtitle-parser.cjs`

@@ -128,6 +128,8 @@ function homeSurface() {
     querySelectorAll(selector) {
       globalScans += 1;
       if (selector.includes(".home-content-card")) return [];
+      // Upstream 1.2.10 indexes home artwork in every state (loaded or pending).
+      if (selector.includes(".home-poster-landscape-logo")) return images;
       if (!selector.includes("[data-src]")) return images.filter((image) => image.src);
       return images.filter((image) => image.dataset.src);
     }

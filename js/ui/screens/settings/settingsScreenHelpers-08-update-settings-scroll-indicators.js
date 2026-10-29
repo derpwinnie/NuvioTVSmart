@@ -1,4 +1,5 @@
 import { Router } from "../../navigation/routerState.js";
+import { isWatchPartySectionVisible } from "./settingsWatchPartySection.js";
 
 import { ScreenUtils } from "../../navigation/screen.js";
 
@@ -41,8 +42,6 @@ import {
 } from "../../../core/player/subtitleTextOpacity.js";
 
 import { TorrentSettingsStore } from "../../../data/local/torrentSettingsStore.js";
-
-import { WebOsAudioCompatibilityStore } from "../../../data/local/webOsAudioCompatibilityStore.js";
 
 import { LayoutPreferences } from "../../../data/local/layoutPreferences.js";
 
@@ -306,6 +305,9 @@ export function getVisibleSections(model) {
     }
     if (section.id === "account" || section.id === "profiles") {
       return isPrimaryProfileActive;
+    }
+    if (section.id === "watchParty") {
+      return isWatchPartySectionVisible();
     }
     return true;
   });

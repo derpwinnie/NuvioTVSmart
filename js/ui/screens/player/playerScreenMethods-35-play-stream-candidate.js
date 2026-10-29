@@ -1,3 +1,6 @@
+import { newerServerResume } from "../../../data/mediaserver/mediaServerUserState.js";
+import { WatchProgressStore } from "../../../data/local/watchProgressStore.js";
+import { MediaServerRepository, canResolveMediaServerStream } from "../../../data/mediaserver/mediaServerRepository.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 import {
@@ -36,6 +39,33 @@ export function createPlayerScreenMethods35() {
       streamRepository.setLocalPluginSearchPaused(true);
       const forceEngineFsResolve = options?.forceEngineFsResolve === true;
       let targetUrl = forceEngineFsResolve ? "" : streamDirectPlaybackUrl(streamCandidate);
+      if (canResolveMediaServerStream(streamCandidate)) {
+        try {
+          const result = await MediaServerRepository.resolve(streamCandidate);
+          if (!this.isActiveMountToken(mountToken)) return;
+          if (result.status !== "success" || !result.stream?.url) throw new Error("servers_playback_failed");
+          Object.assign(streamCandidate, result.stream);
+          targetUrl = result.stream.url;
+          const saved = WatchProgressStore.listForProfile(result.stream.serverPlayback.profileId).find(
+            (entry) =>
+              entry.contentId === this.params?.itemId &&
+              (entry.season ?? null) === (this.params?.season ?? null) &&
+              (entry.episode ?? null) === (this.params?.episode ?? null)
+          );
+          const resume = newerServerResume(result.stream.serverUserState, saved, this.params?.startFromBeginning);
+          if (resume && !options.preservePlaybackState) {
+            this.pendingPlaybackRestore = { timeSeconds: resume.positionMs / 1000, paused: false, attempts: 0, lastAttemptAt: 0 };
+            options = { ...options, preservePendingRestore: true };
+          }
+          this.streamCandidates = this.streamCandidates.map((entry) =>
+            entry.id === streamCandidate.id ? { ...entry, ...streamCandidate } : entry
+          );
+        } catch (_) {
+          if (this.isActiveMountToken(mountToken))
+            this.showStartupError?.(t("servers_playback_failed", {}, "Could not start playback from the server."));
+          return;
+        }
+      }
       if (!targetUrl) {
         const resolveContext = {
           season: this.params?.season == null ? null : Number(this.params.season),
@@ -370,7 +400,7 @@ export function createPlayerScreenMethods35() {
     mediaErrorMessage(errorCode = 0, detail = "", streamCandidate = this.getCurrentStreamCandidate()) {
       const code = Number(errorCode || 0);
       const text = String(detail || "").toLowerCase();
-      const httpStatus = extractPlaybackHttpStatus(detail);
+      const httpStatus = this.resolvePlaybackHttpStatus(detail);
       const httpMessage = this.getHttpPlaybackErrorMessage(httpStatus);
       if (httpMessage) {
         return httpMessage;

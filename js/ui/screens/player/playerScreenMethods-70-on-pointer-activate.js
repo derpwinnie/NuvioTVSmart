@@ -179,6 +179,7 @@ export function createPlayerScreenMethods70() {
         this.seekOverlayVisible ||
         this.seekPreviewSeconds != null ||
         (!this.controlsVisible && this.isNextEpisodeCardVisible()) ||
+        this.partyPanelVisible ||
         this.sourcesPanelVisible ||
         this.subtitleTimingDialogVisible ||
         this.subtitleDelayOverlayVisible ||
@@ -242,6 +243,11 @@ export function createPlayerScreenMethods70() {
         this.skipIntroAutoHidden = false;
         this.stopSkipIntroCountdownAnimation();
         this.renderSkipIntroButton();
+        return true;
+      }
+
+      if (this.partyPanelVisible) {
+        this.dismissPartyPanel();
         return true;
       }
 

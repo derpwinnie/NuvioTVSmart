@@ -25,10 +25,11 @@ for (const platform of ["vidaa", "tizen", "webos", "browser"]) {
   assert.equal(hero.focusGifUrl, platform === "vidaa" ? "" : seed.focusGifUrl);
   assert.equal(hero.focusGifEnabled, platform !== "vidaa");
   const configuredGif = normalizeCollectionFolderItem({ ...seed, focusGifEnabled: false });
+  // Upstream #1149: no platform turns the GIF into an always-on poster.
   assert.equal(
     configuredGif.poster,
-    platform === "vidaa" ? seed.coverImageUrl : seed.focusGifUrl,
-    "VIDAA must not turn the GIF into an always-on poster"
+    seed.coverImageUrl,
+    "The GIF never becomes an always-on poster"
   );
   const animatedHero = normalizeCollectionFolderItem({
     ...seed,

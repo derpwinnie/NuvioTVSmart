@@ -288,7 +288,7 @@
 
 .player-html-subtitle-default {
   right: 5vw;
-  bottom: 8vh;
+  bottom: calc(8vh + var(--player-subtitle-clearance, 0px));
   left: 5vw;
   align-items: center;
   transform: translateY(var(--player-subtitle-offset));

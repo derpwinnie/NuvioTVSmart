@@ -214,6 +214,14 @@ export function createPlayerControllerMethods09() {
         this.emitVideoEvent("loadeddata", { playbackEngine: this.playbackEngine });
         this.emitVideoEvent("canplay", { playbackEngine: this.playbackEngine });
         this.emitVideoEvent("avplaytrackschanged", { playbackEngine: this.playbackEngine });
+        // Apply a seek that was requested while prepareAsync() was running
+        // (normally the resume position). AVPlay is READY now, where seekTo()
+        // is valid; the playback start below waits for it to settle.
+        const deferredSeekMs = Number(this.avplayDeferredSeekMs || 0);
+        this.avplayDeferredSeekMs = 0;
+        if (deferredSeekMs > 0 && !this.avplaySeekInFlight) {
+          this.seekAvPlayTo(deferredSeekMs);
+        }
         if (this.startupAudioGateActive) {
           return;
         }

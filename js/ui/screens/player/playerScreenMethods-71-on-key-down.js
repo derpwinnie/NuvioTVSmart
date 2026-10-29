@@ -1,3 +1,4 @@
+import { isStreamInfoKey } from "./streamInfoOverlay.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
@@ -16,6 +17,19 @@ export function createPlayerScreenMethods71() {
             Router.back();
           }
         }
+        return;
+      }
+      if (this.streamInfoVisible) {
+        event?.preventDefault?.();
+        event?.stopImmediatePropagation?.();
+        if (!event?.repeat && (isBackKey || isStreamInfoKey(event) || isSelectKeyCode(keyCode))) this.closeStreamInfo();
+        else if (keyCode === 38 || keyCode === 40) this.streamInfoOverlay.scrollTop += keyCode === 40 ? 100 : -100;
+        return;
+      }
+      if (isStreamInfoKey(event) && !event?.repeat) {
+        event?.preventDefault?.();
+        event?.stopImmediatePropagation?.();
+        this.showStreamInfo();
         return;
       }
       if (isBackKey) {
@@ -44,6 +58,9 @@ export function createPlayerScreenMethods71() {
           return;
         }
         this.handlePostPlayKey(event);
+        return;
+      }
+      if (this.partyPanelVisible && this.handlePartyPanelKey(event)) {
         return;
       }
       if (this.nextEpisodeBackExitArmed) {
@@ -337,7 +354,11 @@ export function createPlayerScreenMethods71() {
         return;
       }
       if (keyCode === 38) {
-        this.focusProgressBar();
+        if (this.isLivePlayback()) {
+          if (!this.focusSkipIntroButton()) this.setControlsVisible(false);
+        } else {
+          this.focusProgressBar();
+        }
         return;
       }
       if (keyCode === 40) {

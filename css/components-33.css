@@ -384,7 +384,7 @@
 .player-parental-line {
   width: 6px;
   height: 0px;
-  border-radius: 3px;
+  border-radius: 2px;
   position: relative;
   flex: 0 0 auto;
   align-self: flex-start;
@@ -436,6 +436,7 @@
 }
 
 .player-parental-separator {
+  white-space: pre;
   color: rgba(255, 255, 255, 0.4);
   font-size: 22px;
   font-weight: 400;

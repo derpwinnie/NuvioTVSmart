@@ -120,9 +120,10 @@ export function createPlayerScreenMethods61() {
           const nativeTrackIndex = Number(embeddedTrack?.nativeTrackIndex);
           const targetTrackIndex =
             Number.isFinite(nativeTrackIndex) && nativeTrackIndex >= 0 ? nativeTrackIndex : selectedEntry.embeddedAudioTrackIndex;
-          // Only webOS confirms a selection asynchronously. VIDAA switches right here,
-          // and a pending entry left behind would hold the startup audio gate (muted).
-          if (!Environment.isVidaa()) {
+          // Only webOS confirms (and clears) a pending selection through its track
+          // events. Elsewhere, e.g. a desktop browser, a pending entry would hold the
+          // startup audio gate closed forever and playback never starts.
+          if (Environment.isWebOS()) {
             this.pendingWebOsAudioSelection = {
               selectionKind: "embedded",
               targetTrackIndex,
@@ -344,7 +345,7 @@ export function createPlayerScreenMethods61() {
                   const secondary =
                     disabled || conversionFailed ? [entry.secondary, unsupportedText].filter(Boolean).join(" · ") : entry.secondary || "";
                   return `
-                  <div class="player-dialog-item focusable${selected ? " selected" : ""}${focused ? " focused" : ""}${disabled ? " disabled" : ""}${pending ? " pending" : ""}" data-audio-column="tracks" data-audio-index="${index}" aria-disabled="${disabled ? "true" : "false"}" aria-busy="${pending ? "true" : "false"}">
+                  <div class="player-dialog-item focusable${selected ? " selected" : ""}${focused ? " focused" : ""}${disabled ? " disabled" : ""}${pending ? " pending" : ""}" role="radio" aria-checked="${selected ? "true" : "false"}" data-audio-column="tracks" data-audio-index="${index}" aria-disabled="${disabled ? "true" : "false"}" aria-busy="${pending ? "true" : "false"}">
                     <div class="player-dialog-item-main">${escapeHtml(label)}</div>
                     <div class="player-dialog-item-sub">${escapeHtml(secondary)}</div>
                     <div class="player-dialog-item-check">${pending ? "&#8230;" : selected ? "&#10003;" : ""}</div>

@@ -1,5 +1,6 @@
 /* Transport repairs for the vendored EngineFS proxy. ES5 for TV service runtimes. */
 module.exports = function patchPlaybackProxy(source) {
+  source = require("./proxy-redirect-report-patch.cjs")(source);
   if (source.indexOf("/* NUVIO_FIX_PROXY */") !== -1) return source;
 
   function replaceOnce(target, replacement) {

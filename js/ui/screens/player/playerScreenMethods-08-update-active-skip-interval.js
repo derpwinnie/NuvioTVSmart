@@ -49,7 +49,7 @@ export function createPlayerScreenMethods08() {
             : intervalType === "movie-credits"
               ? "movie-credits"
               : "intro";
-        if (active && PlayerSettingsStore.get().autoSkipSegmentTypes?.includes(autoSkipType)) {
+        if (active && PlayerSettingsStore.get().autoSkipSegmentTypes?.includes(autoSkipType) && !this.isPartyControlLocked?.()) {
           this.skipActiveInterval();
           return;
         }

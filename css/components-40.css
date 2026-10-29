@@ -141,6 +141,11 @@
   color: #f6fbff;
 }
 
+.series-episode-rating-chip.exceptional {
+  background: #1da1f3;
+  color: #f7fcff;
+}
+
 .series-episode-rating-chip.excellent {
   background: #14a44d;
   color: #f7fcff;

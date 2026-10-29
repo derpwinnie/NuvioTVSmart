@@ -1,3 +1,4 @@
+import { syncHtmlSubtitleClearance } from "./subtitleOverlayClearance.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
@@ -73,6 +74,10 @@ export function createPlayerScreenMethods24() {
       return true;
     },
     async playNextEpisode({ userInitiated = false } = {}) {
+      if (this.isPartyControlLocked?.()) {
+        if (userInitiated) this.partyBlocksControl();
+        return false;
+      }
       const nextEpisode = this.resolveNextEpisodeInfo();
       const itemType = normalizeItemType(this.params?.itemType || "movie");
       if (!nextEpisode?.videoId || !isSeriesItemType(itemType) || nextEpisode.hasAired === false || this.nextEpisodeLaunching) {
@@ -264,6 +269,31 @@ export function createPlayerScreenMethods24() {
         return;
       }
       const style = this.subtitleStyleSettings || {};
+      const assRenderer = this.assSubtitleRenderer;
+      if (assRenderer?.sourceBody && assRenderer.stripSdh !== Boolean(style.stripSdh)) {
+        const selectionToken = this.subtitleSelectionToken;
+        void this.applyAssSubtitleBody({ body: assRenderer.sourceBody, selectionToken })
+          .then((result) => {
+            if (
+              result.applied ||
+              result.stale ||
+              this.assSubtitleRenderer ||
+              selectionToken !== this.subtitleSelectionToken ||
+              !result.fallbackVtt
+            )
+              return;
+            this.clearHtmlSubtitleOverlay();
+            this.htmlSubtitleCues = this.parseSubtitleCues(result.fallbackVtt);
+            this.htmlSubtitleSelectedId = this.selectedAddonSubtitleId || "ass-fallback";
+            this.webOsEmbeddedTextSubtitleUsingAss = false;
+            this.webOsEmbeddedTextSubtitleUsingHtml = Boolean(this.webOsEmbeddedTextSubtitleTrack);
+            this.renderHtmlSubtitleOverlayAtCurrentTime();
+            this.scheduleHtmlSubtitleOverlayRender();
+          })
+          .catch((error) => console.warn("ASS subtitle refresh failed", error));
+      }
+      if (this.htmlSubtitleCues?.length) this.renderHtmlSubtitleOverlayAtCurrentTime();
+      else if (this.htmlSubtitleLastActiveCues?.length) this.renderHtmlSubtitleOverlayCue(this.htmlSubtitleLastActiveCues);
       const verticalOffsetVh = getSubtitleVerticalOffsetVh(style.verticalOffset);
       const residualOffsetVh = getSubtitleVerticalResidualOffsetVh(style.verticalOffset);
       const subtitleTextOpacity = normalizeSubtitleTextOpacity(style.textOpacity);
@@ -319,6 +349,7 @@ export function createPlayerScreenMethods24() {
       video.style.setProperty("--player-subtitle-shadow", subtitleShadow);
       video.style.setProperty("--player-subtitle-offset", `${residualOffsetVh.toFixed(2)}vh`);
       this.refreshSubtitleCueStyles();
+      syncHtmlSubtitleClearance(this);
       this.renderBitmapSubtitleAtCurrentTime({ force: true });
       if (refreshTrackRendering) {
         this.refreshSubtitleTrackRendering();

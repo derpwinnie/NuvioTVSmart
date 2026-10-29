@@ -8,7 +8,6 @@ export function createPlayerScreenMethods22() {
     PlayerSettingsStore,
     Router,
     shouldShowNextEpisodeCardRule,
-    NEXT_EPISODE_PREFETCH_PERCENT,
     normalizeItemType,
     isSeriesItemType
   } = internals;
@@ -111,7 +110,12 @@ export function createPlayerScreenMethods22() {
       if (!this.isNaturalPlaybackCompletionEligible(durationSeconds)) {
         return false;
       }
-      return currentSeconds / durationSeconds >= NEXT_EPISODE_PREFETCH_PERCENT;
+      const settings = PlayerSettingsStore.get();
+      const leadSeconds = Math.min(30, Math.max(10, Number(settings.streamAutoPlayTimeoutSeconds) || 0));
+      return (
+        this.getNextEpisodeCardThresholdReached(currentSeconds + leadSeconds, durationSeconds) ||
+        durationSeconds - currentSeconds <= leadSeconds
+      );
     },
     getStreamCacheKey(videoId, itemType, season = null, episode = null) {
       const normalizedVideoId = String(videoId || "").trim();
@@ -265,14 +269,8 @@ export function createPlayerScreenMethods22() {
     },
     async runNextEpisodeCountdown(token, selectedStream) {
       const sourceName = String(selectedStream?.name || selectedStream?.addonName || "").trim();
-      const countdownEnabled = PlayerSettingsStore.get().nextEpisodeCountdownEnabled !== false;
       this.nextEpisodeCardSearching = false;
-      this.nextEpisodeCardSourceName = countdownEnabled ? sourceName : "";
-      if (!countdownEnabled) {
-        this.nextEpisodeCardCountdownSec = null;
-        this.renderNextEpisodeCard();
-        return this.isNextEpisodeLaunchActive(token);
-      }
+      this.nextEpisodeCardSourceName = sourceName;
       for (let remaining = 3; remaining >= 1; remaining -= 1) {
         if (!this.isNextEpisodeLaunchActive(token)) {
           return false;

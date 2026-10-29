@@ -1,3 +1,5 @@
+import { isLivePlayback } from "./livePlaybackUi.js";
+import { syncHtmlSubtitleClearance } from "./subtitleOverlayClearance.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
 
@@ -187,7 +189,6 @@ export function createPlayerScreenMethods29() {
     setControlsVisible(visible, { focus = false } = {}) {
       const wasControlsVisible = this.controlsVisible;
       this.controlsVisible = Boolean(visible);
-      this.syncPlayerStreamSource?.();
       if (this.isExternalFrameMode()) {
         return;
       }
@@ -205,6 +206,7 @@ export function createPlayerScreenMethods29() {
         this.renderSeekOverlay();
       }
       overlay.classList.toggle("hidden", !this.controlsVisible);
+      this.renderPartyPill?.();
       this.syncPlayerOverlayLayoutState();
       this.updateSkipIntroCountdown(Date.now());
       this.renderSkipIntroButton();
@@ -229,6 +231,7 @@ export function createPlayerScreenMethods29() {
           this.focusPlayerRootForHiddenControls();
         }
       }
+      syncHtmlSubtitleClearance(this);
     },
     focusPlayerRootForHiddenControls() {
       if (this.isExternalFrameMode() || this.controlsVisible || this.isDialogOpen()) {
@@ -307,7 +310,7 @@ export function createPlayerScreenMethods29() {
         return !this.isStartupLoadingVisible() && !this.isExternalFrameMode() && !this.isStartupErrorVisible();
       }
       if (this.seekLoading) {
-        if (this.isStartupLoadingVisible()) {
+        if (this.isStartupLoadingVisible() || this.seekLoadingVisualComplete) {
           return false;
         }
         return !this.isExternalFrameMode() && !this.isStartupErrorVisible();
@@ -330,8 +333,11 @@ export function createPlayerScreenMethods29() {
       const stalledForMs = Date.now() - Number(this.lastPlaybackProgressAt || 0);
       return stalledForMs >= BUFFERING_SPINNER_STALL_MS;
     },
+    isLivePlayback() {
+      return isLivePlayback(this, PlayerController);
+    },
     isSeekBarAvailable() {
-      return !this.loadingVisible || this.hasPresentedPlaybackFrame || this.seekLoading;
+      return !this.isLivePlayback() && (!this.loadingVisible || this.hasPresentedPlaybackFrame || this.seekLoading);
     },
     isSeekOverlaySuppressingControls() {
       return Date.now() < Number(this.seekOverlaySuppressControlsUntil || 0);

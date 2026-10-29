@@ -1,3 +1,4 @@
+import { trackingErrorMessage } from "../../components/trackingErrorMessage.js";
 import * as internals from "./homeScreenContext.js";
 
 export function createHomeScreenMethods07() {
@@ -139,6 +140,9 @@ export function createHomeScreenMethods07() {
           : [{ key: "local", title: t("detail.library", {}, "Library"), type: "local" }];
       const libraryItem = {
         itemId: item.id,
+        imdbId: item.imdbId || item.ids?.imdb || null,
+        tmdbId: item.tmdbId || item.ids?.tmdb || null,
+        traktId: item.traktId || item.ids?.trakt || null,
         itemType: item.type || "movie",
         title: item.name || item.title || item.id || "Untitled",
         poster: item.poster || null,
@@ -207,7 +211,7 @@ export function createHomeScreenMethods07() {
           this.posterListPicker.destructiveRemovalRequired = error?.code === "SIMKL_DESTRUCTIVE_REMOVAL_REQUIRED";
           this.posterListPicker.error = this.posterListPicker.destructiveRemovalRequired
             ? "Removing this status will also clear watched history or a rating on Simkl. Confirm only if that is intended."
-            : t("detail_lists_save_failed", {}, "Could not save list changes.");
+            : trackingErrorMessage(error, null) || t("detail_lists_save_failed", {}, "Could not save list changes.");
           this.mountPosterListPickerDialog();
         }
         return true;
