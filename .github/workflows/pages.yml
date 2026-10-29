@@ -31,6 +31,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The browser-hosted build cannot read api.introdb.app directly (its CORS
+      # only allows introdb.app). With the repository variable INTRODB_PROXY_URL
+      # set, skip-intro data goes through the proxy in tools/introdb-proxy.
+      - name: Point IntroDB at the CORS proxy
+        if: vars.INTRODB_PROXY_URL != ''
+        env:
+          INTRODB_PROXY_URL: ${{ vars.INTRODB_PROXY_URL }}
+        run: |
+          cp local.example.properties local.properties
+          printf '\nINTRODB_API_URL=%s\n' "${INTRODB_PROXY_URL}" >> local.properties
       # package:vidaa builds the static VIDAA bundle into dist/vidaa
       # (vidaa.html, sw.js, hashed file names).
       - run: npm run package:vidaa

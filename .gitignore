@@ -50,6 +50,7 @@ tests/helpers/*
 !tests/test-vidaa-stream-unicode.mjs
 !tests/test-vidaa-audio-amplification.mjs
 !tests/test-vidaa-glyph-support.mjs
+!tests/test-introdb-proxy.mjs
 *.ipk
 *.wgt
 dist/

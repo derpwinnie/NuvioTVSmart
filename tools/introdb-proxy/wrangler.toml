@@ -1,0 +1,5 @@
+# Deploy: npx wrangler deploy --config tools/introdb-proxy/wrangler.toml
+name = "nuvio-introdb-proxy"
+main = "worker.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = true
