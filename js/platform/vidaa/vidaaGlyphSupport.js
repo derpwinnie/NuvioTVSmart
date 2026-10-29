@@ -57,7 +57,9 @@ export function rendersGlyph(canvas, text, family = "sans-serif") {
   try {
     const ctx = canvas?.getContext?.("2d", { willReadFrequently: true });
     if (!ctx) return false;
-    const missing = drawPixels(ctx, MISSING, family);
+    // One missing-glyph box per code point: a flag is two regional
+    // indicators, which draw as two boxes without a flag font.
+    const missing = drawPixels(ctx, MISSING.repeat([...text].length), family);
     const drawn = drawPixels(ctx, text, family);
     let inked = false;
     let differs = false;

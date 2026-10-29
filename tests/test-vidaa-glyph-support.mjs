@@ -17,6 +17,8 @@ const { readableStreamText, readableStreamHeadline } =
 const MISSING = "\u{10FFFD}";
 
 // drawable(text, font) -> true when the simulated TV has a glyph for it.
+// Without a glyph every code point draws the same missing-glyph box, so a
+// two-code-point flag draws two boxes (as in Chromium).
 function fakeCanvas(drawable) {
   let last = { text: "", font: "" };
   const ctx = {
@@ -27,14 +29,17 @@ function fakeCanvas(drawable) {
     },
     getImageData() {
       const data = new Uint8ClampedArray(48 * 48 * 4);
-      const ok = last.text !== MISSING && drawable(last.text, last.font);
-      // A drawn glyph inks a pixel the missing-glyph box does not.
-      const pixel = ok ? 100 + ([...last.text][0].codePointAt(0) % 100) : 0;
-      for (let i = 0; i < 40; i += 4) {
-        data[i] = ok ? 200 : 0;
-        data[i + 3] = 255;
+      const codePoints = [...last.text];
+      const ok = !codePoints.includes(MISSING) && drawable(last.text, last.font);
+      if (ok) {
+        // A real glyph: pixels unique to the text.
+        const pixel = 100 + (codePoints[0].codePointAt(0) % 100);
+        data[pixel * 4] = 200;
+        data[pixel * 4 + 3] = 255;
+      } else {
+        // One box per code point.
+        for (let box = 0; box < codePoints.length; box++) data[box * 40 + 3] = 255;
       }
-      data[pixel * 4 + 3] = ok ? 255 : 0;
       return { data };
     }
   };
@@ -76,6 +81,22 @@ assert.equal(
   rendersGlyph({ getContext: () => null }, "\u{1F600}"),
   false,
   "no 2D context: unsupported"
+);
+// Regression: a flag without a flag font draws two boxes and must not count
+// as drawn just because two boxes differ from one.
+assert.equal(
+  rendersGlyph(
+    fakeCanvas(() => false),
+    "\u{1F1E9}\u{1F1EA}"
+  ),
+  false
+);
+assert.equal(
+  rendersGlyph(
+    fakeCanvas(() => true),
+    "\u{1F1E9}\u{1F1EA}"
+  ),
+  true
 );
 assert.equal(
   rendersGlyph(
