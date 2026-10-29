@@ -14,6 +14,12 @@
 - Turned embedded subtitles off for real when Nuvio shows none, and kept the remembered audio track at startup
 - Hardened the legacy installer server against path traversal and fixed tile-host validation to IPv4 literals
 - Improved VIDAA focus scrolling, Home image loading and sidebar responsiveness, and removed dead navigation code
+- Merged upstream 1.2.10; VIDAA keeps its own Home image window, focus animation and held-key scrolling
+- Accepted MediaFlow proxy streams whose required headers are carried in the proxy URL, and removed query strings and credentials from playback diagnostics
+- Kept startup audio pending while hidden loading, watchdog recovery or a confirming audio switch are still in progress
+- Made stream names, descriptions, filters and addon names readable on VIDAA fonts (styled letters, small capitals, emoji and flags); auto-play regex and exclude words match the same text
+- Stopped the saved audio boost from routing VIDAA playback through Web Audio, which could silence cross-origin streams
+- Tile installer: pairing with older firmware (static, middle and RemoteNOW profiles) and Toshiba-branded VIDAA TVs, discovery of TVs that only announce themselves, and a check of typed IP addresses
 
 ### Experimental (VIDAA)
 
