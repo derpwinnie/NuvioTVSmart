@@ -1,6 +1,4 @@
 import * as internals from "./homeScreenContext.js";
-import { isVidaaNavigationBusy } from "../../navigation/vidaaNavigationActivity.js";
-import { VIDAA_FOCUS_SCROLL_DURATION_MS } from "../../navigation/vidaaFocusScroll.js";
 
 export function createHomeScreenMethods03() {
   const {
@@ -21,7 +19,9 @@ export function createHomeScreenMethods03() {
     HOME_MAX_ITEMS_PER_ROW_CONSTRAINED,
     HOME_MAX_ITEMS_PER_ROW_DEFAULT,
     HOME_MAX_ITEMS_PER_ROW_LEGACY_TV,
-    parseCssPx
+    parseCssPx,
+    isVidaaNavigationBusy,
+    VIDAA_FOCUS_SCROLL_DURATION_MS
   } = internals;
 
   return {
@@ -40,7 +40,7 @@ export function createHomeScreenMethods03() {
       if (this.layoutMode !== "modern") {
         return false;
       }
-      if (Platform.isVidaa() && (this._mainVertRaf || this._trackHorizRaf)) {
+      if (this.isVidaaHomeRuntime() && (this._mainVertRaf || this._trackHorizRaf)) {
         // Focus changes before the scroll starter runs. Keep that target when
         // another arrow arrives in the same frame, even if its row is offscreen.
         return true;
@@ -58,7 +58,7 @@ export function createHomeScreenMethods03() {
     },
     isVidaaHomeLoadingBusy() {
       return Boolean(
-        Platform.isVidaa() &&
+        this.isVidaaHomeRuntime() &&
         (isVidaaNavigationBusy() ||
           this.shouldSuspendModernViewportFocusSync() ||
           this._mainClassicVertRaf ||
@@ -200,6 +200,11 @@ export function createHomeScreenMethods03() {
         globalThis.document?.body?.classList?.contains("performance-constrained")
       );
     },
+    // VIDAA runs its own focus animation and loading pauses. Asked through the
+    // runtime profile, like the webOS camera rule below.
+    isVidaaHomeRuntime() {
+      return getTvRuntimePerformanceProfile().platform === "vidaa";
+    },
     shouldUseImmediateFocusScroll() {
       return (
         this.isPerformanceConstrained() ||
@@ -273,7 +278,7 @@ export function createHomeScreenMethods03() {
     },
     getScrollDuration(base) {
       const baseline = Number.isFinite(base) ? base : 150;
-      if (Platform.isVidaa()) {
+      if (this.isVidaaHomeRuntime()) {
         return VIDAA_FOCUS_SCROLL_DURATION_MS;
       }
       if (this.isLegacyTvRuntime()) {

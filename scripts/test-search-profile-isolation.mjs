@@ -120,11 +120,6 @@ async function setup(platform = "browser") {
               loader: "js"
             })
           );
-          // kvn fork: router.js re-exports the VIDAA navigation reset.
-          b.onLoad({ filter: /\/vidaaNavigationActivity\.js$/ }, () => ({
-            contents: "export const resetVidaaNavigationActivity = () => {};",
-            loader: "js"
-          }));
           b.onLoad({ filter: /\/customPoster\.js$/ }, () => ({
             contents:
               "export const customPosterForItem = item => item; export const posterFallbackAttributes = () => '';",

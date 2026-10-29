@@ -487,11 +487,7 @@ const frameMethods = new Function(
   "internals",
   frameSource.replace(/^import .*;\n/gm, "").replace("export function", "function") +
     "; return createPlayerScreenMethods30();"
-)({
-  TrackingScrobbleService: { isEnabled: () => true, start: () => frameStarts++ },
-  // kvn fork: the VIDAA branches in this file stay off here.
-  Environment: { isVidaa: () => false, isWebOS: () => false, isTizen: () => false }
-});
+)({ TrackingScrobbleService: { isEnabled: () => true, start: () => frameStarts++ } });
 const frameScreen = {
   hasPresentedPlaybackFrame: false,
   currentEngineFsStream: {},

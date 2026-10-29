@@ -9,9 +9,7 @@ function setup({ platform = "browser", constrained = false, legacyTizen = false 
   const context = vm.createContext({
     internals: {
       getTvRuntimePerformanceProfile: () => ({ platform, isPerformanceConstrained: constrained }),
-      MODERN_HOME_CONSTANTS: { springScrollStiffness: 100, springScrollDampingRatio: 1 },
-      // kvn fork: the VIDAA branches in these files stay off here.
-      Platform: { isVidaa: () => false }
+      MODERN_HOME_CONSTANTS: { springScrollStiffness: 100, springScrollDampingRatio: 1 }
     },
     document: {
       body: { classList: { contains: (name) => name === "legacy-tizen" && legacyTizen } }
@@ -30,7 +28,7 @@ function setup({ platform = "browser", constrained = false, legacyTizen = false 
     ["homeScreenMethods-17-end-modern-vertical-fast-scroll.js", "createHomeScreenMethods17"]
   ]) {
     const source = readFileSync(new URL(`../js/ui/screens/home/${file}`, import.meta.url), "utf8")
-      .replace(/^import .*;\n/gm, "")
+      .replace(/^import .*;\n/m, "")
       .replace("export function", "function");
     Object.assign(screen, vm.runInContext(`${source}\n${factory}()`, context));
   }

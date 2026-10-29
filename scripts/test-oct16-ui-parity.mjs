@@ -64,9 +64,7 @@ const fixtures = {
   isPerformanceConstrainedRuntime: () => false,
   escapeHtml: String,
   contentTextDirection: () => "ltr",
-  findStreamVirtualIndex: () => 0,
-  // kvn fork: the VIDAA branches in these files stay off here.
-  Platform: { isVidaa: () => false }
+  findStreamVirtualIndex: () => 0
 };
 const context = vm.createContext({
   fixtures,

@@ -359,3 +359,9 @@ export {
 } from "./homeScreenHelpers-14-get-home-grid-column-count.js";
 
 export { createPosterCardMarkup } from "./homeScreenHelpers-15-create-poster-card-markup.js";
+
+// VIDAA port: helpers the home method factories read through internals.
+export { animateVidaaFocusScroll, VIDAA_FOCUS_SCROLL_DURATION_MS } from "../../navigation/vidaaFocusScroll.js";
+export { isVidaaNavigationBusy } from "../../navigation/vidaaNavigationActivity.js";
+export { settleVidaaHomeReturnFocus } from "./vidaaHomeReturnFocus.js";
+export { bindExpandedBackdropLoad } from "./vidaaHomeImageWindow.js";

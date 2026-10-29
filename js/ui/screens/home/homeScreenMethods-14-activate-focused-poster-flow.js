@@ -2,14 +2,15 @@ import { registerHomeDomNodes } from "./homeDomUpdate.js";
 import * as internals from "./homeScreenContext.js";
 
 export function createHomeScreenMethods14() {
-  const { Router, Platform, applyTrailerAudioPreferences } = internals;
+  const { Router, applyTrailerAudioPreferences } = internals;
 
   return {
     async activateFocusedPosterFlow(node, flowToken = Number(this.focusedPosterFlowToken || 0)) {
       if (!this.isModernPosterNode(node) || !node.classList.contains("focused")) {
         return;
       }
-      const isVidaa = Platform.isVidaa();
+      // Optional: the poster-flow harness and partial screens may not compose methods03.
+      const isVidaa = Boolean(this.isVidaaHomeRuntime?.());
       const isCurrentVidaaFlow = () =>
         Router.getCurrent() === "home" &&
         Number(this.focusedPosterFlowToken || 0) === Number(flowToken || 0) &&

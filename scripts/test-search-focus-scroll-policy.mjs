@@ -11,8 +11,7 @@ function setup({ platform = "browser", constrained = false, bodyConstrained = fa
   const internals = {
     getTvRuntimePerformanceProfile: () => ({ platform, isPerformanceConstrained: constrained }),
     MODERN_HOME_CONSTANTS: { springScrollStiffness: 100, springScrollDampingRatio: 1 },
-    // kvn fork: the VIDAA branches in these files stay off here.
-    Platform: { isBackEvent: () => false, isVidaa: () => false },
+    Platform: { isBackEvent: () => false },
     isUpKey: (event) => event.keyCode === 38,
     isDownKey: (event) => event.keyCode === 40,
     isLeftKey: (event) => event.keyCode === 37,
@@ -21,7 +20,6 @@ function setup({ platform = "browser", constrained = false, bodyConstrained = fa
   };
   const context = vm.createContext({
     internals,
-    Platform: internals.Platform,
     getTvRuntimePerformanceProfile: internals.getTvRuntimePerformanceProfile,
     document: { body: { classList } },
     Date: { now: () => now },

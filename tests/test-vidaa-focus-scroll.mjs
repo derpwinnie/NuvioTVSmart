@@ -221,6 +221,7 @@ for (const platform of ["vidaa", "tizen", "webos", "browser"]) {
 // Search and Details must use the continuous helper only for VIDAA, including
 // when their callers request spring camera following or invoke it directly.
 const { Platform } = await import("../js/platform/index.js");
+const { getTvRuntimePerformanceProfile } = await import("../js/platform/tvRuntimePerformance.js");
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 const { createSearchScreenMethods04 } =
   await import("../js/ui/screens/search/searchScreenMethods-04-open-sidebar.js");
@@ -230,6 +231,7 @@ for (const methods of [createSearchScreenMethods04(), createMetaDetailsScreenMet
   for (const platform of ["vidaa", "tizen", "webos", "browser"]) {
     globalThis.__NUVIO_PLATFORM__ = platform;
     Platform.current = null;
+    getTvRuntimePerformanceProfile({ forceRefresh: true });
     now = 7000;
     const { node } = scroller();
     const owner = { ...methods, isLegacyTvRuntime: () => false };
@@ -274,6 +276,7 @@ for (const methods of [createSearchScreenMethods04(), createMetaDetailsScreenMet
 for (const platform of ["vidaa", "tizen", "webos", "browser"]) {
   globalThis.__NUVIO_PLATFORM__ = platform;
   Platform.current = null;
+  getTvRuntimePerformanceProfile({ forceRefresh: true });
   frames.clear();
   const container = { style: { display: "none" } };
   ScreenUtils.show(container);

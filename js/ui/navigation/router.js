@@ -36,11 +36,12 @@ import { createRouterMethods01 } from "./routerMethods-01-get-route-state-key.js
 import { createRouterMethods02 } from "./routerMethods-02-complete-route-return-back-guard.js";
 import { createRouterMethods03 } from "./routerMethods-03-back.js";
 import { openPendingLaunchDeepLink } from "../../core/deeplink/launchDeepLink.js";
-// Re-exported so the router method factories read it through internals (kvn VIDAA port).
-export { resetVidaaNavigationActivity } from "./vidaaNavigationActivity.js";
+import { resetVidaaNavigationActivity } from "./vidaaNavigationActivity.js";
 
 export {
   Router,
+  // VIDAA port: the router method factories read it through internals.
+  resetVidaaNavigationActivity,
   HomeScreen,
   PlayerScreen,
   AccountScreen,

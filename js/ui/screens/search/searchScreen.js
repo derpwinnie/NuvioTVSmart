@@ -13,6 +13,7 @@ import { I18n } from "../../../i18n/index.js";
 import { contentTextDirection } from "../../../core/util/contentTextDirection.js";
 import { Platform } from "../../../platform/index.js";
 import { getTvRuntimePerformanceProfile } from "../../../platform/tvRuntimePerformance.js";
+import { animateVidaaFocusScroll } from "../../navigation/vidaaFocusScroll.js";
 import { MODERN_HOME_CONSTANTS } from "../home/modernHomeLayout.js";
 import { allowDpadRepeat, resetDpadRepeat } from "../../navigation/dpadRepeatThrottle.js";
 import {
@@ -68,6 +69,7 @@ export {
   contentTextDirection,
   Platform,
   getTvRuntimePerformanceProfile,
+  animateVidaaFocusScroll,
   MODERN_HOME_CONSTANTS,
   allowDpadRepeat,
   resetDpadRepeat,

@@ -4,6 +4,7 @@ globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
 globalThis.__NUVIO_PLATFORM__ = "vidaa";
 
 const { Platform } = await import("../js/platform/index.js");
+const { getTvRuntimePerformanceProfile } = await import("../js/platform/tvRuntimePerformance.js");
 const { createLibraryScreenMethods01 } =
   await import("../js/ui/screens/library/libraryScreenMethods-01-clear-closing-picker.js");
 const { createDiscoverScreenMethods04 } =
@@ -93,6 +94,7 @@ function surface(initialTop = 0) {
 function platform(name) {
   globalThis.__NUVIO_PLATFORM__ = name;
   Platform.current = null;
+  getTvRuntimePerformanceProfile({ forceRefresh: true });
   now = 0;
   rectReads = 0;
   frames.clear();

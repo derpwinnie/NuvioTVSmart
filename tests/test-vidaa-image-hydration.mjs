@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 globalThis.__NUVIO_PLATFORM__ = "vidaa";
 const { Platform } = await import("../js/platform/index.js");
+const { getTvRuntimePerformanceProfile } = await import("../js/platform/tvRuntimePerformance.js");
 const { noteVidaaNavigationKeyDown, noteVidaaNavigationKeyUp, resetVidaaNavigationActivity } =
   await import("../js/ui/navigation/vidaaNavigationActivity.js");
 const { createHomeScreenMethods03 } =
@@ -42,6 +43,7 @@ Router.getCurrent = () => "home";
 function platform(name) {
   globalThis.__NUVIO_PLATFORM__ = name;
   Platform.current = null;
+  getTvRuntimePerformanceProfile({ forceRefresh: true });
   resetVidaaNavigationActivity();
   now = 0;
   geometryReads = 0;

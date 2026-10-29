@@ -3,11 +3,14 @@ import assert from "node:assert/strict";
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 globalThis.window = {};
 const { Platform } = await import("../js/platform/index.js");
+const { getTvRuntimePerformanceProfile } = await import("../js/platform/tvRuntimePerformance.js");
 const { resetTvRuntimePerformanceProfile } = await import("../js/platform/tvRuntimePerformance.js");
 const { createHomeScreenMethods01 } =
   await import("../js/ui/screens/home/homeScreenMethods-01-get-route-state-key.js");
 const { createHomeScreenMethods02 } =
   await import("../js/ui/screens/home/homeScreenMethods-02-restore-modern-focus-state.js");
+const { createHomeScreenMethods03 } =
+  await import("../js/ui/screens/home/homeScreenMethods-03-is-scroll-animation-active.js");
 const { createHomeScreenMethods17 } =
   await import("../js/ui/screens/home/homeScreenMethods-17-end-modern-vertical-fast-scroll.js");
 let id = 0;
@@ -28,6 +31,7 @@ for (const platform of ["vidaa", "tizen", "webos", "browser"]) {
   for (const layoutMode of ["modern", "classic", "grid"]) {
     globalThis.__NUVIO_PLATFORM__ = platform;
     Platform.current = null;
+    getTvRuntimePerformanceProfile({ forceRefresh: true });
     resetTvRuntimePerformanceProfile();
     frames.clear();
     timers.clear();
@@ -67,6 +71,7 @@ for (const platform of ["vidaa", "tizen", "webos", "browser"]) {
       ...createHomeScreenMethods01(),
       ...createHomeScreenMethods02(),
       ...createHomeScreenMethods17(),
+      isVidaaHomeRuntime: createHomeScreenMethods03().isVidaaHomeRuntime,
       layoutMode,
       isRestoringFocusFromBack: true,
       container: { querySelector: () => viewport },

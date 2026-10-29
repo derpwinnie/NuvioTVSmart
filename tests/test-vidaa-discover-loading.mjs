@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 globalThis.HTMLImageElement = class {};
 const { Platform } = await import("../js/platform/index.js");
+const { getTvRuntimePerformanceProfile } = await import("../js/platform/tvRuntimePerformance.js");
 const { Router } = await import("../js/ui/navigation/routerState.js");
 const {
   noteVidaaNavigationKeyDown,
@@ -54,6 +55,7 @@ function timeouts(time) {
 function setPlatform(platform) {
   globalThis.__NUVIO_PLATFORM__ = platform;
   Platform.current = null;
+  getTvRuntimePerformanceProfile({ forceRefresh: true });
   timers.clear();
   frames.clear();
   resetVidaaNavigationActivity();

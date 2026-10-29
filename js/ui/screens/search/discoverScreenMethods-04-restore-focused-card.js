@@ -1,6 +1,5 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./discoverScreen.js";
-import { animateVidaaFocusScroll, getVidaaCardScrollTop } from "../../navigation/vidaaFocusScroll.js";
 import { getTvRuntimePerformanceProfile } from "../../../platform/tvRuntimePerformance.js";
 
 export function createDiscoverScreenMethods04() {
@@ -11,13 +10,15 @@ export function createDiscoverScreenMethods04() {
     setLegacySidebarExpanded,
     groupNodesByOffsetTop,
     setContainerScrollTop,
-    scrollNodeIntoContainerView
+    scrollNodeIntoContainerView,
+    animateVidaaFocusScroll,
+    getVidaaCardScrollTop
   } = internals;
 
   return {
     shouldUseImmediateFocusScroll() {
       // VIDAA keeps its own focus animation and held-key fast scroll.
-      if (Platform.isVidaa()) {
+      if (getTvRuntimePerformanceProfile().platform === "vidaa") {
         return false;
       }
       const profile = getTvRuntimePerformanceProfile();
@@ -61,7 +62,7 @@ export function createDiscoverScreenMethods04() {
       focusWithoutAutoScroll(target);
       this.rememberRowFocus(target);
       if (scrollMode !== "none") {
-        if (Platform.isVidaa()) {
+        if (getTvRuntimePerformanceProfile().platform === "vidaa") {
           this.scrollVidaaDiscoverFocusNode(target, { center: scrollMode === "center" });
         } else {
           scrollNodeIntoContainerView(target, this.getContentScroller(), {
@@ -133,15 +134,16 @@ export function createDiscoverScreenMethods04() {
       const shouldLoadMore = this.shouldAutoLoadMore(target.dataset.itemIndex);
       // VIDAA retargets one short animation while native scroll remains the
       // established path on the other TV platforms.
-      const nextScrollTop = Platform.isVidaa()
-        ? this.scrollVidaaDiscoverFocusNode(target, { toTop: isFirstRow })
-        : isFirstRow
-          ? setContainerScrollTop(scroller, 0, "auto")
-          : scrollNodeIntoContainerView(target, scroller, {
-              center: false,
-              padding: 20,
-              behavior: "auto"
-            });
+      const nextScrollTop =
+        getTvRuntimePerformanceProfile().platform === "vidaa"
+          ? this.scrollVidaaDiscoverFocusNode(target, { toTop: isFirstRow })
+          : isFirstRow
+            ? setContainerScrollTop(scroller, 0, "auto")
+            : scrollNodeIntoContainerView(target, scroller, {
+                center: false,
+                padding: 20,
+                behavior: "auto"
+              });
       if (Number.isFinite(nextScrollTop)) {
         this.savedScrollTop = nextScrollTop;
       }
@@ -210,7 +212,7 @@ export function createDiscoverScreenMethods04() {
       }
 
       this.endDiscoverVerticalFastScroll({ land: true });
-      if (Platform.isVidaa()) {
+      if (getTvRuntimePerformanceProfile().platform === "vidaa") {
         // The held-scroll loop becomes the sole writer until it lands focus.
         animateVidaaFocusScroll(this, scroller, "y", scroller.scrollTop, { duration: 0 });
       }

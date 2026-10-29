@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 globalThis.__NUVIO_PLATFORM__ = "vidaa";
 const { Platform } = await import("../js/platform/index.js");
+const { getTvRuntimePerformanceProfile } = await import("../js/platform/tvRuntimePerformance.js");
 const { createHomeScreenMethods02 } =
   await import("../js/ui/screens/home/homeScreenMethods-02-restore-modern-focus-state.js");
 const { createHomeScreenMethods03 } =
@@ -39,6 +40,7 @@ function frame(time) {
 function platform(name) {
   globalThis.__NUVIO_PLATFORM__ = name;
   Platform.current = null;
+  getTvRuntimePerformanceProfile({ forceRefresh: true });
 }
 
 function scroller() {
@@ -55,6 +57,8 @@ function scroller() {
 
 const methods02 = createHomeScreenMethods02();
 const methods03 = createHomeScreenMethods03();
+// Home methods ask methods03 whether they run on VIDAA.
+const vidaaRuntime = { isVidaaHomeRuntime: methods03.isVidaaHomeRuntime };
 const methods15 = createHomeScreenMethods15();
 const methods16 = createHomeScreenMethods16();
 const methods17 = createHomeScreenMethods17();
@@ -63,7 +67,7 @@ const methods19 = createHomeScreenMethods19();
 // Ordinary Home scrolls, including the spring entry point, use a short tween.
 {
   const track = scroller();
-  const home = { ...methods02 };
+  const home = { ...methods02, ...vidaaRuntime };
   home.animateSpringScroll(track, "x", 300);
   assert.equal(track.scrollLeft, 0, "Changing focus must not jump to the target");
   frame(70);
@@ -85,6 +89,7 @@ const methods19 = createHomeScreenMethods19();
   let measurements = 0;
   const home = {
     ...methods02,
+    ...vidaaRuntime,
     ...methods17,
     layoutMode: "modern",
     shouldUseImmediateFocusScroll: () => true,
@@ -149,6 +154,7 @@ const methods19 = createHomeScreenMethods19();
   let verticalMeasurements = 0;
   const home = {
     ...methods02,
+    ...vidaaRuntime,
     ...methods17,
     layoutMode: "modern",
     getMainFocusAnchor: (node) => node.row,
@@ -338,7 +344,10 @@ for (const name of ["tizen", "webos", "browser"]) {
   assert.equal(calls.length, 1, `${name} retains its spring entry point`);
 }
 platform("vidaa");
-assert.equal(methods03.getScrollDuration.call({ isLegacyTvRuntime: () => true }, 160), 140);
+assert.equal(
+  methods03.getScrollDuration.call({ ...vidaaRuntime, isLegacyTvRuntime: () => true }, 160),
+  140
+);
 console.log(
   "VIDAA Home navigation passed: animated focus, held arrows, reversal, geometry and platform isolation."
 );

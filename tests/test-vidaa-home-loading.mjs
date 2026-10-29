@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 globalThis.__NUVIO_PLATFORM__ = "vidaa";
 const { Platform } = await import("../js/platform/index.js");
+const { getTvRuntimePerformanceProfile } = await import("../js/platform/tvRuntimePerformance.js");
 const { Router } = await import("../js/ui/navigation/routerState.js");
 const { noteVidaaNavigationKeyDown, noteVidaaNavigationKeyUp, resetVidaaNavigationActivity } =
   await import("../js/ui/navigation/vidaaNavigationActivity.js");
@@ -80,6 +81,7 @@ async function paint() {
 function reset(name = "vidaa") {
   globalThis.__NUVIO_PLATFORM__ = name;
   Platform.current = null;
+  getTvRuntimePerformanceProfile({ forceRefresh: true });
   now = 0;
   timers.clear();
   frames.clear();

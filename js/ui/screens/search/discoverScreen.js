@@ -37,6 +37,10 @@ import { allowDpadRepeat, resetDpadRepeat } from "../../navigation/dpadRepeatThr
 import { catalogSkipStep, catalogSupportsExtra } from "../../../core/addons/homeCatalogs.js";
 
 import { createDiscoverScreenMethods01 } from "./discoverScreenMethods-01-clear-closing-picker.js";
+import {
+  animateVidaaFocusScroll,
+  getVidaaCardScrollTop
+} from "../../navigation/vidaaFocusScroll.js";
 import { createDiscoverScreenMethods02 } from "./discoverScreenMethods-02-reload-items.js";
 import { createDiscoverScreenMethods03 } from "./discoverScreenMethods-03-open-picker-menu.js";
 import { createDiscoverScreenMethods04 } from "./discoverScreenMethods-04-restore-focused-card.js";
@@ -46,6 +50,8 @@ import { createDiscoverScreenMethods06 } from "./discoverScreenMethods-06-bind-c
 export {
   Router,
   ScreenUtils,
+  animateVidaaFocusScroll,
+  getVidaaCardScrollTop,
   addonRepository,
   catalogRepository,
   watchedItemsRepository,

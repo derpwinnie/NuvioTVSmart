@@ -4,6 +4,7 @@ globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
 globalThis.__NUVIO_PLATFORM__ = "vidaa";
 
 const { Platform } = await import("../js/platform/index.js");
+const { getTvRuntimePerformanceProfile } = await import("../js/platform/tvRuntimePerformance.js");
 const { resetTvRuntimePerformanceProfile } = await import("../js/platform/tvRuntimePerformance.js");
 const { setLegacySidebarExpanded } =
   await import("../js/ui/components/sidebarNavigationHelpers-03-render-root-sidebar.js");
@@ -82,6 +83,7 @@ function sidebarSurface(modern = false) {
 function platform(name) {
   globalThis.__NUVIO_PLATFORM__ = name;
   Platform.current = null;
+  getTvRuntimePerformanceProfile({ forceRefresh: true });
   resetTvRuntimePerformanceProfile();
   frames.clear();
   timers.clear();
