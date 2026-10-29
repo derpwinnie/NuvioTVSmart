@@ -44,6 +44,8 @@ tests/helpers/*
 !tests/test-vidaa-legacy-installer.mjs
 !tests/fake-vidaa-tv/
 !tests/fake-vidaa-tv/**
+!tests/test-vidaa-dash-playback-headers.mjs
+!tests/test-vidaa-mediaflow-playback-headers.mjs
 *.ipk
 *.wgt
 dist/

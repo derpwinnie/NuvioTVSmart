@@ -5,9 +5,27 @@ import {
   getStandaloneWebPlaybackCompatibility
 } from "../../../core/player/webPlaybackHeaders.js";
 
+function playbackDiagnosticUrl(value) {
+  const raw = String(value || "");
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    return `${url.protocol}//${url.host}${url.pathname}`;
+  } catch (_) {
+    return raw.split(/[?#]/, 1)[0].replace(/\/\/[^/@\s]+@/, "//");
+  }
+}
+
 export function createPlayerScreenMethods17() {
-  const { PlayerController, Environment, t, cleanPlaybackDiagnosticValue, pushPlaybackDiagnosticLine, extractPlaybackHttpStatus } =
-    internals;
+  const {
+    PlayerController,
+    Environment,
+    t,
+    cleanPlaybackDiagnosticValue,
+    pushPlaybackDiagnosticLine,
+    extractPlaybackHttpStatus,
+    streamDirectPlaybackUrl
+  } = internals;
 
   return {
     resolvePlaybackHttpStatus(detail = "") {
@@ -32,7 +50,9 @@ export function createPlayerScreenMethods17() {
           ? requestHeadersOverride
           : rawBehaviorHints?.proxyHeaders?.request || candidateBehaviorHints?.proxyHeaders?.request;
       const notWebReadyValue = rawBehaviorHints?.notWebReady ?? candidateBehaviorHints?.notWebReady;
-      const compatibility = getStandaloneWebPlaybackCompatibility(requestHeaders, notWebReadyValue);
+      const compatibility = getStandaloneWebPlaybackCompatibility(requestHeaders, notWebReadyValue, {
+        playbackUrl: streamDirectPlaybackUrl(candidate) || streamDirectPlaybackUrl(raw)
+      });
 
       if (!Environment.isVidaa()) {
         if (!compatibility.notWebReady || !compatibility.declaredHeaderNames.length) {
@@ -74,9 +94,11 @@ export function createPlayerScreenMethods17() {
       const candidateBehaviorHints = candidate?.behaviorHints || {};
       const requestHeaders = rawBehaviorHints?.proxyHeaders?.request || candidateBehaviorHints?.proxyHeaders?.request || null;
       const notWebReadyValue = rawBehaviorHints?.notWebReady ?? candidateBehaviorHints?.notWebReady;
+      const activeUrl = playbackUrl || streamDirectPlaybackUrl(candidate) || streamDirectPlaybackUrl(raw) || this.activePlaybackUrl || "";
       const headerDiagnostics = createWebPlaybackHeaderDiagnosticSnapshot(requestHeaders, {
         notWebReady: notWebReadyValue,
-        playbackEngine: PlayerController.playbackEngine
+        playbackEngine: PlayerController.playbackEngine,
+        playbackUrl: activeUrl
       });
       const headerNames =
         requestHeaders && typeof requestHeaders === "object" ? Object.keys(requestHeaders).filter(Boolean).join(", ") : "";
@@ -93,12 +115,12 @@ export function createPlayerScreenMethods17() {
           .join(" ")
       );
       const runtimeDetail = detail || eventErrorDetail || error?.message || error?.name || error?.errorText || error?.status || "";
-      const sourceLabel = [candidate?.addonName, candidate?.name || candidate?.title || candidate?.description, candidate?.id]
+      // Flattened stream IDs may contain the full playback URL and its secrets.
+      const diagnosticSourceId = /https?:\/\//i.test(String(candidate?.id || "")) ? "" : candidate?.id;
+      const sourceLabel = [candidate?.addonName, candidate?.name || candidate?.title || candidate?.description, diagnosticSourceId]
         .filter(Boolean)
         .join(" / ");
       const sourceType = [candidate?.mimeType, raw?.mimeType, candidate?.sourceType, raw?.sourceType, raw?.type].find(Boolean);
-      const activeUrl =
-        playbackUrl || this.activePlaybackUrl || candidate?.url || candidate?.externalUrl || raw?.url || raw?.externalUrl || "";
 
       pushPlaybackDiagnosticLine(
         lines,
@@ -149,11 +171,11 @@ export function createPlayerScreenMethods17() {
       pushPlaybackDiagnosticLine(lines, "HTML media error", mediaError?.message || mediaError?.code);
       pushPlaybackDiagnosticLine(lines, "Video readyState", video?.readyState);
       pushPlaybackDiagnosticLine(lines, "Video networkState", video?.networkState);
-      pushPlaybackDiagnosticLine(lines, "Current src", video?.currentSrc || video?.src, 420);
+      pushPlaybackDiagnosticLine(lines, "Current src", playbackDiagnosticUrl(video?.currentSrc || video?.src), 420);
       pushPlaybackDiagnosticLine(lines, "Playback engine", PlayerController.playbackEngine || "unknown");
       pushPlaybackDiagnosticLine(lines, "Source", sourceLabel);
       pushPlaybackDiagnosticLine(lines, "Source type", sourceType);
-      pushPlaybackDiagnosticLine(lines, "URL", activeUrl, 420);
+      pushPlaybackDiagnosticLine(lines, "URL", playbackDiagnosticUrl(activeUrl), 420);
       if (Environment.isVidaa()) {
         pushPlaybackDiagnosticLine(
           lines,
@@ -181,8 +203,8 @@ export function createPlayerScreenMethods17() {
         pushPlaybackDiagnosticLine(lines, "EngineFS infoHash", engineFs.infoHash);
         pushPlaybackDiagnosticLine(lines, "EngineFS fileIdx", engineFs.fileIdx);
         pushPlaybackDiagnosticLine(lines, "EngineFS base", engineFs.baseUrlKind);
-        pushPlaybackDiagnosticLine(lines, "EngineFS playbackUrl", engineFs.playbackUrl || engineFs.url, 420);
-        pushPlaybackDiagnosticLine(lines, "EngineFS publicUrl", engineFs.publicPlaybackUrl, 420);
+        pushPlaybackDiagnosticLine(lines, "EngineFS playbackUrl", playbackDiagnosticUrl(engineFs.playbackUrl || engineFs.url), 420);
+        pushPlaybackDiagnosticLine(lines, "EngineFS publicUrl", playbackDiagnosticUrl(engineFs.publicPlaybackUrl), 420);
       }
       return lines;
     },

@@ -78,10 +78,51 @@ export function normalizeNotWebReady(value) {
   );
 }
 
-export function getStandaloneWebPlaybackCompatibility(headers = {}, notWebReady = false) {
+function mediaFlowUrlForwardsRestrictedHeaders(headers, playbackUrl) {
+  try {
+    const url = new URL(String(playbackUrl || ""));
+    if (!["http:", "https:"].includes(url.protocol) || url.pathname !== "/proxy/stream") return false;
+    const parameterNames = new Set();
+    const embeddedHeaders = new Map();
+    for (const [name, value] of url.searchParams) {
+      const normalizedName = name.toLowerCase();
+      if (parameterNames.has(normalizedName)) return false;
+      parameterNames.add(normalizedName);
+      // no_proxy bypasses MediaFlow's upstream request-header forwarding.
+      if (normalizedName === "no_proxy") return false;
+      if (!name.startsWith("h_")) continue;
+      const headerName = name.slice(2);
+      if (!/^[!#$%&'*+.^_`|~0-9a-z-]+$/i.test(headerName) || /[\r\n]/.test(value)) return false;
+      embeddedHeaders.set(headerName.toLowerCase(), value);
+    }
+    const destination = new URL(url.searchParams.get("d") || "");
+    if (!["http:", "https:"].includes(destination.protocol)) return false;
+    const declaredEntries = normalizeHeaderEntries(headers);
+    if (declaredEntries.length !== Object.keys(headers).length) return false;
+    const declaredNames = new Set();
+    let matchedRestrictedHeader = false;
+    for (const [name, value] of declaredEntries) {
+      const normalizedName = name.toLowerCase();
+      if (declaredNames.has(normalizedName)) return false;
+      declaredNames.add(normalizedName);
+      if (!isBrowserRestrictedPlaybackHeader(name)) continue;
+      if (embeddedHeaders.get(normalizedName) !== value) return false;
+      matchedRestrictedHeader = true;
+    }
+    return matchedRestrictedHeader;
+  } catch (_) {
+    return false;
+  }
+}
+
+export function getStandaloneWebPlaybackCompatibility(headers = {}, notWebReady = false, { playbackUrl = "" } = {}) {
   const classification = classifyWebPlaybackHeaders(headers);
   const normalizedNotWebReady = normalizeNotWebReady(notWebReady);
-  const unsupportedStandalone = normalizedNotWebReady && classification.restrictedHeaderNames.length > 0;
+  // MediaFlow's /proxy/stream accepts h_<header> query parameters server-side.
+  // Accept only a complete, unambiguous match; notWebReady alone stays binding.
+  const proxyHandlesRestrictedHeaders =
+    classification.restrictedHeaderNames.length > 0 && mediaFlowUrlForwardsRestrictedHeaders(headers, playbackUrl);
+  const unsupportedStandalone = normalizedNotWebReady && classification.restrictedHeaderNames.length > 0 && !proxyHandlesRestrictedHeaders;
 
   return {
     ...classification,
@@ -89,14 +130,19 @@ export function getStandaloneWebPlaybackCompatibility(headers = {}, notWebReady 
     compatible: !unsupportedStandalone,
     standaloneCompatibility: unsupportedStandalone
       ? "unsupported standalone web stream"
-      : classification.restrictedHeaderNames.length
-        ? "direct playback attempt allowed"
-        : "compatible standalone web stream"
+      : proxyHandlesRestrictedHeaders
+        ? "compatible MediaFlow proxy stream"
+        : classification.restrictedHeaderNames.length
+          ? "direct playback attempt allowed"
+          : "compatible standalone web stream"
   };
 }
 
-export function createWebPlaybackHeaderDiagnosticSnapshot(headers = {}, { notWebReady = false, playbackEngine = "" } = {}) {
-  const compatibility = getStandaloneWebPlaybackCompatibility(headers, notWebReady);
+export function createWebPlaybackHeaderDiagnosticSnapshot(
+  headers = {},
+  { notWebReady = false, playbackEngine = "", playbackUrl = "" } = {}
+) {
+  const compatibility = getStandaloneWebPlaybackCompatibility(headers, notWebReady, { playbackUrl });
   const browserSafeHeaderNames = Object.keys(compatibility.forwardableHeaders);
   const engine = String(playbackEngine || "")
     .trim()
@@ -105,7 +151,7 @@ export function createWebPlaybackHeaderDiagnosticSnapshot(headers = {}, { notWeb
   return {
     declaredHeaderNames: [...compatibility.declaredHeaderNames],
     browserSafeHeaderNames,
-    forwardedHeaderNames: engine === "hls.js" ? [...browserSafeHeaderNames] : [],
+    forwardedHeaderNames: ["hls.js", "dash.js"].includes(engine) ? [...browserSafeHeaderNames] : [],
     restrictedHeaderNames: [...compatibility.restrictedHeaderNames],
     notWebReady: compatibility.notWebReady,
     standaloneCompatibility: compatibility.standaloneCompatibility
