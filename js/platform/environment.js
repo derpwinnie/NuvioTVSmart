@@ -23,5 +23,11 @@ export const Environment = {
 
   getDeviceLabel() {
     return Platform.getDeviceLabel();
+  },
+
+  // Which label glyphs the device can draw ({ emoji, flags, symbols, letters }),
+  // or null when it draws them all (only VIDAA reports this).
+  getGlyphSupport() {
+    return Platform.getCapabilities?.()?.glyphs || null;
   }
 };

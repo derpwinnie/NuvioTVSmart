@@ -36,7 +36,9 @@ for (const [decorated, readable] of [
   ["�T \ud835", "�T \ud835"],
   ["ɴᴇᴛғʟɪx · ғалым", "netflix · ғалым"]
 ]) {
-  assert.equal(normalizeStreamDisplayText(decorated), readable.replace(/✓/g, "OK"));
+  // Without emoji/symbol glyphs (the default) icons are left out, not spelled as words.
+  const display = readable.replace(/^✓ /, "").replace(/ 👩‍💻$/, "");
+  assert.equal(normalizeStreamDisplayText(decorated), display);
   assert.equal(normalizeStreamSearchText(decorated), readable);
 }
 
@@ -48,16 +50,16 @@ const conanAio = {
 };
 const conanOriginal = structuredClone(conanAio);
 // Upstream 1.2.10 keeps multiline addon names in the headline.
-assert.equal(getStreamHeadline(conanAio), "1080P    Bolt\n  <Web-dl>     \n  *****");
+assert.equal(getStreamHeadline(conanAio), "1080P    \n  <Web-dl>     \n  *****");
 assert.deepEqual(getStreamDescriptionLines(conanAio), [
   "> Detective Conan The… s01·e04",
-  "Video AVC Audio DD+ Channels 2.0",
-  "Size 270 MB · 3.39 Mbps",
-  "Source [TB] Comet · KQRM",
-  "OK en · es · it · sub (en · es · it · ru)",
+  "AVC DD+ # 2.0",
+  "270 MB · 3.39 Mbps",
+  "[TB] Comet · KQRM",
+  "en · es · it · sub (en · es · it · ru)",
   "» netflix 1650"
 ]);
-assert.equal(normalizeStreamDisplayText(conanAio.name), "1080P    Bolt\n  <Web-dl>     \n  *****");
+assert.equal(normalizeStreamDisplayText(conanAio.name), "1080P    \n  <Web-dl>     \n  *****");
 assert.equal(
   normalizeStreamDisplayText("1080P\n★★★★☆"),
   "1080P\n****-",
@@ -68,37 +70,40 @@ assert.deepEqual(
     name: "1080P",
     description: "✎ Detective.Conan.S01E04.mkv\n⛿ ɪᴛ · ᴇɴ"
   }),
-  ["File Detective.Conan.S01E04.mkv", "Languages it · en"]
+  ["Detective.Conan.S01E04.mkv", "it · en"]
 );
-assert.equal(getStreamHeadline({ name: "🪐 Anime Saturn" }), "Planet Anime Saturn");
-assert.equal(normalizeStreamDisplayText("🌍 🌎 🌏"), "Web Web Web");
-assert.equal(getStreamHeadline({ name: "🤌 Anime World 🌍" }), "Anime World Web");
-assert.equal(getStreamHeadline({ name: "🤌 StreamingCommunity 🍿" }), "StreamingCommunity Cinema");
+assert.equal(getStreamHeadline({ name: "🪐 Anime Saturn" }), "Anime Saturn");
+assert.equal(normalizeStreamDisplayText("🌍 🌎 🌏"), "");
+assert.equal(getStreamHeadline({ name: "🤌 Anime World 🌍" }), "Anime World");
+assert.equal(getStreamHeadline({ name: "🤌 StreamingCommunity 🍿" }), "StreamingCommunity");
+assert.equal(normalizeStreamDisplayText("a 🍿 b\n🤌 Anime World 🌍\nx"), "a b\nAnime World\nx");
 assert.deepEqual(
   getStreamDescriptionLines({
     title: "🎬 Detective conan ▪ S1E4\n🗣 [ITA]\n🌐 Proxy (ON)",
     name: "StreamViX"
   }),
-  ["Video Detective conan - S1E4", "Audio [ITA]", "Web Proxy (ON)"]
+  ["Detective conan - S1E4", "[ITA]", "Proxy (ON)"]
 );
+assert.equal(normalizeStreamDisplayText("🎦 🅵🅷🅳 🎞️ HEVC 🎧 AAC 💾 629 MB"), "FHD HEVC AAC 629 MB");
+assert.equal(normalizeStreamDisplayText("☁︎ File\n❖ 660 MB / 6.98 GB"), "File\n660 MB / 6.98 GB");
+assert.equal(normalizeStreamDisplayText("StreamViX | ElfHosted ⚡ 🌐 📺"), "StreamViX | ElfHosted");
+assert.equal(normalizeStreamDisplayText("F♯ music · ♯ 5.1"), "F# music · # 5.1");
+// Without emoji glyphs a joined emoji goes as a whole; joins inside Arabic and
+// Indic words stay. With emoji glyphs (native or the bundled font) nothing changes.
+assert.equal(normalizeStreamDisplayText("👩‍💻 العربية‍العربية क्‍ष"), "العربية‍العربية क्‍ष");
+assert.equal(normalizeStreamDisplayText("👩‍🚀 🤌🏽 👁️‍🗨️"), "");
+const allGlyphs = { emoji: true, flags: true, symbols: true, letters: true };
+for (const text of ["👩‍💻 العربية‍العربية क्‍ष", "👩‍🚀 🤌🏽 👁️‍🗨️", "🗣 IT | 🇬🇧 EN ★★★★☆ ♬ AAC 𝐅𝐇𝐃"]) {
+  assert.equal(
+    normalizeStreamDisplayText(text, allGlyphs),
+    text,
+    "drawable glyphs stay as they are"
+  );
+}
 assert.equal(
-  normalizeStreamDisplayText("🎦 🅵🅷🅳 🎞️ HEVC 🎧 AAC 💾 629 MB"),
-  "Video FHD Video HEVC Audio AAC Size 629 MB"
-);
-assert.equal(
-  normalizeStreamDisplayText("☁︎ File\n❖ 660 MB / 6.98 GB"),
-  "Cloud File\nSize 660 MB / 6.98 GB"
-);
-assert.equal(
-  normalizeStreamDisplayText("StreamViX | ElfHosted ⚡ 🌐 📺"),
-  "StreamViX | ElfHosted Bolt Web TV"
-);
-assert.equal(normalizeStreamDisplayText("F♯ music · ♯ 5.1"), "F♯ music · Channels 5.1");
-assert.equal(normalizeStreamDisplayText("👩‍💻 العربية‍العربية क्‍ष"), "👩‍💻 العربية‍العربية क्‍ष");
-assert.equal(
-  normalizeStreamDisplayText("👩‍🚀 🤌🏽 👁️‍🗨️"),
-  "👩‍🚀 🤌🏽 👁️‍🗨️",
-  "icon fallback must preserve emoji joins and modifiers"
+  normalizeStreamDisplayText("🗣 IT | 🇬🇧 EN ★ ♬ AAC", { symbols: true }),
+  "IT | [GB] EN ★ ♬ AAC",
+  "a symbol font alone keeps symbols; emoji go and flags become codes"
 );
 assert.equal(
   normalizeStreamSearchText("🗣️ 🇮🇹 💾 629 MB"),
@@ -160,7 +165,7 @@ const aioMetadata = {
 };
 assert.deepEqual(getStreamDescriptionLines(aioMetadata), [
   "Teach You A Lesson s01·e10",
-  "OK it · en · sub (en · itforced)"
+  "it · en · sub (en · itforced)"
 ]);
 assert.equal(resolvePlaybackSourceName({ name: "AIO ɪᴛ · s₀₁·ᴇ₁₀" }), "AIO it · s01·e10");
 assert.deepEqual(getStreamDescriptionLines(source), [
@@ -181,12 +186,10 @@ assert.ok(markup.includes("[IT] / English"));
 
 const decoratedAddon = "𝐀𝐝𝐝𝐨𝐧 ɪᴛ";
 assert.equal(getAddonBadgeLabel(decoratedAddon), "AI");
-assert.equal(getAddonBadgeLabel("🎧 日本語"), "A日", "initials retain complete Unicode characters");
-assert.equal(
-  getAddonBadgeLabel("🧑 日本語"),
-  "🧑日",
-  "unmapped emoji initials keep their complete code point"
-);
+// Icons the TV cannot draw are not used as initials; other scripts keep
+// complete characters.
+assert.equal(getAddonBadgeLabel("🎧 日本語"), "日", "initials retain complete Unicode characters");
+assert.equal(getAddonBadgeLabel("🧑 日本語 Addon"), "日A");
 const addonMarkup = StreamScreen.renderStreamCard.call(
   { isCardActionFocused: () => false },
   { ...source, addonName: decoratedAddon },

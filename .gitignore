@@ -49,6 +49,7 @@ tests/helpers/*
 !tests/test-vidaa-startup-presentation-audio.mjs
 !tests/test-vidaa-stream-unicode.mjs
 !tests/test-vidaa-audio-amplification.mjs
+!tests/test-vidaa-glyph-support.mjs
 *.ipk
 *.wgt
 dist/

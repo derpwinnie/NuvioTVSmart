@@ -1,4 +1,5 @@
 import { isBackEvent, normalizeKeyEvent } from "../sharedKeys.js";
+import { getVidaaGlyphSupport, startVidaaGlyphSupport } from "../vidaa/vidaaGlyphSupport.js";
 import {
   installVidaaKeyboardFix,
   isVidaaTextInputEditingActive,
@@ -60,6 +61,8 @@ export const vidaaAdapter = {
   init() {
     applyVidaaViewport();
     installVidaaKeyboardFix();
+    // No emoji/symbol font on VIDAA: check what draws, load ours if needed.
+    void startVidaaGlyphSupport();
   },
 
   exitApp() {
@@ -132,7 +135,8 @@ export const vidaaAdapter = {
       dashJs: Boolean(globalThis.dashjs?.MediaPlayer),
       nativeVideo: true,
       webosAvplay: false,
-      tizenAvplay: false
+      tizenAvplay: false,
+      glyphs: getVidaaGlyphSupport()
     };
   },
 

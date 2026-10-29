@@ -127,11 +127,18 @@ function plainLabelSymbol(symbol, codePoint, smallCapitalNeighbor = false) {
   return symbol;
 }
 
-function normalizeStreamLabel(value) {
+// letters/flags: the device draws decorated letters / flag emoji itself, so
+// they stay. Search text always folds both (see normalizeStreamSearchText).
+function normalizeStreamLabel(value, { letters = false, flags = false } = {}) {
   const text = String(value || "");
   let normalized = "";
   for (let index = 0; index < text.length;) {
     const current = readCodePoint(text, index);
+    if (flags && isRegionalIndicator(current.codePoint)) {
+      normalized += text.slice(index, index + current.length);
+      index += current.length;
+      continue;
+    }
     if (isRegionalIndicator(current.codePoint) && index + current.length < text.length) {
       const next = readCodePoint(text, index + current.length);
       if (isRegionalIndicator(next.codePoint)) {
@@ -143,11 +150,13 @@ function normalizeStreamLabel(value) {
       }
     }
     const symbol = text.slice(index, index + current.length);
-    normalized += plainLabelSymbol(
-      symbol,
-      current.codePoint,
-      hasSmallCapitalNeighbor(text, index, current.length)
-    );
+    normalized += letters
+      ? symbol
+      : plainLabelSymbol(
+          symbol,
+          current.codePoint,
+          hasSmallCapitalNeighbor(text, index, current.length)
+        );
     index += current.length;
   }
   return normalized
@@ -155,101 +164,61 @@ function normalizeStreamLabel(value) {
     .replace(/([A-Za-z0-9])[\ufe0e\ufe0f]+/g, "$1");
 }
 
-// Metadata icons used by AIOStreams and other addon formatters. TV system
-// fonts often lack these glyphs even after decorative letters are folded.
-// Keep the fallback readable without adding a font download to every card.
-const STREAM_METADATA_SYMBOLS = {
-  "☁": "Cloud",
-  "▣": "Video",
-  "♬": "Audio",
-  "♯": "Channels",
-  "❖": "Size",
-  "◈": "Size",
-  "⛉": "Source",
-  "✓": "OK",
-  "✔": "OK",
-  "☑": "OK",
-  "✅": "OK",
-  "⚡": "Bolt",
-  "🚀": "Rocket",
-  "📁": "File",
-  "📃": "File",
-  "📄": "File",
-  "✎": "File",
-  "🎥": "Video",
-  "🎬": "Video",
-  "🎦": "Video",
-  "🎞": "Video",
-  "📺": "TV",
-  "🎧": "Audio",
-  "🔊": "Audio",
-  "🗣": "Audio",
-  "⛿": "Languages",
-  "💾": "Size",
-  "🔍": "Search",
-  "📡": "Source",
-  "🌐": "Web",
-  "🌍": "Web",
-  "🌎": "Web",
-  "🌏": "Web",
-  "🪐": "Planet",
-  "🤌": "",
-  "🍿": "Cinema",
-  "👤": "Peers",
-  "★": "*",
-  "☆": "-",
-  "⭐": "*",
-  "〈": "<",
-  "〉": ">",
-  "➤": ">",
-  "▪": "-"
+// Metadata icons whose shape has a plain-text equivalent. Used only when the
+// device cannot draw them (no symbol font); other icons are then left out
+// rather than spelled as words.
+const SYMBOL_TEXT_FALLBACK = {
+  "\u2605": "*",
+  "\u2606": "-",
+  "\u2b50": "*",
+  "\u27a4": ">",
+  "\u25aa": "-",
+  "\u266f": "#"
 };
+// Angle brackets (technical and CJK forms): no bundled font covers them.
+const BRACKETS = { "\u2329": "<", "\u232a": ">", "\u3008": "<", "\u3009": ">" };
 
-function isPictographic(codePoint) {
+function isSymbolCodePoint(codePoint) {
   return (
-    (codePoint >= 0x2300 && codePoint <= 0x23ff) ||
-    (codePoint >= 0x2600 && codePoint <= 0x27bf) ||
-    (codePoint >= 0x1f000 && codePoint <= 0x1faff)
+    (codePoint >= 0x2190 && codePoint <= 0x2bff) || (codePoint >= 0x1f650 && codePoint <= 0x1f67f)
   );
 }
 
-function isJoinedEmojiSymbol(text, start, length) {
-  let next = start + length;
-  while (text.charCodeAt(next) === 0xfe0e || text.charCodeAt(next) === 0xfe0f) next++;
-  const modifier = readCodePoint(text, next).codePoint;
-  if (modifier >= 0x1f3fb && modifier <= 0x1f3ff) return true;
-  if (text.charCodeAt(next) === 0x200d) {
-    while (text.charCodeAt(next) === 0x200d) next++;
-    if (isPictographic(readCodePoint(text, next).codePoint)) return true;
-  }
-  let previous = start - 1;
-  if (text.charCodeAt(previous) !== 0x200d) return false;
-  while (text.charCodeAt(previous) === 0x200d) previous--;
-  while (text.charCodeAt(previous) === 0xfe0e || text.charCodeAt(previous) === 0xfe0f) previous--;
-  const codeUnit = text.charCodeAt(previous);
-  if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) previous--;
-  return isPictographic(readCodePoint(text, previous).codePoint);
-}
-
-function normalizeStreamPresentationSymbols(text) {
+// Emoji/symbols the device cannot draw are left out (with their variation
+// selectors and joiners); symbol shapes with a text equivalent keep it.
+function normalizeStreamPresentationSymbols(text, { emoji = false, symbols = false } = {}) {
   let readable = "";
   for (let index = 0; index < text.length;) {
     const current = readCodePoint(text, index);
     const symbol = text.slice(index, index + current.length);
+    const { codePoint } = current;
     index += current.length;
-    const metadataSymbol = Object.prototype.hasOwnProperty.call(STREAM_METADATA_SYMBOLS, symbol);
-    const separated = index === current.length || /\s/.test(text[index - current.length - 1]);
-    const channelsMarker = symbol !== "♯" || (separated && /^\s*\d/.test(text.slice(index)));
-    if (
-      metadataSymbol &&
-      channelsMarker &&
-      !isJoinedEmojiSymbol(text, index - current.length, current.length)
-    ) {
-      readable += STREAM_METADATA_SYMBOLS[symbol];
-      // A selector for a replaced icon cannot select an ASCII presentation.
-      while (text.charCodeAt(index) === 0xfe0e || text.charCodeAt(index) === 0xfe0f) index++;
-    } else {
+    if (Object.prototype.hasOwnProperty.call(BRACKETS, symbol)) {
+      readable += BRACKETS[symbol];
+      continue;
+    }
+    const smpPictograph =
+      codePoint >= 0x1f000 && codePoint <= 0x1faff && !isRegionalIndicator(codePoint);
+    const bmpSymbol = isSymbolCodePoint(codePoint);
+    const drawable = smpPictograph ? emoji : bmpSymbol ? emoji || symbols : true;
+    if (drawable || (!smpPictograph && !bmpSymbol)) {
       readable += symbol;
+      continue;
+    }
+    readable += SYMBOL_TEXT_FALLBACK[symbol] ?? "";
+    while (
+      text.charCodeAt(index) === 0xfe0e ||
+      text.charCodeAt(index) === 0xfe0f ||
+      text.charCodeAt(index) === 0x200d
+    ) {
+      index++;
+    }
+    // A dropped icon leaves one space between words, and none before a line end.
+    if (!SYMBOL_TEXT_FALLBACK[symbol]) {
+      const next = text[index] || "";
+      if (next === " " && (readable === "" || /[ \n]$/.test(readable))) index++;
+      else if ((next === "" || next === "\n" || next === "\r") && / +$/.test(readable))
+        readable = readable.replace(/ +$/, "");
     }
   }
   // AIO labels pad their icons with stand-alone joiners, including at line
@@ -262,8 +231,10 @@ function normalizeStreamPresentationSymbols(text) {
 }
 
 // Presentation only: never write the result into URLs, stream IDs or payloads.
-export function normalizeStreamDisplayText(value = "") {
-  return normalizeStreamPresentationSymbols(normalizeStreamLabel(value)).trim();
+// `glyphs`: what the device draws ({ emoji, flags, symbols, letters }); the
+// default replaces everything, for devices that report nothing usable.
+export function normalizeStreamDisplayText(value = "", glyphs = {}) {
+  return normalizeStreamPresentationSymbols(normalizeStreamLabel(value, glyphs), glyphs).trim();
 }
 
 export function normalizeStreamSearchText(value = "") {
@@ -331,18 +302,20 @@ export function normalizeStreamMatchPattern(value = "") {
   return normalized;
 }
 
-// The platform rule for stream labels, in one place. Callers pass their
-// platform Environment, so this module stays platform-free (and screens keep
-// taking Environment from their internals). VIDAA fonts lack styled letters,
-// small capitals, emoji and flags; other platforms show the text unchanged.
+// The display rule for stream labels, in one place. Callers pass their
+// platform Environment, so this module stays platform-free. A device that
+// reports glyph support (VIDAA) gets only the glyphs it cannot draw replaced;
+// everything else shows the text unchanged.
 export function readableStreamText(value = "", environment = null) {
   const text = String(value ?? "");
-  return environment?.isVidaa?.() ? normalizeStreamDisplayText(text) : text;
+  const glyphs = environment?.getGlyphSupport?.();
+  return glyphs ? normalizeStreamDisplayText(text, glyphs) : text;
 }
 
 // Headlines also keep upstream's webOS rule: decorated letters only, emoji stay.
 export function readableStreamHeadline(value = "", environment = null) {
   const text = String(value ?? "");
-  if (environment?.isVidaa?.()) return normalizeStreamDisplayText(text);
+  const glyphs = environment?.getGlyphSupport?.();
+  if (glyphs) return normalizeStreamDisplayText(text, glyphs);
   return environment?.isWebOS?.() ? normalizeMathematicalAlphanumericSymbols(text) : text;
 }
