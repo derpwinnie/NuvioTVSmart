@@ -154,6 +154,9 @@ export function createPlayerScreenMethods30() {
       if (!this.startupAudioGateActive) {
         return false;
       }
+      // An expired language-discovery window does not cancel an audio switch
+      // already issued to the decoder. Its existing confirmation owns startup.
+      if (Environment.isVidaa() && this.startupAudioPreferenceApplying) return false;
       const readyState =
         typeof PlayerController.getPlaybackReadyState === "function"
           ? Number(PlayerController.getPlaybackReadyState() || 0)
@@ -164,7 +167,7 @@ export function createPlayerScreenMethods30() {
         canReleasePlayingNativeStartupAudioGate({
           allowNativePlayback: this.startupAudioGateAllowsNativePlayback,
           hasPresentedPlaybackFrame: this.hasPresentedPlaybackFrame,
-          pendingAudioSelection: Boolean(this.pendingWebOsAudioSelection),
+          pendingAudioSelection: Boolean(this.pendingWebOsAudioSelection || (Environment.isVidaa() && this.startupAudioPreferenceApplying)),
           readyState
         })
       ) {
@@ -202,13 +205,24 @@ export function createPlayerScreenMethods30() {
     },
     scheduleLoadingCompletionCheck(delayMs = 250, { force = false } = {}) {
       this.clearLoadingCompletionTimer();
-      if (!this.loadingVisible || this.isExternalFrameMode()) {
+      // Recovery and the stall watchdog can hide loading before the normal
+      // presentation callback runs. Its audio mute still needs that callback;
+      // the startup language and resume checks below continue to guard release.
+      if (
+        (!this.loadingVisible && !PlayerController.startupPresentationAudioMuted) ||
+        this.isExternalFrameMode() ||
+        this.isStartupErrorVisible()
+      ) {
         return;
       }
       this.loadingCompletionTimer = setTimeout(
         () => {
           this.loadingCompletionTimer = null;
-          if (!this.loadingVisible || this.isExternalFrameMode()) {
+          if (
+            (!this.loadingVisible && !PlayerController.startupPresentationAudioMuted) ||
+            this.isExternalFrameMode() ||
+            this.isStartupErrorVisible()
+          ) {
             return;
           }
           if (this.isStartupGateReleaseReady()) {

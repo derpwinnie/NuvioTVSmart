@@ -33,6 +33,7 @@ function createScreen({ discoveryPending = true, deadlineInMs = 3000 } = {}) {
     hasPresentedPlaybackFrame: true,
     startupAudioPreferenceApplied: false,
     startupAudioFallbackApplied: false,
+    startupAudioPreferenceApplying: false,
     pendingWebOsAudioSelection: null,
     startupTrackPreferenceReady: true,
     subtitleDialogVisible: false,

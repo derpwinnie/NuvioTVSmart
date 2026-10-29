@@ -5,6 +5,7 @@ export function createPlayerScreenMethods52() {
   const {
     PlayerController,
     selectStartupAudioFallbackOption,
+    hasOnlyImplicitStartupAudioOptions,
     resolveSubtitleStyleControlAvailability,
     Environment,
     TizenCapabilities,
@@ -25,7 +26,20 @@ export function createPlayerScreenMethods52() {
     applyStartupAudioFallback() {
       this.clearStartupAudioPreferenceRetry();
       this.startupAudioFallbackApplied = true;
-      const fallbackOption = selectStartupAudioFallbackOption(this.collectAudioOptionItems());
+      const audioOptions = this.collectAudioOptionItems();
+      if (Environment.isVidaa() && !this.startupAudioPreferenceApplied && hasOnlyImplicitStartupAudioOptions(audioOptions)) {
+        // A slow native open can outlive discovery before exposing any tracks.
+        // Preserve one preference pass when its first real metadata arrives.
+        this.startupImplicitAudioFallback = {
+          video: PlayerController.video,
+          playToken: PlayerController.playRequestToken,
+          mountToken: this.playerMountToken,
+          sourceAttemptToken: this.sourcePlaybackAttemptToken,
+          playbackUrl: this.activePlaybackUrl,
+          audioToken: Number(this.audioSelectionToken || 0)
+        };
+      }
+      const fallbackOption = selectStartupAudioFallbackOption(audioOptions);
       if (!fallbackOption?.entry || !Number.isFinite(fallbackOption.entryIndex)) {
         this.startupAudioPreferenceApplied = true;
         return true;

@@ -220,6 +220,25 @@ export function createPlayerScreenMethods51() {
       return null;
     },
     applyStartupAudioPreference() {
+      const implicitFallback = Environment.isVidaa() ? this.startupImplicitAudioFallback : null;
+      if (implicitFallback) {
+        const ownsStartup =
+          implicitFallback.video === PlayerController.video &&
+          implicitFallback.playToken === PlayerController.playRequestToken &&
+          implicitFallback.mountToken === this.playerMountToken &&
+          implicitFallback.sourceAttemptToken === this.sourcePlaybackAttemptToken &&
+          implicitFallback.playbackUrl === this.activePlaybackUrl &&
+          implicitFallback.audioToken === Number(this.audioSelectionToken || 0);
+        if (!ownsStartup || this.hasPresentedPlaybackFrame) {
+          this.startupImplicitAudioFallback = null;
+        } else if (!this.startupAudioPreferenceApplying && this.getAudioTracks().length > 0) {
+          // Consume once before issuing a native selection. A manual choice,
+          // new source or already presented playback keeps its own audio.
+          this.startupImplicitAudioFallback = null;
+          this.startupAudioPreferenceApplied = false;
+          this.startupAudioFallbackApplied = false;
+        }
+      }
       if (this.startupAudioPreferenceApplied || this.startupAudioPreferenceApplying) {
         return false;
       }

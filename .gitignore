@@ -46,6 +46,7 @@ tests/helpers/*
 !tests/fake-vidaa-tv/**
 !tests/test-vidaa-dash-playback-headers.mjs
 !tests/test-vidaa-mediaflow-playback-headers.mjs
+!tests/test-vidaa-startup-presentation-audio.mjs
 *.ipk
 *.wgt
 dist/
