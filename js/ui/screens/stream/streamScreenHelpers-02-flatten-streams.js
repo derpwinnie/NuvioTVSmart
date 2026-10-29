@@ -69,7 +69,7 @@ import { localizedGenreText } from "../../../i18n/genreLabels.js";
 
 import { matchStreamBadges, normalizeStreamBadgeChipColor, normalizeStreamBadgeRules } from "../../../core/streams/streamBadgeRules.js";
 
-import { normalizeStreamDisplayText } from "../../../core/streams/streamDisplayText.js";
+import { normalizeMathematicalAlphanumericSymbols, normalizeStreamDisplayText } from "../../../core/streams/streamDisplayText.js";
 
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
 
@@ -186,7 +186,7 @@ export function mergeStreamItems(existing = [], incoming = []) {
 }
 
 export function getAddonBadgeLabel(name = "") {
-  const cleaned = (Environment.isWebOS() || Environment.isVidaa() ? normalizeStreamDisplayText(name) : String(name || "")).trim();
+  const cleaned = (Environment.isVidaa() ? normalizeStreamDisplayText(name) : String(name || "")).trim();
   if (!cleaned) {
     return "A";
   }
@@ -246,12 +246,13 @@ export function getStreamHeadline(stream = {}) {
   const primary = [stream.name, stream.title, stream.description].find((value) => String(value || "").trim());
   if (!primary) {
     const fallback = stream.addonName || "Unknown source";
-    return Environment.isWebOS() || Environment.isVidaa() ? normalizeStreamDisplayText(fallback) : fallback;
+    return Environment.isVidaa() ? normalizeStreamDisplayText(fallback) : fallback;
   }
-  // Upstream keeps multiline addon names; webOS and VIDAA fonts also need the
-  // decorated letters normalized.
+  // Upstream keeps multiline addon names. webOS only needs the decorated
+  // letters normalized; VIDAA fonts also lack emoji, flags and small capitals.
   const name = String(primary).trim();
-  return Environment.isWebOS() || Environment.isVidaa() ? normalizeStreamDisplayText(name) : name;
+  if (Environment.isVidaa()) return normalizeStreamDisplayText(name);
+  return Environment.isWebOS() ? normalizeMathematicalAlphanumericSymbols(name) : name;
 }
 
 export function getStreamQuality(stream = {}) {
@@ -283,8 +284,7 @@ export function getStreamDescriptionLines(stream = {}) {
   if (!displayDescription || displayDescription === displayName) {
     return [];
   }
-  const readableDescription =
-    Environment.isWebOS() || Environment.isVidaa() ? normalizeStreamDisplayText(displayDescription) : displayDescription;
+  const readableDescription = Environment.isVidaa() ? normalizeStreamDisplayText(displayDescription) : displayDescription;
   return readableDescription
     .split(/\r?\n/)
     .map((line) => line.trim())

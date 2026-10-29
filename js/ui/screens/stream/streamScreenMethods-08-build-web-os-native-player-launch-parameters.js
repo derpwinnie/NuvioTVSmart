@@ -180,7 +180,7 @@ export function createStreamScreenMethods08() {
     },
     renderChip(name, selected, status) {
       const label = name === "all" ? t("common.all", {}, "All") : name;
-      const readableLabel = Environment.isVidaa() || Environment.isWebOS() ? normalizeStreamDisplayText(label) : label;
+      const readableLabel = Environment.isVidaa() ? normalizeStreamDisplayText(label) : label;
       const chipStatus = String(status || "success");
       const classes = ["stream-route-chip", "focusable", selected ? "selected" : "", chipStatus !== "success" ? chipStatus : ""]
         .filter(Boolean)
@@ -217,7 +217,7 @@ export function createStreamScreenMethods08() {
       let addonIdentity = "";
       if (showAddonLogo) {
         const addonName = stream.addonName || "Addon";
-        const readableAddonName = Environment.isVidaa() || Environment.isWebOS() ? normalizeStreamDisplayText(addonName) : addonName;
+        const readableAddonName = Environment.isVidaa() ? normalizeStreamDisplayText(addonName) : addonName;
         const addonLogoUrl = normalizeAddonLogoUrl(stream.addonLogo) || resolveAddonLogo(stream.addonName, this.addonLogoLookup);
         const cachedAddonLogoUrl = getCachedAddonLogoDisplayUrl(addonLogoUrl);
         let displayAddonLogoUrl = cachedAddonLogoUrl || "";

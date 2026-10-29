@@ -30,7 +30,7 @@ export function createPlayerScreenMethods67() {
       const selectedEpisode = this.episodes[this.episodePanelIndex] || null;
       const filters = this.getEpisodePanelStreamFilters();
       const streams = this.getFilteredEpisodePanelStreams();
-      const readableText = Environment.isVidaa() || Environment.isWebOS() ? normalizeStreamDisplayText : String;
+      const readableText = Environment.isVidaa() ? normalizeStreamDisplayText : String;
       const focus = this.episodePanelStreamFocus || { zone: "actions", index: 0 };
       const badgeSettings = StreamBadgeSettingsStore.snapshot();
       const showAddonLogo = badgeSettings.showAddonLogo === true;

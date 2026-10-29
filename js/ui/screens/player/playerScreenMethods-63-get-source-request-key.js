@@ -199,7 +199,7 @@ export function createPlayerScreenMethods63() {
       const orderedSources = this.getOrderedStreamCandidates();
       const filters = this.getSourceFilters(orderedSources);
       const filtered = this.getFilteredSources(orderedSources);
-      const readableText = Environment.isVidaa() || Environment.isWebOS() ? normalizeStreamDisplayText : String;
+      const readableText = Environment.isVidaa() ? normalizeStreamDisplayText : String;
       const badgeSettings = StreamBadgeSettingsStore.snapshot();
       const showAddonLogo = badgeSettings.showAddonLogo === true;
       const badgePlacement = resolvePlayerSourceBadgePlacement(badgeSettings);
