@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, normalize } from "node:path";
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { discover } from "../discovery.mjs";
+import { discover, verifyTvHost } from "../discovery.mjs";
 import { extractKeystores } from "../cert.mjs";
 import { importFromSidee } from "../sidee-import.mjs";
 import { loadSecrets, requireComplete } from "../secrets.mjs";
@@ -148,6 +148,13 @@ export async function startDashboard({ lan = false, port = 0, tv = {} } = {}) {
     async "POST /api/discover"() {
       return { tvs: await discover({ timeoutMs: 4000 }) };
     },
+    // A typed address is checked before pairing: VIDAA descriptor and an open
+    // pairing port. Never a PIN bypass; it only explains a dead address early.
+    async "POST /api/verify-host"(body) {
+      if (!body.host) throw new Error("no TV address given");
+      const result = await (tv.verifyHost || verifyTvHost)(String(body.host).trim());
+      return { ok: Boolean(result.ok), reason: result.reason || null };
+    },
     async "POST /api/pair/start"(body) {
       if (!body.host) throw new Error("no TV address given");
       const secrets = loadSecrets();
@@ -166,6 +173,7 @@ export async function startDashboard({ lan = false, port = 0, tv = {} } = {}) {
           host: body.host,
           ...(tv.port ? { port: tv.port } : {}),
           getTimestamp: tv.getTimestamp,
+          ...(tv.getBrand ? { getBrand: tv.getBrand } : {}),
           secrets,
           onPinReady: () => ready(),
           pinProvider: () => pin

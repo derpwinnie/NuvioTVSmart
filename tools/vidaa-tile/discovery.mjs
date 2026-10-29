@@ -6,6 +6,7 @@
 
 import dgram from "node:dgram";
 import http from "node:http";
+import net from "node:net";
 import os from "node:os";
 
 const SSDP_MULTICAST = "239.255.255.250";
@@ -13,12 +14,29 @@ const SSDP_PORT = 1900;
 const UPNP_PORTS = [18400, 38400, 80];
 const ST = "urn:schemas-upnp-org:device:MediaRenderer:1";
 
+// The brand the TV declares in its modelDescription ("brand=his" on Hisense,
+// "brand=tos" on Toshiba-licensed VIDAA firmware), or null.
+export function descriptorBrand(desc = "") {
+  for (const line of String(desc).split(/\r?\n|;/)) {
+    const m = /^\s*brand\s*=\s*([A-Za-z0-9]{1,8})\s*$/.exec(line);
+    if (m) return m[1].toLowerCase();
+  }
+  return null;
+}
+
 export function parseDescriptor(xml) {
   const name = /<friendlyName>([^<]+)<\/friendlyName>/.exec(xml);
   const model = /<modelDescription>([\s\S]*?)<\/modelDescription>/.exec(xml);
   const desc = model ? model[1] : "";
-  const isVidaa = /vidaa_support|transport_protocol/.test(desc) || /hisense/i.test(xml);
-  return { friendlyName: name ? name[1] : "", model: desc.trim().slice(0, 120), isVidaa };
+  // Toshiba-licensed firmware names neither Hisense nor VIDAA in the
+  // manufacturer field, but its descriptor still carries the VIDAA keys.
+  const isVidaa = /vidaa_support|transport_protocol/.test(desc) || /hisense|vidaa/i.test(xml);
+  return {
+    friendlyName: name ? name[1] : "",
+    model: desc.trim().slice(0, 120),
+    isVidaa,
+    brand: descriptorBrand(desc)
+  };
 }
 
 export function readDateHeader(headers) {
@@ -28,12 +46,53 @@ export function readDateHeader(headers) {
   return Math.floor(t / 1000);
 }
 
-// Turn one raw SSDP datagram into its descriptor URL, or null if it is not a
-// usable 200 response.
+// Turn one raw SSDP datagram into its descriptor URL, or null. Accepts an
+// M-SEARCH 200 reply, and a MediaRenderer "ssdp:alive" NOTIFY: some TVs only
+// announce themselves and never answer a search (Sidee PR #2). Other NOTIFY
+// types are ignored so routers and printers cause no descriptor fetches.
 export function _classifyReply(text) {
-  if (!/^HTTP\/1\.1 200/i.test(text)) return null;
+  if (/^NOTIFY/i.test(text)) {
+    const nt = /^NT:\s*(\S+)/im.exec(text);
+    const nts = /^NTS:\s*(\S+)/im.exec(text);
+    if (!nt || nt[1] !== ST || !nts || nts[1].toLowerCase() !== "ssdp:alive") return null;
+  } else if (!/^HTTP\/1\.1 200/i.test(text)) {
+    return null;
+  }
   const m = /Location:\s*(\S+)/i.exec(text);
   return m ? m[1] : null;
+}
+
+// Every non-internal IPv4 address, for joining the SSDP group per interface.
+function localIPv4Addresses() {
+  const out = [];
+  for (const addrs of Object.values(os.networkInterfaces())) {
+    for (const a of addrs || []) if (a.family === "IPv4" && !a.internal) out.push(a.address);
+  }
+  return [...new Set(out)];
+}
+
+// Listen on the SSDP port for NOTIFY announcements. Joining fails on some
+// interfaces (or the port is taken); discovery then just relies on M-SEARCH.
+async function openNotifyListener(notifyPort, onMessage) {
+  const sock = dgram.createSocket({ type: "udp4", reuseAddr: true });
+  sock.on("message", onMessage);
+  const bound = await new Promise((resolve) => {
+    sock.once("error", () => resolve(false));
+    sock.bind(notifyPort, () => resolve(true));
+  });
+  if (!bound) {
+    sock.close();
+    return null;
+  }
+  sock.on("error", () => {});
+  for (const address of localIPv4Addresses()) {
+    try {
+      sock.addMembership(SSDP_MULTICAST, address);
+    } catch {
+      /* this interface cannot join; others may */
+    }
+  }
+  return sock;
 }
 
 // Every interface's directed IPv4 broadcast address, for unicast-friendly
@@ -73,7 +132,8 @@ export async function discover({
   timeoutMs = 4000,
   port = 0,
   targets = null,
-  ssdpPort = SSDP_PORT
+  ssdpPort = SSDP_PORT,
+  notifyPort = SSDP_PORT
 } = {}) {
   const locations = new Map();
   const sock = dgram.createSocket({ type: "udp4", reuseAddr: true });
@@ -88,16 +148,19 @@ export async function discover({
     });
   });
   const sendTo = targets || [..._directedBroadcasts(), "255.255.255.255", SSDP_MULTICAST];
-  sock.on("message", (data, rinfo) => {
+  const onMessage = (data, rinfo) => {
     const loc = _classifyReply(data.toString("utf8"));
     if (loc && !locations.has(rinfo.address)) locations.set(rinfo.address, loc);
-  });
+  };
+  sock.on("message", onMessage);
+  const notify = notifyPort === null ? null : await openNotifyListener(notifyPort, onMessage);
   const blast = () => sendTo.forEach((t) => msearch(sock, t, ssdpPort));
   blast();
   const ticker = setInterval(blast, 500);
   await new Promise((r) => setTimeout(r, timeoutMs));
   clearInterval(ticker);
   sock.close();
+  notify?.close();
 
   const found = [];
   for (const [host, loc] of locations) {
@@ -187,4 +250,27 @@ export async function tvTimestamp(host, { query = queryTvClock, now = Date.now }
   } catch {
     return Math.floor(now() / 1000);
   }
+}
+
+// Check an address the user typed before pairing: it must serve a VIDAA UPnP
+// descriptor and accept TCP on the pairing port. Never bypasses the PIN; it
+// only turns a silent pairing timeout into a clear message.
+export async function verifyTvHost(
+  host,
+  { pairingPort = 36669, timeoutMs = 3000, describe = fetchDescriptor } = {}
+) {
+  const info = await describe(host).catch(() => null);
+  if (!info) return { ok: false, reason: "no-descriptor" };
+  if (!info.isVidaa) return { ok: false, reason: "not-vidaa", info };
+  const open = await new Promise((resolve) => {
+    const socket = net.connect({ host, port: pairingPort });
+    const done = (value) => {
+      socket.destroy();
+      resolve(value);
+    };
+    socket.setTimeout(timeoutMs, () => done(false));
+    socket.once("connect", () => done(true));
+    socket.once("error", () => done(false));
+  });
+  return open ? { ok: true, info } : { ok: false, reason: "port-closed", info };
 }

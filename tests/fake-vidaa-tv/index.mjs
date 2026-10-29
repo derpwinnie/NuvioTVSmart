@@ -13,7 +13,18 @@ import { makeTestCerts, haveOpenssl } from "./make-test-certs.mjs";
 
 export { haveOpenssl };
 
-export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } = {}) {
+// acceptProfiles: auth profiles the broker accepts (default: modern only).
+// brand: written as "brand=<x>" into the descriptor; dynamic credentials must
+// then be derived with it. tokenless: static firmware that shows the PIN on a
+// TV state query and never issues tokens.
+export async function startFakeTv({
+  constants,
+  pin = "4321",
+  behavior = "ok",
+  acceptProfiles = ["modern"],
+  brand = null,
+  tokenless = false
+} = {}) {
   const certs = makeTestCerts();
   const timestamp = 1759800000; // fixed TV clock, mirrored in the Date header
   const state = {
@@ -27,9 +38,17 @@ export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } =
   const setBehavior = (b) => (state.behavior = b);
   const setInstallDelay = (ms) => (state.installDelayMs = ms);
 
-  const expectedFor = (clientId) => {
-    const deviceId = clientId.split("$")[0];
-    return sessionCredentials({ deviceId, tvTimestamp: timestamp, constants });
+  state.authAttempts = [];
+  const expectedFor = (clientId, authProfile) => {
+    const [deviceId, clientBrand] = clientId.split("$");
+    if (brand && clientBrand !== brand) return null;
+    return sessionCredentials({
+      deviceId,
+      tvTimestamp: timestamp,
+      constants,
+      authProfile,
+      brand: clientBrand
+    });
   };
 
   const broker = new Aedes({
@@ -40,12 +59,24 @@ export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } =
         return cb(err, false);
       }
       const pass = password ? password.toString("utf8") : "";
+      state.authAttempts.push({ clientId: client.id, username });
       if (state.tokens.has(pass)) return cb(null, true); // token-based reconnect
-      const exp = expectedFor(client.id);
-      const ok = username === exp.username && pass === exp.password;
+      if (
+        acceptProfiles.includes("static") &&
+        username === constants.STATIC_USERNAME &&
+        pass === constants.STATIC_PASSWORD
+      ) {
+        return cb(null, true);
+      }
+      const ok = acceptProfiles
+        .filter((profile) => profile !== "static")
+        .some((profile) => {
+          const exp = expectedFor(client.id, profile);
+          return exp && username === exp.username && pass === exp.password;
+        });
       if (ok) return cb(null, true);
       const err = new Error("bad credentials");
-      err.returnCode = 4;
+      err.returnCode = 5;
       return cb(err, false);
     }
   });
@@ -54,11 +85,19 @@ export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } =
     if (!client) return; // broker's own republishes
     const topic = packet.topic;
     const payload = packet.payload ? packet.payload.toString("utf8") : "";
-    const t = tvTopics(client.id);
+    // Topics carry the paired identity; with the static profile the broker
+    // client id is a separate random id (as on the real TV).
+    const id = /^\/remoteapp\/tv\/(?:ui|platform)_service\/(.+?)\/(?:actions|data)\//.exec(
+      topic
+    )?.[1];
+    if (!id) return;
+    const t = tvTopics(id);
     const send = (replyTopic, obj) =>
       broker.publish({ topic: replyTopic, payload: JSON.stringify(obj), qos: 0 }, () => {});
 
-    if (topic === t.ui + "actions/vidaa_app_connect") {
+    if (topic === t.ui + "actions/gettvstate") {
+      if (tokenless) send(t.authReply, { ok: true });
+    } else if (topic === t.ui + "actions/vidaa_app_connect") {
       send(t.authReply, { ok: true });
     } else if (topic === t.ui + "actions/authenticationcode") {
       let num = null;
@@ -70,7 +109,7 @@ export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } =
       const good = state.behavior !== "wrongPin" && String(num) === state.pin;
       send(t.authCodeReply, { result: good ? 1 : 0 });
     } else if (topic === t.platform + "data/gettoken") {
-      if (state.behavior === "noTokenAfterPin") return;
+      if (state.behavior === "noTokenAfterPin" || tokenless) return;
       const token = "tok-" + Math.random().toString(36).slice(2);
       const refresh = "ref-" + Math.random().toString(36).slice(2);
       state.tokens.add(token);
@@ -141,7 +180,7 @@ export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } =
     res.setHeader("Content-Type", "text/xml");
     res.end(
       `<root><device><friendlyName>Fake VIDAA</friendlyName>` +
-        `<modelDescription>vidaa_support;transport_protocol</modelDescription></device></root>`
+        `<modelDescription>vidaa_support;transport_protocol${brand ? `;brand=${brand}` : ""}</modelDescription></device></root>`
     );
   });
   await new Promise((r) => descServer.listen(0, "127.0.0.1", r));
@@ -197,6 +236,7 @@ export async function startFakeTv({ constants, pin = "4321", behavior = "ok" } =
     setBehavior,
     setInstallDelay,
     launches: state.launches,
+    authAttempts: () => state.authAttempts,
     appList: () => state.appList,
     startSsdp,
     stop,

@@ -7,6 +7,25 @@
 import { createHash, randomBytes } from "node:crypto";
 
 export const CONSTANT_KEYS = ["PATTERN", "VALUE_SUFFIX", "XOR_MASK", "BRAND", "OPERATION"];
+// Extra firmware constants for the older authentication profiles. Optional:
+// without them only the "modern" profile is available.
+export const OPTIONAL_CONSTANT_KEYS = ["STANDARD_SUFFIX", "STATIC_USERNAME", "STATIC_PASSWORD"];
+
+// The credential variants VIDAA firmware accepts (same set and order as Sidee
+// 0.1.4+). "static" is a fixed identity without tokens; "middle" and
+// "remotenow" use the standard value suffix, "remotenow" without the XOR mask.
+export const AUTH_PROFILES = ["modern", "static", "middle", "remotenow"];
+
+const PROFILE_NEEDS = {
+  modern: [],
+  static: ["STATIC_USERNAME", "STATIC_PASSWORD"],
+  middle: ["STANDARD_SUFFIX"],
+  remotenow: ["STANDARD_SUFFIX"]
+};
+
+export function availableAuthProfiles(constants = {}) {
+  return AUTH_PROFILES.filter((profile) => PROFILE_NEEDS[profile].every((key) => constants[key]));
+}
 
 const md5Upper = (s) => createHash("md5").update(s, "utf8").digest("hex").toUpperCase();
 
@@ -15,19 +34,42 @@ export function newDeviceId() {
   return [...b].map((x) => x.toString(16).padStart(2, "0")).join(":");
 }
 
-export function sessionCredentials({ deviceId, tvTimestamp, token = null, constants }) {
-  const { PATTERN, VALUE_SUFFIX, XOR_MASK, BRAND, OPERATION } = constants;
+// `brand` is what the TV declares in its UPnP descriptor (his = Hisense,
+// tos = Toshiba-licensed firmware); the official app feeds it into the same
+// algorithm. It defaults to the BRAND constant.
+export function sessionCredentials({
+  deviceId,
+  tvTimestamp,
+  token = null,
+  constants,
+  authProfile = "modern",
+  brand = null
+}) {
+  if (!AUTH_PROFILES.includes(authProfile)) throw new Error(`unknown auth profile ${authProfile}`);
+  const missing = PROFILE_NEEDS[authProfile].filter((key) => !constants[key]);
+  if (missing.length) throw new Error(`auth profile ${authProfile} needs ${missing.join(", ")}`);
+  const { PATTERN, VALUE_SUFFIX, XOR_MASK, OPERATION } = constants;
+  const BRAND = brand || constants.BRAND;
   const clean = String(deviceId).replace(/-/g, ":").toLowerCase();
   const race = md5Upper(`${PATTERN}$${clean}`).slice(0, 6);
   const clientId = `${clean}$${BRAND}$${race}_${OPERATION}`;
+  if (authProfile === "static") {
+    return {
+      clientId,
+      username: constants.STATIC_USERNAME,
+      password: token !== null ? token : constants.STATIC_PASSWORD
+    };
+  }
   const mask = typeof XOR_MASK === "bigint" ? XOR_MASK : BigInt(XOR_MASK);
-  const username = `${BRAND}$${BigInt(tvTimestamp) ^ mask}`;
+  const stamp = authProfile === "remotenow" ? BigInt(tvTimestamp) : BigInt(tvTimestamp) ^ mask;
+  const username = `${BRAND}$${stamp}`;
   if (token !== null) return { clientId, username, password: token };
   const digit =
     String(tvTimestamp)
       .split("")
       .reduce((a, d) => a + Number(d), 0) % 10;
-  const valueMd5 = md5Upper(`${BRAND}${digit}${VALUE_SUFFIX}`).slice(0, 6);
+  const suffix = authProfile === "modern" ? VALUE_SUFFIX : constants.STANDARD_SUFFIX;
+  const valueMd5 = md5Upper(`${BRAND}${digit}${suffix}`).slice(0, 6);
   return { clientId, username, password: md5Upper(`${tvTimestamp}$${valueMd5}`) };
 }
 

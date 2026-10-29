@@ -11,7 +11,7 @@ const loadMqtt = async () => (mqttLib ??= (await import("mqtt")).default);
 import net from "node:net";
 import tls from "node:tls";
 import * as protocol from "./protocol.mjs";
-import { tvTimestamp as realTvTimestamp } from "./discovery.mjs";
+import { tvTimestamp as realTvTimestamp, fetchDescriptor } from "./discovery.mjs";
 import { readState, writeState } from "./store.mjs";
 
 const DEFAULT_PORT = 36669;
@@ -114,7 +114,7 @@ async function openVerified({ host, port, creds, secrets, expectedFingerprint = 
   const { socket, fingerprint } = await openTls({ host, port, secrets, expectedFingerprint });
   const opts = {
     protocolVersion: 4,
-    clientId: creds.clientId,
+    clientId: creds.mqttClientId || creds.clientId,
     username: creds.username,
     password: creds.password,
     reconnectPeriod: 0,
@@ -222,6 +222,34 @@ function saveRecord(record) {
   writeState(state);
 }
 
+// The brand the TV declares in its descriptor (null when unknown).
+async function realTvBrand(host) {
+  const info = await fetchDescriptor(host).catch(() => null);
+  return info?.brand || null;
+}
+
+// Credentials for a stored pairing: its profile and brand, and for the static
+// profile the paired topic identity with a fresh broker id (as Sidee does).
+function recordCredentials(record, { ts, token, secrets }) {
+  const authProfile = record.authProfile || "modern";
+  const creds = protocol.sessionCredentials({
+    deviceId: record.deviceId,
+    tvTimestamp: ts,
+    token,
+    constants: secrets.constants,
+    authProfile,
+    brand: record.brand
+  });
+  if (authProfile !== "static") return creds;
+  return {
+    ...creds,
+    clientId: record.clientId || creds.clientId,
+    mqttClientId: "nuvio_" + protocol.newDeviceId().replace(/:/g, "")
+  };
+}
+
+const isTokenless = (record) => record?.authProfile === "static" && !record?.tokens;
+
 function tokensToRecord(tok, base) {
   const dur = Number(tok.accesstoken_duration_day || 2);
   return {
@@ -238,14 +266,29 @@ export async function pair({
   pinProvider,
   onPinReady,
   secrets,
-  getTimestamp
+  getTimestamp,
+  getBrand,
+  pinWaitMs
 }) {
   const ts = await (getTimestamp ? getTimestamp() : realTvTimestamp(host));
+  const brand = await (getBrand ? getBrand() : realTvBrand(host));
   const prev = readState().tvs[host];
   const reused = Boolean(prev?.deviceId) && !pairFailuresExceeded(prev);
   const deviceId = reused ? prev.deviceId : protocol.newDeviceId();
   try {
-    return await pairWith({ host, port, pinProvider, onPinReady, secrets, ts, prev, deviceId });
+    return await pairWith({
+      host,
+      port,
+      pinProvider,
+      onPinReady,
+      secrets,
+      ts,
+      prev,
+      deviceId,
+      brand,
+      reused,
+      pinWaitMs
+    });
   } catch (e) {
     if (countsAsPairFailure(e)) registerPairFailure(host, reused);
     throw e;
@@ -274,26 +317,90 @@ function registerPairFailure(host, reused) {
   writeState(state);
 }
 
-async function pairWith({ host, port, pinProvider, onPinReady, secrets, ts, prev, deviceId }) {
-  const creds = protocol.sessionCredentials({
-    deviceId,
-    tvTimestamp: ts,
-    constants: secrets.constants
-  });
-  const t = protocol.tvTopics(creds.clientId);
-  // Re-pairing a TV we already know: verify its pinned certificate so a MITM
-  // cannot hijack the re-pair. First-ever pairing has nothing to compare (TOFU).
-  const conn = await openVerified({
+// Open the pairing connection, trying each available auth profile once, and
+// only after the TV explicitly refused the previous one (MQTT rc 4/5). Network,
+// TLS and certificate failures stop at once: other credentials cannot fix them.
+// Order as in Sidee: a known working profile first, otherwise "static" (a
+// rejected dynamic attempt can throttle static auth on Toshiba firmware).
+async function openPairingConnection({ host, port, secrets, ts, prev, deviceId, brand, reused }) {
+  const available = protocol.availableAuthProfiles(secrets.constants);
+  const preferred = reused && prev?.authProfile ? prev.authProfile : "static";
+  const order = [...new Set([preferred, ...protocol.AUTH_PROFILES])].filter((p) =>
+    available.includes(p)
+  );
+  const refused = [];
+  for (const authProfile of order) {
+    const creds = protocol.sessionCredentials({
+      deviceId,
+      tvTimestamp: ts,
+      constants: secrets.constants,
+      authProfile,
+      brand
+    });
+    if (authProfile === "static") {
+      creds.mqttClientId = "nuvio_" + protocol.newDeviceId().replace(/:/g, "");
+    }
+    try {
+      // Re-pairing a TV we already know: verify its pinned certificate so a
+      // MITM cannot hijack the re-pair. First-ever pairing is TOFU.
+      const conn = await openVerified({
+        host,
+        port,
+        creds,
+        secrets,
+        expectedFingerprint: prev?.serverFingerprint
+      });
+      return { conn, creds, authProfile };
+    } catch (e) {
+      if (!(e instanceof AuthError)) throw e;
+      refused.push(authProfile);
+    }
+  }
+  throw new AuthError(
+    "rejected",
+    `the TV refused every authentication profile (${refused.join(", ") || "none available"})`
+  );
+}
+
+async function pairWith({
+  host,
+  port,
+  pinProvider,
+  onPinReady,
+  secrets,
+  ts,
+  prev,
+  deviceId,
+  brand,
+  reused,
+  pinWaitMs = {}
+}) {
+  const { conn, creds, authProfile } = await openPairingConnection({
     host,
     port,
-    creds,
     secrets,
-    expectedFingerprint: prev?.serverFingerprint
+    ts,
+    prev,
+    deviceId,
+    brand,
+    reused
   });
+  const t = protocol.tvTopics(creds.clientId);
+  const isStatic = authProfile === "static";
   try {
     await conn.subscribe([t.authReply, t.authCodeReply, t.tokenReply]);
-    await conn.publish(t.ui + "actions/vidaa_app_connect", protocol.connectPayload());
-    if ((await conn.waitFor(t.authReply, 15000)) === null) {
+    // Pre-token (static) firmware shows the PIN on a TV state query; newer
+    // TVs, and static ones that ignore it, use the app-connect request.
+    let started = null;
+    if (isStatic) {
+      await conn.publish(t.ui + "actions/gettvstate", "");
+      started = await conn.waitFor(t.authReply, pinWaitMs.tvState ?? 5000);
+    }
+    if (started === null) {
+      await conn.publish(t.ui + "actions/vidaa_app_connect", protocol.connectPayload());
+      started = await conn.waitFor(t.authReply, isStatic ? 10000 : 15000);
+    }
+    if (started === null) {
       throw new TimeoutError("the TV did not start pairing");
     }
     if (onPinReady) await onPinReady();
@@ -319,18 +426,39 @@ async function pairWith({ host, port, pinProvider, onPinReady, secrets, ts, prev
     const sincePin = conn.messages.length;
     await conn.publish(t.platform + "data/gettoken", protocol.tokenRequestPayload(""));
     await conn.publish(t.ui + "actions/authenticationcodeclose", "");
-    const raw = await conn.waitFor(t.tokenReply, 20000, sincePin);
-    const tok = raw && protocol.parseToken(raw);
-    if (!tok) throw new TimeoutError("PIN accepted but the TV sent no token");
-
-    const record = tokensToRecord(tok, {
+    const raw = await conn.waitFor(
+      t.tokenReply,
+      isStatic ? (pinWaitMs.staticToken ?? 5000) : 20000,
+      sincePin
+    );
+    const base = {
       host,
       port,
       deviceId,
       clientId: creds.clientId,
       username: creds.username,
+      authProfile,
+      brand: brand || null,
       serverFingerprint: conn.fingerprint
-    });
+    };
+    if (raw === null && isStatic) {
+      // Static firmware authorizes the client identity after the PIN and sends
+      // no token. Only save it once it answers a fresh read-only request.
+      await conn.subscribe([t.applistReply]);
+      const sinceApps = conn.messages.length;
+      await conn.publish(t.ui + "actions/applist", "0");
+      const apps = await conn.waitFor(t.applistReply, 8000, sinceApps);
+      if (apps === null || protocol.parseAppList(apps) === null) {
+        throw new TimeoutError("PIN accepted but the TV did not confirm access to its app list");
+      }
+      const record = { ...base, tokens: null, pairFailures: 0 };
+      saveRecord(record);
+      return record;
+    }
+    const tok = raw && protocol.parseToken(raw);
+    if (!tok) throw new TimeoutError("PIN accepted but the TV sent no token");
+
+    const record = tokensToRecord(tok, base);
     saveRecord(record);
     return record;
   } finally {
@@ -339,13 +467,11 @@ async function pairWith({ host, port, pinProvider, onPinReady, secrets, ts, prev
 }
 
 export async function refresh(record, { secrets, getTimestamp } = {}) {
+  // A static pairing has no tokens to refresh: the TV must be paired again.
+  if (isTokenless(record))
+    throw new AuthError("rejected", "the TV rejected the pairing: pair again");
   const ts = await (getTimestamp ? getTimestamp() : realTvTimestamp(record.host));
-  const creds = protocol.sessionCredentials({
-    deviceId: record.deviceId,
-    tvTimestamp: ts,
-    token: record.tokens.refreshtoken,
-    constants: secrets.constants
-  });
+  const creds = recordCredentials(record, { ts, token: record.tokens.refreshtoken, secrets });
   const t = protocol.tvTopics(creds.clientId);
   const conn = await openVerified({
     host: record.host,
@@ -375,16 +501,22 @@ export async function refresh(record, { secrets, getTimestamp } = {}) {
 // when the access token is near expiry and retrying once if the TV rejects it.
 export async function withSession(record, op, { secrets, getTimestamp } = {}) {
   let current = record;
-  if (current.expiresAt && Date.now() > current.expiresAt - REFRESH_MARGIN_MS) {
+  if (
+    !isTokenless(current) &&
+    current.expiresAt &&
+    Date.now() > current.expiresAt - REFRESH_MARGIN_MS
+  ) {
     current = await refresh(current, { secrets, getTimestamp });
   }
   for (let attempt = 0; attempt < 2; attempt++) {
-    const ts = await (getTimestamp ? getTimestamp() : realTvTimestamp(current.host));
-    const creds = protocol.sessionCredentials({
-      deviceId: current.deviceId,
-      tvTimestamp: ts,
-      token: current.tokens.accesstoken,
-      constants: secrets.constants
+    // A static pairing needs no TV clock: its identity is fixed.
+    const ts = isTokenless(current)
+      ? 0
+      : await (getTimestamp ? getTimestamp() : realTvTimestamp(current.host));
+    const creds = recordCredentials(current, {
+      ts,
+      token: isTokenless(current) ? null : current.tokens.accesstoken,
+      secrets
     });
     const t = protocol.tvTopics(creds.clientId);
     let conn;

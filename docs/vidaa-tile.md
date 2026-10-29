@@ -45,6 +45,12 @@ Hisense material. You choose one of two ways:
   You then supply the keystore passphrase and the constants (`PATTERN`,
   `VALUE_SUFFIX`, `XOR_MASK`, `BRAND`, `OPERATION`) yourself.
 
+The one-click route also picks up three optional constants (a second value
+suffix and a fixed identity) that unlock the older authentication profiles
+below. The APK route only has the five constants, so it pairs with the
+`modern` profile only. If you set up with an older version of this tool, run
+the one-click setup again to get them.
+
 Either way the result is stored under your user config
 (`~/.config/nuvio-vidaa/` on Linux, `~/Library/Application Support/nuvio-vidaa/`
 on macOS, `%APPDATA%\nuvio-vidaa\` on Windows), readable only by you.
@@ -159,6 +165,27 @@ npm run vidaa:tile -- install 192.168.1.50 --app-id nuviodebug
 `list <host>` shows the app ids of the tiles already on the TV. The default
 tile icon is the square `assets/images/tizenIcon.png` from the hosted build
 (the same image Sidee uses); pass `--image URL` for your own.
+
+## Pairing on other firmware and brands
+
+These follow Sidee 0.1.4.x and are only tested against the fake TV here:
+
+- **Authentication profiles.** VIDAA firmware accepts one of four credential
+  variants (`modern`, `static`, `middle`, `remotenow`). A fresh pairing tries
+  `static` first, then the others, each only after the TV explicitly refused
+  the previous one (MQTT code 4 or 5); a network, TLS or certificate failure
+  stops at once. Re-pairing the same TV starts with the profile that worked.
+  `static` firmware shows the PIN on a TV state query and issues no tokens;
+  the pairing is only saved once the TV answers an app-list request, and it is
+  never refreshed (if the TV rejects it later, pair again).
+- **Brand.** The credentials include the brand the TV declares in its UPnP
+  descriptor (`brand=his` on Hisense, `brand=tos` on Toshiba-licensed VIDAA
+  TVs such as the Z670). A descriptor without one uses `BRAND`.
+- **Discovery.** Some TVs never answer a search and only announce themselves;
+  the tool also listens for those announcements (`NOTIFY ssdp:alive`) on every
+  network interface.
+- **Typed IP address.** The dashboard checks it first: the address must serve
+  a VIDAA descriptor and accept connections on the pairing port 36669.
 
 ## Limitations
 

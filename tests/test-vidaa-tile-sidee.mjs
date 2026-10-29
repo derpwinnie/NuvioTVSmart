@@ -70,6 +70,18 @@ assert.deepEqual(sidee.decodeProtocol(protocolText), {
   BRAND: "his",
   OPERATION: "op_001"
 });
+// Newer protocol.py: the standard suffix and the static identity are picked up.
+const newerText =
+  protocolText +
+  `STANDARD_SUFFIX = _deco("${enc(Buffer.from("standard-z"))}", _K).decode("ascii")
+def session_credentials():
+    if auth_profile == "static":
+        return client_id, "fixture-user", token if token is not None else "fixture-pass"
+`;
+const newer = sidee.decodeProtocol(newerText);
+assert.equal(newer.STANDARD_SUFFIX, "standard-z");
+assert.equal(newer.STATIC_USERNAME, "fixture-user");
+assert.equal(newer.STATIC_PASSWORD, "fixture-pass");
 assert.throws(() => sidee.decodeProtocol("nothing here"), /layout/);
 
 // A download that does not match the pinned hash is refused and stores nothing.

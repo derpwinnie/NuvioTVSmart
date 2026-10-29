@@ -14,7 +14,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { writeFileAtomic, secretsPath } from "./store.mjs";
 import { CONSTANT_KEYS } from "./protocol.mjs";
 
-export const SIDEE_COMMIT = "bfbb47ee6860a85fe69a25290f62fb0cbe9a1c31";
+// v0.1.4.2 + docs (2026-10-21): adds the older auth profiles and the TV brand.
+export const SIDEE_COMMIT = "36095890dbf27e3daf1cf9c461bc62f8e7cad175";
 const RAW = `https://raw.githubusercontent.com/Empi9245/Sidee/${SIDEE_COMMIT}/`;
 
 export const SIDEE_FILES = {
@@ -24,7 +25,7 @@ export const SIDEE_FILES = {
   },
   protocol: {
     path: "core/protocol.py",
-    sha256: "14e9d5b8e2656eb7c6436240f30286f2e262138dbefe58931ce5b2db444b5260"
+    sha256: "fe5ebcf173e91388baca59555bb1b316c91c1e7c26a2e0542ab8d4e96babdc95"
   }
 };
 
@@ -67,7 +68,9 @@ export function decodeBundle(text) {
 }
 
 // protocol.py stores PATTERN, VALUE_SUFFIX and XOR_MASK as base85+xor strings
-// in `_C` with key `_K`; BRAND and OPERATION are plain literals.
+// in `_C` with key `_K`; BRAND and OPERATION are plain literals. Newer versions
+// add STANDARD_SUFFIX (same encoding) and the static identity as literals in
+// session_credentials; both are optional and enable the older auth profiles.
 export function decodeProtocol(source) {
   const key = /_K\s*=\s*b"([^"]+)"/.exec(source);
   const list = /_C\s*=\s*\[([\s\S]*?)\]/.exec(source);
@@ -79,13 +82,23 @@ export function decodeProtocol(source) {
   const k = Buffer.from(key[1], "latin1");
   const dec = (s) => xor(b85decode(s), k);
   const mask = dec(items[2]);
-  return {
+  const constants = {
     PATTERN: dec(items[0]).toString("ascii"),
     VALUE_SUFFIX: dec(items[1]).toString("ascii"),
     XOR_MASK: BigInt("0x" + (mask.toString("hex") || "0")).toString(),
     BRAND: brand[1],
     OPERATION: op[1]
   };
+  const standard = /STANDARD_SUFFIX\s*=\s*_deco\("([^"]+)",\s*_K\)/.exec(source);
+  if (standard) constants.STANDARD_SUFFIX = dec(standard[1]).toString("ascii");
+  const fixed = /return client_id, "([^"]+)", token if token is not None else "([^"]+)"/.exec(
+    source
+  );
+  if (fixed) {
+    constants.STATIC_USERNAME = fixed[1];
+    constants.STATIC_PASSWORD = fixed[2];
+  }
+  return constants;
 }
 
 const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");

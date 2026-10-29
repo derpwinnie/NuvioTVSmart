@@ -144,11 +144,19 @@ if (haveOpenssl()) {
     tv: {
       port: tv.port,
       getTimestamp: async () => tv.timestamp,
+      getBrand: async () => null,
+      verifyHost: async (h) => (h === tv.host ? { ok: true } : { ok: false, reason: "not-vidaa" }),
       delays: { afterInstallMs: 0, installRetryMs: 0, afterLaunchMs: 0 }
     }
   });
   const call = (method, path, body) => jsonCall(dash.port, method, path, body);
   const host = tv.host;
+
+  // A typed address is checked before pairing.
+  let v = await call("POST", "/api/verify-host", { host });
+  assert.deepEqual(v.json, { ok: true, reason: null });
+  v = await call("POST", "/api/verify-host", { host: "192.0.2.1" });
+  assert.deepEqual(v.json, { ok: false, reason: "not-vidaa" });
 
   // A pairing that fails before the PIN step reports the failure (not
   // "waiting for PIN") and leaves nothing to submit a PIN to.

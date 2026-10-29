@@ -89,9 +89,25 @@ $("find-btn").onclick = async () => {
   });
 };
 
-$("manual-btn").onclick = () => {
+const VERIFY_REASONS = {
+  "no-descriptor":
+    "No TV answered at this address. Check the IP in the TV's network settings and that both devices are on the same network.",
+  "not-vidaa": "A device answered at this address, but it is not a VIDAA TV.",
+  "port-closed":
+    "The TV answered, but its pairing port (36669) is closed. Turn the TV fully on and try again."
+};
+
+$("manual-btn").onclick = async () => {
   const h = $("manual-host").value.trim();
-  if (h) startPair(h);
+  if (!h) return;
+  msg($("find-msg"), `Checking ${h}…`, true);
+  const r = await api("POST", "/api/verify-host", { host: h });
+  if (r.ok) {
+    msg($("find-msg"), "", true);
+    startPair(h);
+    return;
+  }
+  msg($("find-msg"), VERIFY_REASONS[r.reason] || r.error || "That address did not answer.", false);
 };
 
 function startPair(host) {

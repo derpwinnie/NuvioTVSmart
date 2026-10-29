@@ -24,7 +24,7 @@ const constants = {
 const tv = await startFakeTv({ constants, pin: "4321", behavior: "ok" });
 const secrets = { pfx: tv.clientPfx, passphrase: tv.clientPass, constants, caPem: tv.ca };
 const getTimestamp = async () => tv.timestamp;
-const base = { host: tv.host, port: tv.port, secrets, getTimestamp };
+const base = { host: tv.host, port: tv.port, secrets, getTimestamp, getBrand: async () => null };
 
 // Pairing with the right PIN yields tokens.
 const rec = await session.pair({ ...base, pinProvider: async () => "4321" });
@@ -230,6 +230,114 @@ await tv.stop();
 await assert.rejects(
   session.listTiles(rec, { secrets, getTimestamp }),
   (e) => e.name === "UnreachableError"
+);
+
+// Older firmware: the TV refuses the first profiles (rc 5) and accepts a later
+// one. Pairing walks Sidee's order (static first on a fresh pairing) and keeps
+// the accepted profile and the TV's declared brand.
+const allConstants = {
+  ...constants,
+  STANDARD_SUFFIX: "std",
+  STATIC_USERNAME: "static-user",
+  STATIC_PASSWORD: "static-pass"
+};
+{
+  process.env.NUVIO_VIDAA_HOME = mkdtempSync(join(tmpdir(), "vidaa-prof-"));
+  const middleTv = await startFakeTv({
+    constants: allConstants,
+    acceptProfiles: ["middle"],
+    brand: "tos"
+  });
+  const s2 = {
+    pfx: middleTv.clientPfx,
+    passphrase: middleTv.clientPass,
+    constants: allConstants,
+    caPem: middleTv.ca
+  };
+  const b2 = {
+    host: middleTv.host,
+    port: middleTv.port,
+    secrets: s2,
+    getTimestamp: async () => middleTv.timestamp
+  };
+  // Without the TV's brand the dynamic profiles cannot match a Toshiba broker.
+  await assert.rejects(
+    session.pair({ ...b2, getBrand: async () => null, pinProvider: async () => "4321" }),
+    (e) => e.name === "AuthError" && /static, modern, middle, remotenow/.test(e.message)
+  );
+  const toshiba = await session.pair({
+    ...b2,
+    getBrand: async () => "tos",
+    pinProvider: async () => "4321"
+  });
+  assert.equal(toshiba.authProfile, "middle");
+  assert.equal(toshiba.brand, "tos");
+  assert.ok(toshiba.tokens.accesstoken);
+  const tried = middleTv
+    .authAttempts()
+    .slice(-3)
+    .map((a) => a.username);
+  assert.deepEqual(
+    tried.map((u) => (u === "static-user" ? "static" : u.split("$")[0])),
+    ["static", "tos", "tos"],
+    "static first, then modern and middle with the declared brand"
+  );
+  // The stored pairing reconnects with its own profile.
+  const tiles = await session.addTile(
+    toshiba,
+    { appId: "nuvio.vidaa", name: "Nuvio", url: "https://example.test/vidaa.html" },
+    {
+      secrets: s2,
+      getTimestamp: async () => middleTv.timestamp,
+      delays: { afterInstallMs: 0, installRetryMs: 0 }
+    }
+  );
+  assert.ok(tiles.some((a) => a.appId === "nuvio.vidaa"));
+  await middleTv.stop();
+}
+
+// Static firmware: PIN via TV state query, no token, access confirmed through
+// the app list; later operations reconnect with the fixed identity.
+{
+  process.env.NUVIO_VIDAA_HOME = mkdtempSync(join(tmpdir(), "vidaa-static-"));
+  const staticTv = await startFakeTv({
+    constants: allConstants,
+    acceptProfiles: ["static"],
+    tokenless: true
+  });
+  const s3 = {
+    pfx: staticTv.clientPfx,
+    passphrase: staticTv.clientPass,
+    constants: allConstants,
+    caPem: staticTv.ca
+  };
+  const opts3 = { secrets: s3, getTimestamp: async () => staticTv.timestamp };
+  const paired = await session.pair({
+    host: staticTv.host,
+    port: staticTv.port,
+    ...opts3,
+    getBrand: async () => null,
+    pinProvider: async () => "4321",
+    pinWaitMs: { tvState: 2000, staticToken: 300 }
+  });
+  assert.equal(paired.authProfile, "static");
+  assert.equal(paired.tokens, null, "static pairings carry no tokens");
+  const tiles = await session.addTile(
+    paired,
+    { appId: "nuvio.vidaa", name: "Nuvio", url: "https://example.test/vidaa.html" },
+    { ...opts3, delays: { afterInstallMs: 0, installRetryMs: 0 } }
+  );
+  assert.ok(tiles.some((a) => a.appId === "nuvio.vidaa"));
+  // The broker id is random per connection; the topic identity stays the paired one.
+  const ids = staticTv.authAttempts().map((a) => a.clientId);
+  assert.ok(ids.every((id) => id.startsWith("nuvio_")));
+  await staticTv.stop();
+}
+
+// APK-route constants only allow the modern profile: no static attempt.
+assert.deepEqual(
+  (await import("../tools/vidaa-tile/protocol.mjs")).availableAuthProfiles(constants),
+  ["modern"]
 );
 
 console.log("session tests passed");
