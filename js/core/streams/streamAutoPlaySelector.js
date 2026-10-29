@@ -5,6 +5,8 @@ import { canResolveMediaServerStream } from "../../data/mediaserver/mediaServerR
 // streams shown in the picker and the user's auto-play settings, it returns the
 // stream that should play automatically, or null to leave the picker open.
 
+import { normalizeStreamMatchPattern, normalizeStreamSearchText } from "./streamDisplayText.js";
+
 export const STREAM_AUTO_PLAY_MODE = {
   MANUAL: "MANUAL",
   FIRST_STREAM: "FIRST_STREAM",
@@ -32,7 +34,7 @@ function normalizeSource(value) {
 }
 
 export function isRegexSelectionConfigured(regexPattern) {
-  const pattern = String(regexPattern || "").trim();
+  const pattern = normalizeStreamMatchPattern(regexPattern).trim();
   if (!pattern || !/[a-z0-9]/i.test(pattern)) {
     return false;
   }
@@ -101,7 +103,12 @@ function streamBingeGroup(stream = {}) {
 }
 
 function streamSearchableText(stream = {}) {
-  const parts = [stream.addonName, stream.name, stream.title, stream.description, stream.url];
+  // Match the readable labels even when addons decorate them with mathematical
+  // letters or flag symbols. URLs and hashes are identities, not display text.
+  const parts = [stream.addonName, stream.name, stream.title, stream.description].map(
+    normalizeStreamSearchText
+  );
+  parts.push(stream.url);
   if (stream.infoHash) {
     parts.push(stream.infoHash);
   }
@@ -139,7 +146,7 @@ function buildExcludeRegex(pattern) {
     return null;
   }
   try {
-    return new RegExp(`\\b(${words.join("|")})\\b`, "i");
+    return new RegExp(normalizeStreamMatchPattern(`\\b(${words.join("|")})\\b`), "i");
   } catch (_) {
     return null;
   }
@@ -223,14 +230,14 @@ export function selectAutoPlayStream(streams, options = {}) {
   }
 
   // REGEX_MATCH
-  const pattern = String(options.regexPattern || "").trim();
+  const pattern = normalizeStreamMatchPattern(options.regexPattern).trim();
   let includeRegex;
   try {
     includeRegex = new RegExp(pattern, "i");
   } catch (_) {
     return null;
   }
-  const excludeRegex = buildExcludeRegex(pattern);
+  const excludeRegex = buildExcludeRegex(options.regexPattern);
   const match = candidates.find((stream) => {
     if (!isPlayableStream(stream)) {
       return false;

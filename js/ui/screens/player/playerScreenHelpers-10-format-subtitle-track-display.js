@@ -306,7 +306,10 @@ export function dbToGain(db = 0) {
 }
 
 export function supportsTvWebAudioAmplification() {
-  return !Environment.isWebOS() && !Environment.isTizen();
+  // Keep TV playback on its native audio output. Creating a Web Audio source
+  // reroutes the media element and can silence cross-origin addon streams,
+  // including when a previously saved boost is applied during player mount.
+  return !Environment.isWebOS() && !Environment.isTizen() && !Environment.isVidaa();
 }
 
 export function isMagnetUrl(value = "") {

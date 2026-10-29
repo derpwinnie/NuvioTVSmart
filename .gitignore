@@ -47,6 +47,8 @@ tests/helpers/*
 !tests/test-vidaa-dash-playback-headers.mjs
 !tests/test-vidaa-mediaflow-playback-headers.mjs
 !tests/test-vidaa-startup-presentation-audio.mjs
+!tests/test-vidaa-stream-unicode.mjs
+!tests/test-vidaa-audio-amplification.mjs
 *.ipk
 *.wgt
 dist/

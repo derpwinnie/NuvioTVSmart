@@ -1,6 +1,7 @@
 import { saveReusableStreamLink } from "../../../core/streams/streamLinkReuse.js";
 /* eslint-disable no-unused-vars */
 import * as internals from "./streamScreen.js";
+import { normalizeStreamDisplayText } from "../../../core/streams/streamDisplayText.js";
 
 export function createStreamScreenMethods08() {
   const {
@@ -178,6 +179,8 @@ export function createStreamScreenMethods08() {
       return true;
     },
     renderChip(name, selected, status) {
+      const label = name === "all" ? t("common.all", {}, "All") : name;
+      const readableLabel = Environment.isVidaa() || Environment.isWebOS() ? normalizeStreamDisplayText(label) : label;
       const chipStatus = String(status || "success");
       const classes = ["stream-route-chip", "focusable", selected ? "selected" : "", chipStatus !== "success" ? chipStatus : ""]
         .filter(Boolean)
@@ -186,7 +189,7 @@ export function createStreamScreenMethods08() {
       return `
           <button class="${classes}" data-action="setFilter" data-addon="${escapeHtml(name)}" aria-selected="${selected ? "true" : "false"}">
             ${spinner}
-            <span dir="${contentTextDirection(name === "all" ? t("common.all", {}, "All") : name)}">${escapeHtml(name === "all" ? t("common.all", {}, "All") : name)}</span>
+            <span dir="${contentTextDirection(readableLabel)}">${escapeHtml(readableLabel)}</span>
           </button>
         `;
     },
@@ -213,6 +216,8 @@ export function createStreamScreenMethods08() {
       const descriptionLines = getStreamDescriptionLines(stream);
       let addonIdentity = "";
       if (showAddonLogo) {
+        const addonName = stream.addonName || "Addon";
+        const readableAddonName = Environment.isVidaa() || Environment.isWebOS() ? normalizeStreamDisplayText(addonName) : addonName;
         const addonLogoUrl = normalizeAddonLogoUrl(stream.addonLogo) || resolveAddonLogo(stream.addonName, this.addonLogoLookup);
         const cachedAddonLogoUrl = getCachedAddonLogoDisplayUrl(addonLogoUrl);
         let displayAddonLogoUrl = cachedAddonLogoUrl || "";
@@ -229,12 +234,12 @@ export function createStreamScreenMethods08() {
         const addonLogoLoading = "lazy";
         const addonLogoDecoding = "async";
         const addonBadge = displayAddonLogoUrl
-          ? `<img src="${escapeHtml(displayAddonLogoUrl)}" alt="${escapeHtml(stream.addonName || "Addon")}" data-addon-logo="${escapeHtml(addonLogoUrl)}" decoding="${addonLogoDecoding}" loading="${addonLogoLoading}" referrerpolicy="no-referrer" /><span hidden>${addonBadgeLabel}</span>`
+          ? `<img src="${escapeHtml(displayAddonLogoUrl)}" alt="${escapeHtml(readableAddonName)}" data-addon-logo="${escapeHtml(addonLogoUrl)}" decoding="${addonLogoDecoding}" loading="${addonLogoLoading}" referrerpolicy="no-referrer" /><span hidden>${addonBadgeLabel}</span>`
           : `<span>${addonBadgeLabel}</span>`;
         addonIdentity = `
               <div class="stream-route-card-side">
                 <div class="stream-route-addon-badge">${addonBadge}</div>
-                <div class="stream-route-addon-name" dir="${contentTextDirection(stream.addonName || "Addon")}">${escapeHtml(stream.addonName || "Addon")}</div>
+                <div class="stream-route-addon-name" dir="${contentTextDirection(readableAddonName)}">${escapeHtml(readableAddonName)}</div>
               </div>`;
       }
 
