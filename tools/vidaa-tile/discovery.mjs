@@ -15,10 +15,11 @@ const UPNP_PORTS = [18400, 38400, 80];
 const ST = "urn:schemas-upnp-org:device:MediaRenderer:1";
 
 // The brand the TV declares in its modelDescription ("brand=his" on Hisense,
-// "brand=tos" on Toshiba-licensed VIDAA firmware), or null.
+// "brand=tos" on Toshiba-licensed VIDAA firmware), or null. Some firmware
+// writes the key as "Brand=" (Sidee fc497d9).
 export function descriptorBrand(desc = "") {
   for (const line of String(desc).split(/\r?\n|;/)) {
-    const m = /^\s*brand\s*=\s*([A-Za-z0-9]{1,8})\s*$/.exec(line);
+    const m = /^\s*brand\s*=\s*([A-Za-z0-9]{1,8})\s*$/i.exec(line);
     if (m) return m[1].toLowerCase();
   }
   return null;

@@ -30,6 +30,7 @@ assert.equal(toshiba.brand, "tos");
 assert.equal(descriptorBrand("brand=HIS"), "his");
 assert.equal(descriptorBrand("brand=not valid!"), null);
 assert.equal(descriptorBrand("x;brand=tos;y"), "tos");
+assert.equal(descriptorBrand("Brand=TES"), "tes", "the key is case-insensitive (Sidee fc497d9)");
 
 assert.equal(readDateHeader({ date: "Tue, 07 Oct 2025 00:00:00 GMT" }), 1759795200);
 assert.throws(() => readDateHeader({}), /did not report its clock/);
