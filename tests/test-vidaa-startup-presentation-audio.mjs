@@ -96,6 +96,8 @@ function fixture() {
     ...createPlayerScreenMethods30(),
     ...createPlayerScreenMethods31(),
     ...createPlayerScreenMethods38(),
+    // Upstream clears the next-episode dismissal on the first frame; not part of this check.
+    resetNextEpisodeCardDismissal() {},
     activePlaybackUrl: "https://fixture.invalid/audio.m3u8",
     uiRefs: { loadingOverlay: { classList: classList() } },
     loadingVisible: true,

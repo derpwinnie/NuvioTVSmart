@@ -128,6 +128,9 @@ function homeSurface() {
     contains: () => true,
     querySelector: () => viewport,
     querySelectorAll(selector) {
+      // Upstream's isSidebarFocusActive() looks up the sidebar roots (cached on a
+      // real Home); that is not an artwork scan.
+      if (selector.includes(".home-sidebar")) return [];
       globalScans += 1;
       if (selector.includes(".home-content-card")) return [];
       // Upstream 1.2.10 indexes home artwork in every state (loaded or pending).

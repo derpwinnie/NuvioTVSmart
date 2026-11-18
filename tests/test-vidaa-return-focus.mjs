@@ -85,6 +85,8 @@ for (const platform of ["vidaa", "tizen", "webos", "browser"]) {
         this.focusOptions = options;
       },
       syncFocusedCollectionCardState() {},
+      // Upstream row windowing (homeRowWindow.js) is not part of this check.
+      prepareHomeRowsForRestore() {},
       rememberMainRowFocus() {},
       scheduleModernHeroUpdate() {},
       scheduleFocusedPosterFlow() {},

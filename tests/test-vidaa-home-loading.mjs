@@ -5,6 +5,7 @@ globalThis.__NUVIO_PLATFORM__ = "vidaa";
 const { Platform } = await import("../js/platform/index.js");
 const { getTvRuntimePerformanceProfile } = await import("../js/platform/tvRuntimePerformance.js");
 const { Router } = await import("../js/ui/navigation/routerState.js");
+const { HOME_TV_PERFORMANCE_POLICY } = await import("../js/platform/tvPerformancePolicy.js");
 const { noteVidaaNavigationKeyDown, noteVidaaNavigationKeyUp, resetVidaaNavigationActivity } =
   await import("../js/ui/navigation/vidaaNavigationActivity.js");
 const { createHomeScreenMethods03 } =
@@ -185,6 +186,8 @@ for (const direction of [39, 40]) {
   assert.deepEqual(imageLoads, [], "The final release must receive the 250ms quiet period");
   await advance(750);
   await paint();
+  // Constrained TVs wait a dwell before the metadata request (upstream 1.4).
+  await advance(750 + HOME_TV_PERFORMANCE_POLICY.constrainedHeroEnrichDwellMs);
   assert.deepEqual(metadata, ["final"]);
   assert.deepEqual(trailers, ["final"]);
   assert.deepEqual(expanded, ["final"]);
