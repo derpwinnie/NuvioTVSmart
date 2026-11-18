@@ -25,6 +25,10 @@ import { WebOSPlayerExtensions } from "../../platform/webos/webosPlayerExtension
 import { loadStreamingLibs } from "../../runtime/loadStreamingLibs.js";
 import { WATCH_PROGRESS_UNKNOWN_DURATION_PERCENT } from "../../domain/model/watchProgress.js";
 import { parseAspectRatio } from "./playerAspect.js";
+import {
+  classifyWebPlaybackHeaders,
+  isBrowserRestrictedPlaybackHeader
+} from "./webPlaybackHeaders.js";
 
 import { createPlayerControllerMethods01 } from "./playerControllerMethods-01-is-expected-play-interruption.js";
 import { createPlayerControllerMethods02 } from "./playerControllerMethods-02-is-likely-direct-file-url.js";
@@ -70,6 +74,8 @@ export {
   createPlayerControllerMethods20
 };
 export {
+  classifyWebPlaybackHeaders,
+  isBrowserRestrictedPlaybackHeader,
   watchProgressRepository,
   watchedItemsRepository,
   watchedSeriesReconciliationService,
