@@ -18,6 +18,9 @@ const LIFECYCLE_SELECTOR =
 function buildHome({ rescale = null, tv = true, route = "home", constants = {} } = {}) {
   const context = vm.createContext({
     console,
+    // VIDAA port: the fork's VIDAA paths stay off in these upstream checks.
+    Platform: { isVidaa: () => false },
+    cancelVidaaHomePosterPrefetches: () => {},
     setTimeout,
     clearTimeout,
     requestAnimationFrame: (callback) => callback(),

@@ -19,6 +19,7 @@ function loadProfile({
     Platform: {
       isWebOS: () => webos,
       isTizen: () => !webos,
+      isVidaa: () => false,
       getName: () => (webos ? "webos" : "tizen")
     },
     TizenCapabilities: { get: () => ({ tizenVersion, chromiumMajorVersion: chromium }) },
