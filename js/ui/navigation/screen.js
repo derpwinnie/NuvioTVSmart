@@ -30,7 +30,14 @@ function scheduleVidaaViewportRestore() {
 
 // Upstream's focusWithoutScroll, plus the VIDAA viewport reset: the VIDAA browser
 // can still shift the document origin after a focus, even with preventScroll.
-function focusWithoutDocumentScroll(node) {
+// preventScroll: false keeps upstream's plain focus() outside VIDAA.
+function focusWithoutDocumentScroll(node, { preventScroll = true } = {}) {
+  if (!preventScroll && !Platform.isVidaa()) {
+    try {
+      node?.focus?.();
+    } catch (_) {}
+    return;
+  }
   focusWithoutScroll(node);
   scheduleVidaaViewportRestore();
 }
