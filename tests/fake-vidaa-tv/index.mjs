@@ -33,10 +33,14 @@ export async function startFakeTv({
     appList: [],
     tokens: new Set(),
     installDelayMs: 0,
+    // "legacy": older firmware lists a tile only by Id/mediaId, without its URL.
+    listStyle: "modern",
     launches: []
   };
   const setBehavior = (b) => (state.behavior = b);
   const setInstallDelay = (ms) => (state.installDelayMs = ms);
+  const setListStyle = (style) => (state.listStyle = style);
+  const tileId = (a) => a.appId || a.Id || a.mediaId;
 
   state.authAttempts = [];
   const expectedFor = (clientId, authProfile) => {
@@ -129,14 +133,18 @@ export async function startFakeTv({
           // A real launcher needs a while before the new tile shows up in
           // the app list; installDelayMs models that.
           const register = () => {
-            state.appList = state.appList.filter((a) => a.appId !== info.Id);
-            state.appList.push({
-              appId: info.Id,
-              name: info.Title,
-              url: info.URL,
-              appUrl: info.URL,
-              image: info.Image
-            });
+            state.appList = state.appList.filter((a) => tileId(a) !== info.Id);
+            state.appList.push(
+              state.listStyle === "legacy"
+                ? { Id: info.Id, mediaId: info.Id, name: info.Title }
+                : {
+                    appId: info.Id,
+                    name: info.Title,
+                    url: info.URL,
+                    appUrl: info.URL,
+                    image: info.Image
+                  }
+            );
           };
           if (state.installDelayMs > 0) setTimeout(register, state.installDelayMs);
           else register();
@@ -162,7 +170,7 @@ export async function startFakeTv({
       } catch {
         /* ignore */
       }
-      state.appList = state.appList.filter((a) => a.appId !== id);
+      state.appList = state.appList.filter((a) => tileId(a) !== id);
     }
   });
 
@@ -235,6 +243,7 @@ export async function startFakeTv({
     timestamp,
     setBehavior,
     setInstallDelay,
+    setListStyle,
     launches: state.launches,
     authAttempts: () => state.authAttempts,
     appList: () => state.appList,

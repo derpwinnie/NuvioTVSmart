@@ -544,13 +544,36 @@ export async function withSession(record, op, { secrets, getTimestamp } = {}) {
   throw new AuthError("rejected", "could not authenticate with the TV");
 }
 
-export function tileMatches(tile, appId, url) {
-  if (!tile || String(tile.appId || "").toLowerCase() !== String(appId).toLowerCase()) {
-    return false;
+// Identity fields a TV reports for a tile: newer firmware uses appId, older
+// firmware lists an installed web app only by Id or mediaId (Sidee c385080).
+const TILE_ID_KEYS = ["appId", "Id", "mediaId"];
+
+export function tileIds(tile) {
+  if (!tile || typeof tile !== "object") return [];
+  const ids = [];
+  for (const key of TILE_ID_KEYS) {
+    const value = typeof tile[key] === "string" ? tile[key].trim().toLowerCase() : "";
+    if (value && !ids.includes(value)) ids.push(value);
   }
-  const urls = ["url", "appUrl", "URL"]
+  return ids;
+}
+
+// Address fields a TV reports for a tile; many firmwares report none.
+export function tileAddresses(tile) {
+  if (!tile || typeof tile !== "object") return [];
+  return ["url", "appUrl", "URL"]
     .map((k) => (typeof tile[k] === "string" ? tile[k].trim() : ""))
     .filter(Boolean);
+}
+
+export function hasTileId(tile, appId) {
+  return tileIds(tile).includes(String(appId).toLowerCase());
+}
+
+// Strict match: the right identity and every reported address is ours.
+export function tileMatches(tile, appId, url) {
+  if (!hasTileId(tile, appId)) return false;
+  const urls = tileAddresses(tile);
   return urls.length > 0 && urls.every((u) => u === url);
 }
 
@@ -580,6 +603,12 @@ export async function addTile(record, { appId, name, url, image = "" }, opts) {
         const raw = await conn.waitFor(t.applistReply, 8000, since);
         const apps = raw ? protocol.parseAppList(raw) : null;
         if (apps && apps.some((a) => tileMatches(a, appId, url))) return apps;
+        // Firmware that lists tiles without an address: the identity is the
+        // only proof. Accept it on the second poll only, so a stale entry from
+        // before this install is not mistaken for it.
+        const found = (apps || []).filter((a) => hasTileId(a, appId));
+        if (attempt === 1 && found.length && found.every((a) => !tileAddresses(a).length))
+          return apps;
         if (attempt === 0) await sleep(delays.installRetryMs);
       }
       throw new TimeoutError("the TV did not confirm the tile");
@@ -625,7 +654,7 @@ export async function removeTile(record, appId, opts) {
       await conn.publish(t.ui + "actions/applist", "0");
       const raw = await conn.waitFor(t.applistReply, 8000, since);
       const apps = (raw && protocol.parseAppList(raw)) || [];
-      return !apps.some((a) => String(a.appId).toLowerCase() === String(appId).toLowerCase());
+      return !apps.some((a) => hasTileId(a, appId));
     },
     opts
   );

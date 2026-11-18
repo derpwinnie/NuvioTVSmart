@@ -114,6 +114,32 @@ tv.setInstallDelay(150);
 }
 tv.setInstallDelay(0);
 
+// Older firmware lists tiles only by Id/mediaId and without a URL (Sidee c385080).
+assert.deepEqual(session.tileIds({ Id: "Nuvio", mediaId: "nuvio" }), ["nuvio"]);
+assert.equal(
+  session.tileMatches({ Id: "nuvio" }, "nuvio", tile.url),
+  false,
+  "strict match still needs the URL"
+);
+assert.equal(session.hasTileId({ mediaId: "NUVIO" }, "nuvio"), true);
+assert.equal(
+  session.tileMatches({ appId: "nuvio", url: "https://other.example/" }, "nuvio", tile.url),
+  false,
+  "a reported foreign address is never accepted"
+);
+tv.setListStyle("legacy");
+{
+  const legacyTile = { ...tile, appId: "legacy1" };
+  const got = await session.addTile(rec, legacyTile, tileOpts());
+  assert.ok(
+    got.some((a) => session.hasTileId(a, "legacy1")),
+    "identity-only tile confirmed on the second poll"
+  );
+  assert.equal(await session.removeTile(rec, "legacy1", { secrets, getTimestamp }), true);
+  assert.ok(!tv.appList().some((a) => session.hasTileId(a, "legacy1")));
+}
+tv.setListStyle("modern");
+
 // List shows it, remove drops it.
 const listed = await session.listTiles(rec, { secrets, getTimestamp });
 assert.ok(listed.some((a) => a.appId === "nuvio"));
