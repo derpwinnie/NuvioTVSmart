@@ -68,3 +68,6 @@ store-assets/
 # Python cache
 __pycache__/
 *.pyc
+
+# Cloudflare wrangler local state
+.wrangler/
