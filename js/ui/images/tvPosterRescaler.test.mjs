@@ -2,11 +2,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  artworkResizeTarget,
+  artworkWorkerCount,
   computeSourceRect,
-  getHomeArtworkPixelRatio,
+  isArtworkTooLarge,
   isJpegHeader,
-  isRescalableArtworkFit
+  isRescalableArtworkFit,
+  jpegDimensions,
+  rescaleArtwork,
+  rescaleHomeArtwork,
+  shouldQueueRescale
 } from "./tvPosterRescaler.js";
+import { getTvArtworkPixelRatio } from "../../platform/tvRuntimePerformance.js";
 
 // Every existing crop case is a cover crop; fill has its own cases below.
 const computeCoverRect = (nw, nh, bw, bh) => computeSourceRect(nw, nh, bw, bh, "cover");
@@ -19,7 +26,7 @@ function withScreen({ innerWidth, screenWidth, devicePixelRatio }) {
   };
   Object.assign(globalThis, { innerWidth, screen: { width: screenWidth }, devicePixelRatio });
   try {
-    return getHomeArtworkPixelRatio();
+    return getTvArtworkPixelRatio();
   } finally {
     Object.assign(globalThis, previous);
   }
@@ -135,4 +142,133 @@ test("only JPEG bytes are accepted for re-encoding", () => {
     "a truncated header is not a jpeg"
   );
   assert.equal(isJpegHeader(null), false);
+});
+
+test("a source above the native 8 MiB body cap is refused", () => {
+  assert.equal(isArtworkTooLarge({ byteLength: 8388608 }), false);
+  assert.equal(isArtworkTooLarge({ byteLength: 8388609 }), true);
+  assert.equal(isArtworkTooLarge(null), false);
+});
+
+test("a 1 GB TV keeps one artwork worker", () => {
+  assert.equal(artworkWorkerCount(4, 1), 1);
+  assert.equal(artworkWorkerCount(8, 0.5), 1);
+  assert.equal(artworkWorkerCount(4, 2), 3);
+  assert.equal(artworkWorkerCount(8, undefined), 3);
+  assert.equal(artworkWorkerCount(1, undefined), 1);
+});
+
+function jpegWithDimensions(width, height) {
+  const app0 = [0xff, 0xe0, 0x00, 0x10, ...new Array(14).fill(0)];
+  const sof = [
+    0xff,
+    0xc0,
+    0x00,
+    0x11,
+    0x08,
+    (height >> 8) & 0xff,
+    height & 0xff,
+    (width >> 8) & 0xff,
+    width & 0xff,
+    0x03,
+    0x01,
+    0x22,
+    0x00,
+    0x02,
+    0x11,
+    0x01,
+    0x03,
+    0x11,
+    0x01
+  ];
+  return new Uint8Array([0xff, 0xd8, ...app0, ...sof]);
+}
+
+test("a bounded source size is read from the JPEG header", () => {
+  assert.deepEqual(jpegDimensions(jpegWithDimensions(1920, 1080)), {
+    width: 1920,
+    height: 1080
+  });
+  assert.deepEqual(jpegDimensions(jpegWithDimensions(500, 750)), {
+    width: 500,
+    height: 750
+  });
+  assert.equal(jpegDimensions(null), null);
+  assert.equal(jpegDimensions(new Uint8Array([0xff, 0xd8, 0xff])), null);
+  assert.equal(jpegDimensions(new Uint8Array([0x89, 0x50, 0x4e, 0x47])), null);
+});
+
+test("only an oversized JPEG asks for a clamped decode", () => {
+  assert.deepEqual(artworkResizeTarget(1920, 1080), { width: 1280 });
+  assert.deepEqual(artworkResizeTarget(1000, 1500), { height: 1280 });
+  assert.deepEqual(artworkResizeTarget(3000, 3000), { width: 1280 });
+  assert.equal(artworkResizeTarget(1280, 720), null);
+  assert.equal(artworkResizeTarget(640, 480), null);
+  assert.equal(artworkResizeTarget(0, 0), null);
+});
+
+test("shouldQueueRescale fast-skips obvious non-JPEG URLs and non-JPEG data URIs", () => {
+  const box = { width: 220, height: 338, fit: "cover" };
+  for (const url of [
+    "https://cdn.example.com/posters/collection.gif",
+    "https://cdn.example.com/posters/collection.gifv?autoplay=1",
+    "https://cdn.example.com/posters/collection.webp?w=600#card",
+    "https://cdn.example.com/posters/collection.WEBP",
+    "https://cdn.example.com/posters/logo.png?size=large",
+    "https://cdn.example.com/posters/mark.svg#icon",
+    "https://cdn.example.com/posters/hero.avif?q=85",
+    "assets/images/local.png",
+    "data:image/png;base64,iVBORw0KGgo=",
+    "data:image/gif;base64,R0lGODlhAQAB",
+    "data:image/webp;base64,UklGRh4AAABXRUJQ",
+    "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'/%3E",
+    "data:image/avif;base64,AAAA"
+  ]) {
+    assert.equal(shouldQueueRescale(url, box), false, `${url} should skip worker queue`);
+  }
+
+  for (const url of [
+    "https://image.tmdb.org/t/p/w500/poster.jpg",
+    "https://image.tmdb.org/t/p/w500/poster.JPEG?lang=en#hero",
+    "https://cdn.example.com/poster.jpg?fallback=placeholder.png",
+    "https://images.metahub.space/poster/medium/tt1234567/img",
+    "https://cdn.example.com/artwork?id=42",
+    "data:image/jpeg;base64,/9j/4AAQ",
+    "data:image/jpg;base64,/9j/4AAQ"
+  ]) {
+    assert.equal(
+      shouldQueueRescale(url, box),
+      true,
+      `${url} should remain eligible for worker JPEG check`
+    );
+  }
+});
+
+test("rescaleHomeArtwork and rescaleArtwork resolve null without starting workers for non-JPEG URLs", async () => {
+  const box = { width: 220, height: 338, fit: "cover" };
+  const originalWorker = globalThis.Worker;
+  let workerSpawns = 0;
+  globalThis.Worker = class RejectingWorker {
+    constructor() {
+      workerSpawns += 1;
+    }
+  };
+  try {
+    for (const url of [
+      "https://cdn.example.com/focused/action.webp?v=2",
+      "https://cdn.example.com/focused/action.gif#loop",
+      "https://cdn.example.com/focused/action.png",
+      "data:image/webp;base64,UklGRh4AAABXRUJQ"
+    ]) {
+      assert.equal(await rescaleHomeArtwork(url, box), null);
+      assert.equal(await rescaleArtwork(url, box), null);
+    }
+    assert.equal(workerSpawns, 0, "obvious non-JPEG URLs must not instantiate workers");
+  } finally {
+    if (originalWorker === undefined) {
+      delete globalThis.Worker;
+    } else {
+      globalThis.Worker = originalWorker;
+    }
+  }
 });

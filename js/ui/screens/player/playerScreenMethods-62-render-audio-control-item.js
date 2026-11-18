@@ -236,6 +236,24 @@ export function createPlayerScreenMethods62() {
       }
       return orderedStreams.filter((stream) => stream.addonName === this.sourceFilter);
     },
+    focusPlayingSourceIfUntouched({ allowFirstResult = false } = {}) {
+      if (!this.sourcesPanelVisible || this.sourcesUserMoved) {
+        return false;
+      }
+      const list = this.getFilteredSources();
+      const playingUrl = this.streamCandidates[this.currentStreamIndex]?.url;
+      const playingIndex = playingUrl ? list.findIndex((stream) => stream?.url === playingUrl) : -1;
+      if (playingIndex >= 0) {
+        // Results keep arriving, so the playing stream may show up after the first one.
+        this.sourcesUserMoved = true;
+        this.sourcesFocus = { zone: "list", index: playingIndex };
+        return true;
+      }
+      if (allowFirstResult && list.length) {
+        this.sourcesFocus = { zone: "list", index: 0 };
+      }
+      return false;
+    },
     ensureSourcesFocus(filters = null, list = null) {
       const availableFilters = Array.isArray(filters) ? filters : this.getSourceFilters();
       const availableSources = Array.isArray(list) ? list : this.getFilteredSources();
@@ -309,6 +327,7 @@ export function createPlayerScreenMethods62() {
     openSourcesPanel({ forceReload = false } = {}) {
       streamRepository.setLocalPluginSearchPaused(false);
       this.cancelSeekPreview({ commit: false });
+      this.closeChaptersPanel?.({ restoreFocus: false });
       this.sourcesPanelVisible = true;
       this.sourcesLastNavigationRepeatAt = 0;
       this.subtitleDialogVisible = false;
@@ -317,32 +336,13 @@ export function createPlayerScreenMethods62() {
       this.moreActionsVisible = false;
 
       const filters = this.getSourceFilters();
-      // Only VIDAA starts on the current source, so skip the filter pass elsewhere.
-      const filteredSources = Platform.isVidaa() ? this.getFilteredSources() : [];
-      if (filteredSources.length) {
-        const currentStream = this.getCurrentStreamCandidate();
-        const currentKey = currentStream ? streamMergeKey(currentStream) : "";
-        const activePlaybackUrl = String(this.activePlaybackUrl || "").trim();
-        const currentIndex = filteredSources.findIndex((stream) => {
-          if (stream === currentStream) {
-            return true;
-          }
-          const streamKey = streamMergeKey(stream);
-          if (currentKey && streamKey && streamKey === currentKey) {
-            return true;
-          }
-          return Boolean(activePlaybackUrl && streamDirectPlaybackUrl(stream) === activePlaybackUrl);
-        });
-        this.sourcesFocus = {
-          zone: "list",
-          index: currentIndex >= 0 ? currentIndex : 0
-        };
-      } else {
-        this.sourcesFocus = {
-          zone: "filter",
-          index: clamp(filters.indexOf(this.sourceFilter), 0, Math.max(0, filters.length - 1))
-        };
-      }
+      this.sourcesFocus = {
+        zone: "filter",
+        index: clamp(filters.indexOf(this.sourceFilter), 0, Math.max(0, filters.length - 1))
+      };
+      // Android opens the panel on the stream playing now, else the first result.
+      this.sourcesUserMoved = false;
+      this.focusPlayingSourceIfUntouched({ allowFirstResult: true });
 
       this.renderControlButtons();
       this.renderSubtitleDialog();

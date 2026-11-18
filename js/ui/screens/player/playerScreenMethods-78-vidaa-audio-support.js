@@ -56,7 +56,7 @@ export function resetVidaaAudioCounterProbe() {
   memorySynced = false;
 }
 
-export function createPlayerScreenMethods74() {
+export function createPlayerScreenMethods78() {
   const { PlayerController, Environment, t } = internals;
 
   return {

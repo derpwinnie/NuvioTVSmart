@@ -151,8 +151,8 @@ export function createLibraryScreenMethods03() {
                            data-backdrop-src="${escapeHtml(item.background || "")}"
                            data-addon-base-url="${escapeHtml(item.addonBaseUrl || "")}"
                            data-focus-key="${escapeHtml(focusKey)}">
-                    <div class="library-grid-poster${item.poster ? "" : " placeholder"}"${item.poster && !item.rawPosterUrl ? ` style="background-image:url('${escapeHtml(item.poster)}')"` : ""}>
-                      ${item.rawPosterUrl ? `<img class="library-custom-poster" src="${escapeHtml(item.poster)}"${posterFallbackAttributes(item)} alt="" loading="lazy" decoding="async" />` : ""}
+                    <div class="library-grid-poster${item.poster ? "" : " placeholder"}">
+                      ${item.poster ? `<img class="library-grid-poster-image" src="${escapeHtml(item.poster)}"${posterFallbackAttributes(item)} alt="" loading="lazy" decoding="async" />` : ""}
                       ${isWatched ? renderTitleWatchedBadge({ className: "library-watched-badge", iconClassName: "library-watched-badge-svg" }) : ""}
                     </div>
                     <div class="library-grid-title">${escapeHtml(item.name || item.id || "Untitled")}</div>
@@ -166,7 +166,7 @@ export function createLibraryScreenMethods03() {
     },
     renderEmptyState() {
       return `
-          <section class="library-empty-state">
+          <section class="library-empty-state library-empty-state-items">
             ${bookmarkOutlineSvg()}
             <h3 class="library-empty-title">${escapeHtml(this.controller.getEmptyStateTitle())}</h3>
             <p class="library-empty-subtitle">${escapeHtml(this.controller.getEmptyStateSubtitle())}</p>

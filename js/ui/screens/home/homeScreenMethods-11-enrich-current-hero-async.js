@@ -11,6 +11,7 @@ export function createHomeScreenMethods11() {
     shouldPreserveHomeRuntimeText,
     firstNonEmpty,
     resolveImdbRating,
+    preloadHeroBackdrop,
     preloadImageSource,
     parseRuntimeMinutes,
     normalizeCollectionFolderItem,
@@ -62,7 +63,7 @@ export function createHomeScreenMethods11() {
         }
         if (deferCommit) {
           const display = buildModernHeroPresentation(resolvedHero);
-          await Promise.all([preloadImageSource(display?.backdrop), preloadImageSource(display?.logo)]);
+          await Promise.all([preloadHeroBackdrop(display?.backdrop), preloadImageSource(display?.logo)]);
         }
         if (isVidaa && !(await this.waitForVidaaHomeLoadingIdle(canCommitHero))) {
           return false;

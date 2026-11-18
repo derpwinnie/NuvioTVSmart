@@ -6,6 +6,7 @@ import vm from "node:vm";
 test("poster settings are read once per layout, stay fresh, and preserve card markup", async () => {
   let reads = 0;
   let pattern = "https://posters.example/a/{imdb_id}";
+  let locale = "it";
   const context = vm.createContext({
     LayoutPreferences: {
       get() {
@@ -14,6 +15,8 @@ test("poster settings are read once per layout, stay fresh, and preserve card ma
       }
     },
     Router: { getCurrent: () => "home" },
+    I18n: { getLocale: () => locale },
+    Platform: { isTizen: () => false, isWebOS: () => false },
     isCollectionFolderItem: () => false,
     normalizeCatalogItem: (item) => item,
     firstNonEmpty: (...values) => values.find(Boolean) || "",
@@ -87,6 +90,42 @@ test("poster settings are read once per layout, stay fresh, and preserve card ma
     !refreshed.includes("https://posters.example/a/"),
     "a later render must read current profile settings"
   );
+
+  // Home's row cache: an unchanged row is neither rebuilt nor sent to the parser.
+  let built = 0;
+  const watched = new Set();
+  const cached = {
+    ...options,
+    rowMarkupCache: new WeakMap(),
+    watchedTitleIds: watched,
+    createPosterCardMarkup: (...args) => (built++, api.createPosterCardMarkup(...args))
+  };
+  context.unchangedHomeRowMarkup = (rowKey) => `<stub ${rowKey}>`;
+  const first = api.renderModernHomeLayout(cached);
+  assert.equal(built, 20);
+  assert.equal(first.domMarkup, first.markup, "nothing is mounted yet");
+  const second = api.renderModernHomeLayout({ ...cached, mountedRowMarkups: first.rowMarkups });
+  assert.equal(built, 20, "an unchanged row must not be rebuilt");
+  assert.equal(second.markup, first.markup);
+  assert.ok(second.domMarkup.includes("<stub ") && !second.domMarkup.includes("Title 0"));
+  api.renderModernHomeLayout({ ...cached, watchedTitleIds: new Set() });
+  assert.equal(built, 40, "new watched state must rebuild the row");
+  const sameWatched = new Set();
+  api.renderModernHomeLayout({ ...cached, watchedTitleIds: sameWatched });
+  assert.equal(built, 60);
+  locale = "en";
+  api.renderModernHomeLayout({ ...cached, watchedTitleIds: sameWatched });
+  assert.equal(built, 80, "a language change must rebuild the row's translated labels");
+  locale = "it";
+  pattern = "https://posters.example/c/{imdb_id}";
+  assert.ok(api.renderModernHomeLayout(cached).markup.includes("https://posters.example/c/tt0"));
+  const moreItems = structuredClone(options.rows);
+  assert.ok(
+    api
+      .renderModernHomeLayout({ ...cached, rows: moreItems, mountedRowMarkups: first.rowMarkups })
+      .domMarkup.includes("Title 0"),
+    "a refreshed item list is rendered and parsed again"
+  );
 });
 
 test("landscape artwork keeps its own branding while backdrop fallbacks retain overlays", async () => {
@@ -103,7 +142,8 @@ test("landscape artwork keeps its own branding while backdrop fallbacks retain o
     isTitleItemWatched: () => false,
     escapeHtml: String,
     escapeAttribute: String,
-    buildLazyImageAttributes: (src) => `src="${src}"`
+    buildLazyImageAttributes: (src) => `src="${src}"`,
+    LayoutPreferences: { get: () => ({}) }
   });
   const source = await readFile(
     new URL("./homeScreenHelpers-15-create-poster-card-markup.js", import.meta.url),
@@ -115,6 +155,31 @@ test("landscape artwork keeps its own branding while backdrop fallbacks retain o
       .replace(/^export /gm, ""),
     context
   );
+  // Android "Always Backdrop with Logo for Landscape Posters": supplied
+  // landscape artwork is ignored and the backdrop gets the logo/title overlay.
+  const ignored = context.createPosterCardMarkup(
+    {
+      id: "tt1",
+      name: "Title",
+      poster: "poster.png",
+      background: "backdrop.png",
+      landscapePoster: "landscape.png"
+    },
+    0,
+    0,
+    "movie",
+    { homeCatalogKey: "test" },
+    true,
+    "modern",
+    false,
+    true,
+    false,
+    null,
+    { alwaysShowLandscapeClearlogo: true }
+  );
+  assert.ok(!ignored.includes("has-landscape-artwork"));
+  assert.ok(!ignored.includes("landscape.png"));
+  assert.ok(ignored.includes('class="home-poster-landscape-copy"'));
   for (const logo of ["", "logo.png"]) {
     for (const expanded of [false, true]) {
       for (const landscape of [false, true]) {

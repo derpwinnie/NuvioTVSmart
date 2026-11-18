@@ -3,19 +3,21 @@ import { cancelVidaaHomePosterPrefetches } from "./vidaaHomePosterPrefetch.js";
 import { resetHomeArtworkRescaler } from "../../images/tvPosterRescaler.js";
 
 export function createHomeScreenMethods30() {
-  const { ScreenUtils, Platform, getTvRuntimePerformanceProfile } = internals;
+  const { ScreenUtils, Platform } = internals;
 
   return {
     cleanup() {
-      // Hand every poster back to its original url before the rescaler is
-      // torn down. TV runtimes keep this DOM in the document, so revoking a
-      // blob url a card still points at would break it on the way back.
-      if (getTvRuntimePerformanceProfile().isTvRuntime) {
-        this.releaseAllHomeLazyImages();
+      this.homeRowWindow?.destroy();
+      this.homeRowWindow = null;
+      this.homeRowWindowRoot = null;
+      if (this.homeLazyImageEvictTimer) {
+        clearTimeout(this.homeLazyImageEvictTimer);
+        this.homeLazyImageEvictTimer = null;
       }
-      // Drop the rescale workers and every blob url they produced. Leaving
-      // them alive would keep the artwork of a screen nobody is looking at.
-      resetHomeArtworkRescaler();
+      if (this.homeLazyImageEvictMaxTimer) {
+        clearTimeout(this.homeLazyImageEvictMaxTimer);
+        this.homeLazyImageEvictMaxTimer = null;
+      }
       this.heroMdbListRequest = null;
       if (this.unsubscribeStartupSyncPullCompleted) {
         this.unsubscribeStartupSyncPullCompleted();
@@ -50,6 +52,8 @@ export function createHomeScreenMethods30() {
       this.cancelModernCameraFollow({ stopAnimations: true });
       this.endModernVerticalFastScroll({ land: false });
       this.stopHeroRotation();
+      this.heroDescriptionAutoScroller?.stop();
+      this.heroDescriptionScrollHolding = false;
       this.cancelPendingHeroFocus();
       this.cancelFocusedPosterFlow();
       this.clearFocusedPosterFlowState();
@@ -78,6 +82,10 @@ export function createHomeScreenMethods30() {
       if (this.homeLazyImageHydrationRaf) {
         cancelAnimationFrame(this.homeLazyImageHydrationRaf);
         this.homeLazyImageHydrationRaf = 0;
+      }
+      if (this.homeViewportSettleHydrationTimer) {
+        clearTimeout(this.homeViewportSettleHydrationTimer);
+        this.homeViewportSettleHydrationTimer = null;
       }
       if (this.homeLazyImageHydrationSettleTimer) {
         clearTimeout(this.homeLazyImageHydrationSettleTimer);
@@ -130,17 +138,28 @@ export function createHomeScreenMethods30() {
         // Keep the DOM cached, but remove it from the compositor completely. Some
         // TV runtimes can still present composited descendants after visibility and
         // transform changes, which lets the old Home bleed through a new route.
+        //
+        // The retained cards keep their artwork, exactly like the Android back
+        // stack keeps its Coil memory cache: stripping every src and revoking the
+        // blob urls here would force a full re-fetch and decode of every visible
+        // poster on the way back, and a single missed re-hydration left those
+        // cards permanently blank. The bounded eviction still releases the rows
+        // that leave the artwork window, so memory stays where it was.
         this.container.style.position = "absolute";
         this.container.style.top = "0";
         this.container.style.right = "0";
         this.container.style.bottom = "0";
         this.container.style.left = "0";
-        this.container.style.display = "none";
-        this.container.style.visibility = "hidden";
-        this.container.style.pointerEvents = "none";
+        // The home-dom-preserved class hides the layer (content-visibility or
+        // display:none). Inline visibility/pointer-events are inherited, so
+        // toggling them restyled every card on return (~1 s on webOS).
         this.container.classList.add("home-dom-preserved");
         this.homeDomPreserved = true;
       } else {
+        // Without a retained DOM the cards are about to be discarded: hand the
+        // painted urls back, then drop the workers and every blob they produced.
+        this.releaseAllHomeLazyImages();
+        resetHomeArtworkRescaler();
         this.homeDomPreserved = false;
         this.container.classList.remove("home-dom-preserved");
         this.container.style.removeProperty("position");

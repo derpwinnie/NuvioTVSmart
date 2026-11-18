@@ -1,5 +1,7 @@
 import { isAmbientTrailerPlaying } from "./ambientPlaybackPolicy.js";
+import { focusWithoutScroll } from "../navigation/focusWithoutScroll.js";
 import { WebOSPlayerExtensions } from "../../platform/webos/webosPlayerExtensions.js";
+import { TizenScreenSaver } from "../../platform/tizen/tizenScreenSaver.js";
 import { Platform } from "../../platform/index.js";
 import { AmbientModeStore } from "../../data/local/ambientModeStore.js";
 import { ProfileManager } from "../../core/profile/profileManager.js";
@@ -25,7 +27,43 @@ const BLOCKED_ROUTES = new Set([
   "authSignIn",
   "serverConnection"
 ]);
+const TIZEN_SCREEN_SAVER_BLOCK_IDLE_MS = 10000;
 const now = () => globalThis.performance?.now?.() ?? Date.now();
+let lastImageFailure = "";
+function logImageFailure(url, reason) {
+  let host = "";
+  try {
+    host = new URL(url).host;
+  } catch (_) {
+    /* Keep the reason when the URL is not parseable. */
+  }
+  const key = `${reason}:${host}`;
+  if (key === lastImageFailure) return;
+  lastImageFailure = key;
+  console.warn("Ambient image failed", { reason, host });
+}
+const NON_TEXT_INPUT_TYPES = new Set([
+  "button",
+  "checkbox",
+  "color",
+  "file",
+  "hidden",
+  "image",
+  "radio",
+  "range",
+  "reset",
+  "submit"
+]);
+
+// An element that opens the TV's on-screen keyboard while it has focus.
+function isTextEntryElement(element) {
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+  const tag = String(element.tagName || "").toUpperCase();
+  if (tag === "TEXTAREA") return true;
+  return tag === "INPUT" && !NON_TEXT_INPUT_TYPES.has(String(element.type || "text").toLowerCase());
+}
+
 function shuffled(values) {
   const copy = [...values];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -38,22 +76,41 @@ function loadImage(url, signal) {
   return new Promise((resolve) => {
     if (!url || signal.aborted) return resolve(null);
     const image = new Image();
+    // Some Tizen engines only complete an image load once it is in the
+    // document. Keep it invisible until it is moved into the slide.
+    image.setAttribute(
+      "style",
+      "position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none"
+    );
+    document.body?.appendChild(image);
     let timer;
     const finish = (result) => {
       clearTimeout(timer);
       signal.removeEventListener("abort", cancel);
       image.onload = null;
       image.onerror = null;
+      image.removeAttribute("style");
+      image.remove?.();
       resolve(result);
     };
     const cancel = () => {
+      image.onload = null;
+      image.onerror = null;
       image.src = "";
       finish(null);
     };
-    image.onload = () => finish(image.naturalWidth > 0 ? image : null);
-    image.onerror = () => finish(null);
+    // onload already proves the image is usable. Some TV engines report
+    // naturalWidth as 0 until the image is attached, which left Ambient black.
+    image.onload = () => finish(image);
+    image.onerror = () => {
+      logImageFailure(url, "error");
+      finish(null);
+    };
     signal.addEventListener("abort", cancel, { once: true });
-    timer = setTimeout(cancel, 10000);
+    timer = setTimeout(() => {
+      logImageFailure(url, "timeout");
+      cancel();
+    }, 10000);
     image.src = url;
   });
 }
@@ -63,6 +120,7 @@ export const AmbientMode = {
   generation: 0,
   lastInteraction: 0,
   swallowedKey: null,
+  exiting: false,
   start() {
     if (this.started) return;
     this.started = true;
@@ -93,9 +151,20 @@ export const AmbientMode = {
       true
     );
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden) this.dismiss();
+      if (document.hidden) {
+        this.dismiss();
+        if (!this.exiting) this.setTizenScreenSaverBlocked(false);
+      }
       this.lastInteraction = now();
     });
+    if (Platform.isTizen())
+      document.addEventListener("nuvio:beforeExitApp", () => {
+        // Android drops keepScreenOn with the window; the launcher then owns
+        // the screensaver. Re-enabling the Samsung one here lets the TV's
+        // black screensaver cover the exit and Smart Hub on sets where it is
+        // due, which is the exit black screen reported on Tizen 6 (#1375).
+        this.exiting = true;
+      });
     this.interval = setInterval(() => this.tick(), 1000);
     this.tick();
   },
@@ -111,6 +180,11 @@ export const AmbientMode = {
     }
     this.swallowedKey = null;
   },
+  setTizenScreenSaverBlocked(blocked) {
+    if (!Platform.isTizen() || this.exiting) return;
+    if (blocked) TizenScreenSaver.block();
+    else TizenScreenSaver.unblock();
+  },
   allowed(settings) {
     const route = Router.getCurrent();
     return (
@@ -122,7 +196,20 @@ export const AmbientMode = {
     );
   },
   tick() {
+    if (this.exiting) return;
     const route = Router.getCurrent();
+    if (BLOCKED_ROUTES.has(route)) {
+      // Playback and sign-in routes never show Ambient Mode. Skip the settings
+      // read and JSON signature there: one storage parse per second for the
+      // whole film competed with AVPlay and key handling (issue #1208). A
+      // settings or profile change made on such a route is picked up by the
+      // first tick after leaving it.
+      this.lastInteraction = now();
+      this.idleRoute = route;
+      this.setTizenScreenSaverBlocked(false);
+      if (this.showing) this.dismiss();
+      return;
+    }
     const trailerPlaying = isAmbientTrailerPlaying(Router.getCurrentScreen?.());
     if (route !== this.idleRoute || trailerPlaying || this.trailerPlaying !== trailerPlaying) {
       // A completed/paused trailer starts a fresh idle period, as on Android.
@@ -147,9 +234,15 @@ export const AmbientMode = {
         }, 20000);
     }
     if (!this.allowed(settings)) {
+      this.setTizenScreenSaverBlocked(false);
       if (this.showing) this.dismiss();
       return;
     }
+    // The first AppCommon call loads Samsung's plugin synchronously (243 ms on
+    // a UE50RU7400), and the first allowed tick lands while Home is mounting.
+    // The TV screensaver needs minutes of idle, so wait for a quiet moment.
+    if (now() - this.lastInteraction >= TIZEN_SCREEN_SAVER_BLOCK_IDLE_MS)
+      this.setTizenScreenSaverBlocked(true);
     if (!this.showing && now() - this.lastInteraction >= settings.timeoutMinutes * 60000)
       this.show();
   },
@@ -172,11 +265,13 @@ export const AmbientMode = {
         controller?.signal.aborted
       )
         return;
+      if (!slides.length) console.warn("Ambient catalog load returned no slides");
       if (slides.length || this.loadedSignature !== signature) this.slides = shuffled(slides);
       this.loadedSignature = signature;
       this.loadedAt = now();
-    } catch (_) {
+    } catch (error) {
       /* Keep the last successful selection on transient failure. */
+      console.warn("Ambient catalog load failed", error);
     } finally {
       if (this.generation === generation && this.controller === controller)
         this.loadingSignature = null;
@@ -187,6 +282,14 @@ export const AmbientMode = {
     this.showing = true;
     if (Platform.isWebOS())
       WebOSPlayerExtensions.startAmbientKeepAwake(() => this.showing && !document.hidden);
+    // On a Tizen 5 set the slide animations advanced but were only seen on
+    // screen while something kept requesting frames, so Ambient Mode does.
+    if (Platform.isTizen() && typeof requestAnimationFrame === "function") {
+      const keepPresenting = () => {
+        if (this.showing) requestAnimationFrame(keepPresenting);
+      };
+      requestAnimationFrame(keepPresenting);
+    }
     const screen = Router.getCurrentScreen?.();
     screen?.stopTrailerPlayback?.();
     screen?.cancelFocusedPosterFlow?.();
@@ -205,6 +308,11 @@ export const AmbientMode = {
     this.previousScreen = screen;
     this.previousProfileId = ProfileManager.getActiveProfileId();
     this.previousFocus = document.activeElement;
+    // Android hides the on-screen keyboard when Ambient Mode starts. On TVs the
+    // keyboard follows the focused text field, so release it; the field keeps
+    // its D-pad highlight and is not refocused afterwards, so it stays closed.
+    this.previousFocusWasTextEntry = isTextEntryElement(this.previousFocus);
+    if (this.previousFocusWasTextEntry) this.previousFocus.blur?.();
     const root = document.createElement("div");
     root.className = "ambient-mode";
     root.setAttribute("role", "presentation");
@@ -276,6 +384,14 @@ export const AmbientMode = {
     stage.appendChild(copy);
     this.root.textContent = "";
     this.root.appendChild(stage);
+    clearTimeout(this.paintTimer);
+    this.paintTimer = setTimeout(() => {
+      this.paintTimer = 0;
+      if (signal.aborted || !this.showing || !stage.isConnected) return;
+      const opacity = globalThis.getComputedStyle?.(backdrop)?.opacity;
+      if (Number(opacity) !== 0) return;
+      stage.classList.add("ambient-static");
+    }, 500);
     this.slideTimer = setTimeout(() => {
       void this.nextSlide(signal);
     }, 13250);
@@ -291,26 +407,27 @@ export const AmbientMode = {
       this.slideSignal = null;
     }
     clearTimeout(this.slideTimer);
+    clearTimeout(this.paintTimer);
+    this.paintTimer = 0;
     this.root?.remove();
     this.root = null;
     const canRestoreFocus =
       Router.getCurrentScreen?.() === this.previousScreen &&
       ProfileManager.getActiveProfileId() === this.previousProfileId;
-    if (
+    if (canRestoreFocus && this.previousFocusWasTextEntry) {
+      // Leave the keyboard closed, as Android does.
+    } else if (
       canRestoreFocus &&
       this.previousFocus?.isConnected &&
       this.previousFocus !== document.body &&
       this.previousFocus !== document.documentElement
     ) {
-      try {
-        this.previousFocus.focus({ preventScroll: true });
-      } catch (_) {
-        this.previousFocus.focus();
-      }
+      focusWithoutScroll(this.previousFocus);
     } else if (canRestoreFocus) {
       this.previousScreen?.applyFocus?.();
     }
     this.previousFocus = null;
+    this.previousFocusWasTextEntry = false;
     this.previousScreen = null;
     this.previousProfileId = null;
   }

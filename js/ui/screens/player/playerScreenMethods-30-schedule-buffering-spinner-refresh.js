@@ -7,6 +7,7 @@ export function createPlayerScreenMethods30() {
   const {
     PlayerController,
     TrackingScrobbleService,
+    recordDistinctPluginPlay,
     canReleasePlayingNativeStartupAudioGate,
     Environment,
     STARTUP_PLAYBACK_ADVANCE_EPSILON_SECONDS,
@@ -74,6 +75,16 @@ export function createPlayerScreenMethods30() {
       this.startupAudioTrackSetSignature = "";
       PlayerController.setStartupAudioGate?.(false, { resume });
     },
+    syncStartupGateAndParentalGuide() {
+      // Track discovery can finish after the loading overlay is gone, so the
+      // loading-completion loop is no longer there to release the gate.
+      if (this.startupAudioGateActive && this.isStartupGateReleaseReady()) {
+        this.releaseStartupAudioGate();
+      }
+      if (!this.parentalGuideShown) {
+        this.maybeShowParentalGuideOverlay();
+      }
+    },
     isPlaybackStartupSettled() {
       if (!this.hasPresentedPlaybackFrame || this.pendingPlaybackRestore || this.startupAudioGateActive) {
         return false;
@@ -115,6 +126,15 @@ export function createPlayerScreenMethods30() {
         return false;
       }
       this.hasPresentedPlaybackFrame = true;
+      // Android clears the dismissal on each stream's first frame.
+      this.resetNextEpisodeCardDismissal();
+      const currentStream = this.getCurrentStreamCandidate?.() || null;
+      // Only a confirmed first frame counts as a plugin provider play, with the
+      // group+identity dedupe Android uses.
+      recordDistinctPluginPlay(
+        currentStream?.behaviorHints?.bingeGroup || currentStream?.raw?.behaviorHints?.bingeGroup || "",
+        currentStream?.infoHash || currentStream?.clientResolve?.infoHash || currentStream?.raw?.infoHash || this.activePlaybackUrl || ""
+      );
       // engineFs defers the playing handler until its first verified frame.
       if (this.currentEngineFsStream && TrackingScrobbleService.isEnabled()) TrackingScrobbleService.start(this.buildScrobbleContext());
       this.beginPlaybackEngineValidation();

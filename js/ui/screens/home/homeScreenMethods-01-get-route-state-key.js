@@ -1,5 +1,6 @@
 import * as internals from "./homeScreenContext.js";
 import { settleVidaaHomeReturnFocus } from "./vidaaHomeReturnFocus.js";
+import { getHomeTrackScrollLeft } from "./homeRowWindow.js";
 
 export function createHomeScreenMethods01() {
   const {
@@ -51,7 +52,7 @@ export function createHomeScreenMethods01() {
       }
       const trackStates = Object.fromEntries(
         this.getNavigationTrackNodes()
-          .map((track) => [String(track.dataset.trackRowKey || ""), track.scrollLeft])
+          .map((track) => [String(track.dataset.trackRowKey || ""), getHomeTrackScrollLeft(track)])
           .filter(([key]) => key)
       );
       const section = focused?.closest?.("[data-row-key]") || null;
@@ -113,7 +114,7 @@ export function createHomeScreenMethods01() {
 
       const trackStates = Object.fromEntries(
         this.getNavigationTrackNodes()
-          .map((track) => [String(track.dataset.trackRowKey || ""), track.scrollLeft])
+          .map((track) => [String(track.dataset.trackRowKey || ""), getHomeTrackScrollLeft(track)])
           .filter(([key]) => key)
       );
       const section = node.closest("[data-row-key]") || null;
@@ -194,6 +195,7 @@ export function createHomeScreenMethods01() {
         return false;
       }
 
+      this.prepareHomeRowsForRestore(focusState);
       Object.entries(focusState.trackStates || {}).forEach(([rowKey, scrollLeft]) => {
         const track = this.getNavigationTrackNodes().find((node) => String(node.dataset.trackRowKey || "") === String(rowKey || ""));
         if (track) {
@@ -250,6 +252,8 @@ export function createHomeScreenMethods01() {
         return false;
       }
       const focusState = state?.layoutMode === this.layoutMode ? state : this.savedFocusStates?.[this.layoutMode] || null;
+      // The restored card and the saved row offsets need real boxes.
+      this.prepareHomeRowsForRestore(focusState);
       if (!focusState) {
         return false;
       }

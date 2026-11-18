@@ -3,7 +3,6 @@ import {
   rescaleHomeArtwork,
   releaseHomeArtwork,
   shouldRescaleHomeArtwork,
-  getHomeArtworkPixelRatio,
   getHomeArtworkObjectFit,
   isRescalableArtworkFit
 } from "../../images/tvPosterRescaler.js";
@@ -223,6 +222,8 @@ function getVidaaVerticalPrefetchNodes(screen, anchor, direction, plan) {
   });
   return groups;
 }
+import { getTvArtworkPixelRatio } from "../../../platform/tvRuntimePerformance.js";
+import { getArtworkEvictIdleMs, getArtworkEvictMarginPx, getDeviceMemoryGb } from "../../../platform/tvPerformancePolicy.js";
 
 export function createHomeScreenMethods24() {
   const imageRequests = new WeakMap();
@@ -231,7 +232,6 @@ export function createHomeScreenMethods24() {
     CW_DAYS_CAP,
     HOME_LAZY_IMAGE_LIFECYCLE_SELECTOR,
     HOME_LAZY_IMAGE_ROW_SELECTOR,
-    HOME_LAZY_IMAGE_EVICT_MARGIN_PX,
     HOME_LEGACY_LAZY_HYDRATION_DEBOUNCE_MS,
     HOME_LEGACY_LAZY_HYDRATION_MAX_PER_FRAME,
     Router,
@@ -259,6 +259,13 @@ export function createHomeScreenMethods24() {
         navigationDirection = null
       } = {}
     ) {
+      // Opening the sidebar must not start artwork work behind the open menu.
+      // Android keeps the drawer outside the Home lazy rows; a sidebar anchor
+      // has no row, so this pass used to walk the whole image index and hydrate
+      // the visible rows while the viewer was navigating the menu.
+      if (typeof this.isSidebarFocusActive === "function" && this.isSidebarFocusActive()) {
+        return;
+      }
       if (Platform.isVidaa()) {
         this.scheduleVidaaHomeLazyImageHydration(anchorNode, { refreshIndex, navigationDirection });
         return;
@@ -312,7 +319,11 @@ export function createHomeScreenMethods24() {
           this.homeLazyImageNeighborTimer = null;
         }
       }
-      if (deferUntilVerticalSettle && !legacyFocusedRowPass && this.shouldUseImmediateFocusScroll() && this.layoutMode === "modern") {
+      // Bounded TV hydration must wait for the vertical camera to settle on
+      // every TV generation. On animated webOS the focus path used to start
+      // poster decodes while the spring was still running, which is the same
+      // decode burst the immediate-scroll policy already avoided.
+      if (deferUntilVerticalSettle && !legacyFocusedRowPass && this.shouldUseBoundedHomeImageHydration() && this.layoutMode === "modern") {
         if (this.homeLazyImageHydrationSettleTimer) {
           clearTimeout(this.homeLazyImageHydrationSettleTimer);
         }
@@ -322,7 +333,7 @@ export function createHomeScreenMethods24() {
           : MODERN_HOME_CONSTANTS.verticalScrollSettlePollMs;
         const retryAfterVerticalSettle = () => {
           this.homeLazyImageHydrationSettleTimer = null;
-          if (this.isModernVerticalScrollActive()) {
+          if (this.isModernHydrationScrollActive()) {
             this.homeLazyImageHydrationSettleTimer = setTimeout(retryAfterVerticalSettle, MODERN_HOME_CONSTANTS.verticalScrollSettlePollMs);
             return;
           }
@@ -455,6 +466,11 @@ export function createHomeScreenMethods24() {
       { forceFullScan = false, refreshIndex = false, focusedRowOnly = false, includeNeighborRows = false } = {}
     ) {
       if (!this.container) {
+        return;
+      }
+      // A frame may already be queued when the sidebar takes focus. Drop it
+      // here as well, so the menu does not inherit the Home hydration burst.
+      if (typeof this.isSidebarFocusActive === "function" && this.isSidebarFocusActive()) {
         return;
       }
       if (Platform.isVidaa() && isVidaaHomeHydrationBusy(this)) {
@@ -590,7 +606,7 @@ export function createHomeScreenMethods24() {
       // for the D-pad hot path.
       // VIDAA releases distant artwork through its own image window (above).
       if (getTvRuntimePerformanceProfile().isTvRuntime && !Platform.isVidaa() && Router.getCurrent() === "home") {
-        this.evictDistantHomeLazyImages(anchorNode);
+        this.scheduleHomeLazyImageEviction(anchorNode);
       }
     },
     assignHomeLazyImageSource(image, src, priority = 2) {
@@ -619,7 +635,7 @@ export function createHomeScreenMethods24() {
       // already 1920 wide, so trusting it decodes four times the pixels the
       // panel can show. Derive the ratio from the screen instead, which stays
       // correct on a real 4K device where the app still lays out at 1920.
-      const ratio = getHomeArtworkPixelRatio();
+      const ratio = getTvArtworkPixelRatio();
       const width = Math.round(rect.width * ratio);
       const height = Math.round(rect.height * ratio);
       if (!(width > 0) || !(height > 0)) {
@@ -650,6 +666,40 @@ export function createHomeScreenMethods24() {
         image.src = objectUrl || src;
       });
     },
+    scheduleHomeLazyImageEviction(anchorNode = null) {
+      const idleMs = getArtworkEvictIdleMs(getTvRuntimePerformanceProfile(), getDeviceMemoryGb());
+      if (idleMs <= 0) {
+        this.evictDistantHomeLazyImages(anchorNode);
+        return;
+      }
+      // Modern TVs keep artwork while the viewer is still moving; releasing a
+      // row and then focusing back up pays a fetch and a decode again. The
+      // constrained generations keep the immediate sweep above.
+      if (this.homeLazyImageEvictTimer) {
+        clearTimeout(this.homeLazyImageEvictTimer);
+      }
+      const token = this.homeLoadToken;
+      this.homeLazyImageEvictTimer = setTimeout(() => {
+        this.homeLazyImageEvictTimer = null;
+        if (token !== this.homeLoadToken || Router.getCurrent() !== "home") {
+          return;
+        }
+        this.evictDistantHomeLazyImages(this.getCurrentFocusedNode?.() || anchorNode);
+      }, idleMs);
+      // A long uninterrupted scroll must not postpone eviction forever.
+      if (!this.homeLazyImageEvictMaxTimer) {
+        this.homeLazyImageEvictMaxTimer = setTimeout(
+          () => {
+            this.homeLazyImageEvictMaxTimer = null;
+            if (token !== this.homeLoadToken || Router.getCurrent() !== "home") {
+              return;
+            }
+            this.evictDistantHomeLazyImages(this.getCurrentFocusedNode?.() || anchorNode);
+          },
+          Math.max(4000, idleMs)
+        );
+      }
+    },
     evictDistantHomeLazyImages(anchorNode = null) {
       if (!this.container || !Array.isArray(this.homeLazyImageHydrationIndex)) {
         return 0;
@@ -665,7 +715,7 @@ export function createHomeScreenMethods24() {
         bottom: Number(globalThis.innerHeight || doc?.clientHeight || 0) || 1080,
         right: Number(globalThis.innerWidth || doc?.clientWidth || 0) || 1920
       };
-      const margin = HOME_LAZY_IMAGE_EVICT_MARGIN_PX;
+      const margin = getArtworkEvictMarginPx(getTvRuntimePerformanceProfile(), getDeviceMemoryGb());
       const anchorRow = anchorNode?.closest?.(HOME_LAZY_IMAGE_ROW_SELECTOR) || null;
       let released = 0;
       // Measure rows, never individual images. A full per-image sweep measured
@@ -705,11 +755,11 @@ export function createHomeScreenMethods24() {
       if (!original) {
         return false;
       }
-      releaseHomeArtwork(painted);
       imageRequests.delete(image);
       delete image.dataset.originalSrc;
       image.dataset.src = original;
       image.removeAttribute("src");
+      releaseHomeArtwork(painted);
       return true;
     },
     releaseAllHomeLazyImages() {

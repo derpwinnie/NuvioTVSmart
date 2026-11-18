@@ -2,10 +2,13 @@ import "./ui/components/serverWatchedNotice.js";
 import { MediaServerSyncService } from "./core/profile/mediaServerSyncService.js";
 import { installCustomPosterFallback } from "./core/poster/customPoster.js";
 import { installWebOsImgurImageFallback } from "./core/media/imageProxy.js";
+import { startTvArtworkLazyLoader } from "./ui/images/tvArtworkLazyLoader.js";
+import { installFrameBudgetSampler } from "./core/diagnostics/frameBudget.js";
 import { AmbientMode } from "./ui/ambient/ambientMode.js";
 /* global __NUVIO_APP_VERSION__ */
 
 import "./core/diagnostics/consoleDebugBuffer.js";
+import { markBootTiming } from "./core/diagnostics/bootTiming.js";
 import { detailWatchedEnrichmentService } from "./data/repository/detailWatchedEnrichmentService.js";
 import { NON_BACKSTACK_ROUTES, Router } from "./ui/navigation/router.js";
 import { FocusEngine } from "./ui/navigation/focusEngine.js";
@@ -16,6 +19,7 @@ import { DeviceSessionRegistration } from "./core/auth/deviceSessionRegistration
 import { ProfileManager } from "./core/profile/profileManager.js";
 import { MemberAccessRepository } from "./data/remote/supabase/memberAccessRepository.js";
 import { ProfileSyncService } from "./core/profile/profileSyncService.js";
+import { ProfileSettingsSyncService } from "./core/profile/profileSettingsSyncService.js";
 import { StartupSyncService } from "./core/profile/startupSyncService.js";
 import { ProviderCredentialSyncService } from "./core/profile/providerCredentialSyncService.js";
 import { ThemeManager } from "./ui/theme/themeManager.js";
@@ -23,10 +27,15 @@ import { renderAppShell } from "./bootstrap/renderAppShell.js";
 import { renderAddonRemotePage } from "./bootstrap/renderAddonRemotePage.js";
 import { preloadStreamBadgeImages } from "./ui/screens/stream/streamScreen.js";
 import { warmStreamingLibs } from "./runtime/loadStreamingLibs.js";
+import { runAfterFirstHomePaint } from "./runtime/startupScheduler.js";
 import { Platform } from "./platform/index.js";
 import { TizenCapabilities } from "./platform/tizen/tizenCapabilities.js";
 import { PluginServiceClient } from "./platform/pluginServiceClient.js";
-import { getTvRuntimePerformanceProfile } from "./platform/tvRuntimePerformance.js";
+import {
+  getTvRuntimePerformanceProfile,
+  resetTvRuntimePerformanceProfile
+} from "./platform/tvRuntimePerformance.js";
+import { createFramePaceMonitor, storeMeasuredTvTier } from "./platform/tvAdaptiveTier.js";
 import { LocalStore } from "./core/storage/localStore.js";
 import { I18n } from "./i18n/index.js";
 import { getLatestAppUpdateWithRetry } from "./core/update/appUpdateService.js";
@@ -38,6 +47,7 @@ import { installPartyEffects } from "./ui/screens/party/partyEffects.js";
 import {
   hasPendingLaunchDeepLink,
   openPendingLaunchDeepLink,
+  takeTizenLaunchDeepLink,
   takeWebOsLaunchDeepLink
 } from "./core/deeplink/launchDeepLink.js";
 
@@ -58,6 +68,45 @@ LocalStore.remove("rotatedDpadMapping");
   }
 })();
 
+// All imported modules have been evaluated at this point: the gap from the
+// boot-guard mark to this one is the bundle fetch + parse + compile cost.
+markBootTiming("app-bundle-evaluated");
+
+// Web fonts used to be `@import`ed at the top of the stylesheet, which made
+// first paint wait for fonts.googleapis.com (DNS + TLS, or a long failure on
+// offline TVs). Load the same stylesheets from here instead: the CSSOM no
+// longer blocks on them, the fonts still swap in once available, and the
+// Material Icons ligature names stay hidden until that font is ready.
+const REMOTE_FONT_STYLESHEETS = Object.freeze({
+  text: "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap",
+  icons: "https://fonts.googleapis.com/icon?family=Material+Icons"
+});
+
+function loadRemoteStylesheet(href) {
+  return new Promise((resolve) => {
+    try {
+      const head = document.head || document.documentElement;
+      if (!head) {
+        resolve(false);
+        return;
+      }
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = href;
+      link.onload = () => resolve(true);
+      link.onerror = () => resolve(false);
+      // Before the local sheets, like the old @imports: they rely on source
+      // order to size `.material-icons` (Google's sheet sets 24px).
+      head.insertBefore(link, head.querySelector('link[rel="stylesheet"]'));
+    } catch (_) {
+      resolve(false);
+    }
+  });
+}
+
+const materialIconsStylesheetLoaded = loadRemoteStylesheet(REMOTE_FONT_STYLESHEETS.icons);
+void loadRemoteStylesheet(REMOTE_FONT_STYLESHEETS.text);
+
 const GUEST_QR_BYPASS_KEY = "skipAuthQrGate";
 const SIGNED_OUT_ALLOWED_ROUTES = new Set([
   "trakt",
@@ -73,7 +122,34 @@ const APP_VERSION = typeof __NUVIO_APP_VERSION__ !== "undefined" ? __NUVIO_APP_V
 const UPDATE_DISMISSED_TAG_KEY = "app_update_dismissed_tag";
 const UPDATE_ROUTE_WAIT_TIMEOUT_MS = 60_000;
 
+// Settings icons are Material Icons ligatures from Google Fonts. The font only
+// downloads on first use, so the first Settings open painted "grid_view",
+// "palette"... as text. Fetch it at startup and keep ligatures hidden until it
+// is ready; after 3 s (offline) the names show again as before.
+function preloadMaterialIconFont() {
+  const root = document.documentElement;
+  const markReady = () => root.classList.add("material-icons-ready");
+  const timer = setTimeout(markReady, 3000);
+  // The icon stylesheet is injected asynchronously (see REMOTE_FONT_STYLESHEETS);
+  // the @font-face only exists once it has loaded, so wait for that first.
+  materialIconsStylesheetLoaded
+    .then((loaded) => {
+      if (!loaded) {
+        return null;
+      }
+      return document.fonts?.load?.('24px "Material Icons"', "home");
+    })
+    .then((faces) => {
+      if (Array.isArray(faces) && faces.length) {
+        clearTimeout(timer);
+        markReady();
+      }
+    })
+    .catch(() => {});
+}
+
 function markBootStage(stage) {
+  markBootTiming(stage);
   const guard = globalThis.NuvioBootGuard;
   if (guard && typeof guard.stage === "function") {
     guard.stage(stage);
@@ -167,9 +243,9 @@ function renderFatalError(error) {
 }
 
 function isLowEndDevice() {
-  // TV runtimes use the year/Chromium profile below. Their exposed
-  // hardwareConcurrency/deviceMemory values are often coarse and would mark
-  // otherwise modern TV generations as low-end by accident.
+  // TV runtimes use the year/Chromium profile, which also applies the narrow
+  // 1 GB RAM check. Their exposed hardwareConcurrency is often coarse and
+  // would mark otherwise modern TV generations as low-end by accident.
   if (getTvRuntimePerformanceProfile().isTvRuntime) {
     return false;
   }
@@ -219,6 +295,27 @@ function applyPerformanceMode() {
   );
 }
 
+// A TV on the full profile is watched after every key press; one that cannot
+// hold its frame rate is moved to the constrained profile, now and on the next
+// launches of this build.
+function watchTvFramePace() {
+  const profile = getTvRuntimePerformanceProfile();
+  if (!profile.isTvRuntime || profile.isPerformanceConstrained) {
+    return;
+  }
+  const monitor = createFramePaceMonitor({
+    onSlow: (lostMs) => {
+      storeMeasuredTvTier({ tier: "constrained", appVersion: APP_VERSION, lostMs });
+      resetTvRuntimePerformanceProfile();
+      applyPerformanceMode();
+      console.warn(`TV moved to the constrained profile (${Math.round(lostMs)} ms lost per key)`);
+    }
+  });
+  // Readable from the remote inspector when a set's tier is in question.
+  globalThis.__NUVIO_FRAME_PACE__ = monitor;
+  document.addEventListener("keydown", () => monitor.noteKey(), true);
+}
+
 function isAddonRemoteMode() {
   try {
     return new URLSearchParams(window.location.search).get("addonsRemote") === "1";
@@ -227,18 +324,70 @@ function isAddonRemoteMode() {
   }
 }
 
+// How long startup routing waits for the profile-lock RPC when the cached
+// lock state says the active profile has no PIN. The RPC otherwise runs with
+// the 60 s default request timeout, so a slow TV network held the whole start
+// on it even for a single PIN-less profile.
+const PROFILE_LOCK_STATE_WAIT_MS = 2500;
+
+function hasProfilePin(pinStates, profileId) {
+  return Boolean(pinStates?.[String(profileId)] || pinStates?.[Number(profileId)]);
+}
+
+function raceWithTimeout(promise, timeoutMs) {
+  let timer = null;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(undefined), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// The bounded wait above may route into the app before the server answers.
+// If the answer then reports a PIN on the active profile, open the picker so
+// the PIN is still required, exactly as an immediate answer would have.
+function enforceLateProfileLock(lockStatePull, profileId) {
+  void lockStatePull
+    .then((pinStates) => {
+      if (!hasProfilePin(pinStates, profileId)) return;
+      if (String(ProfileManager.getActiveProfileId()) !== String(profileId)) return;
+      if (Router.getCurrent() === "profileSelection") return;
+      console.warn("Profile lock state arrived after routing; opening the profile picker");
+      void Router.navigate(
+        "profileSelection",
+        { skipInitialProfileSync: true, profilePinEnabled: pinStates },
+        { replaceHistory: true, skipStackPush: true }
+      );
+    })
+    .catch(() => {});
+}
+
 async function shouldShowProfileSelection() {
-  const [profiles, pinStates] = await Promise.all([
-    ProfileManager.getProfiles(),
-    ProfileSyncService.pullProfileLockStates()
-  ]);
+  const profiles = await ProfileManager.getProfiles();
   const activeProfileId = ProfileManager.getActiveProfileId();
-  const activeProfileHasPin = Boolean(
-    pinStates?.[String(activeProfileId)] || pinStates?.[Number(activeProfileId)]
-  );
+  const cachedPinStates = ProfileSyncService.getCachedProfileLockStates();
+  const lockStatePull = ProfileSyncService.pullProfileLockStates();
+  // A profile the cache knows to be PIN-protected, or a TV the server has
+  // never answered, waits for the live state as before. Otherwise the pull is
+  // bounded so the network cannot delay Home; a late PIN answer is enforced by
+  // enforceLateProfileLock.
+  const waitForLiveState =
+    cachedPinStates === null || hasProfilePin(cachedPinStates, activeProfileId);
+  let pinStates;
+  let liveStateKnown = true;
+  if (waitForLiveState) {
+    pinStates = await lockStatePull;
+  } else {
+    pinStates = await raceWithTimeout(lockStatePull, PROFILE_LOCK_STATE_WAIT_MS);
+    if (pinStates === undefined) {
+      liveStateKnown = false;
+      pinStates = cachedPinStates;
+      enforceLateProfileLock(lockStatePull, activeProfileId);
+    }
+  }
+  const activeProfileHasPin = hasProfilePin(pinStates, activeProfileId);
 
   if (hasSelectedProfileThisSession) {
-    return { show: false, pinStates };
+    return { show: false, pinStates, liveStateKnown };
   }
 
   // Remember last profile: when enabled and the last used profile has no PIN,
@@ -249,10 +398,10 @@ async function shouldShowProfileSelection() {
     ProfileManager.hasEverSelectedProfile() &&
     !activeProfileHasPin
   ) {
-    return { show: false, pinStates };
+    return { show: false, pinStates, liveStateKnown };
   }
 
-  return { show: profiles.length > 1 || activeProfileHasPin, pinStates };
+  return { show: profiles.length > 1 || activeProfileHasPin, pinStates, liveStateKnown };
 }
 
 async function enterWithLastProfile({ restoreWebOsRoute = false } = {}) {
@@ -265,24 +414,37 @@ async function enterWithLastProfile({ restoreWebOsRoute = false } = {}) {
     null;
   if (activeProfile) {
     await ProfileManager.setActiveProfile(activeProfile.id);
+    // The account wins at sign-in. Start the settings pull before Home without
+    // delaying its first paint; an edit made meanwhile aborts it and is pushed.
+    void ProfileSettingsSyncService.pull(activeProfile.id).catch(() => false);
     StartupSyncService.enableProfileScopedSync();
     detailWatchedEnrichmentService.invalidateAllCache();
     await I18n.init();
     const memberAccess = MemberAccessRepository.getCachedAccess();
     ThemeManager.apply({ enforceAccess: true, access: memberAccess });
-    void MemberAccessRepository.getAccess().catch((error) => {
-      console.warn("Profile member access refresh failed", error);
-    });
     I18n.apply();
-    void preloadStreamBadgeImages().catch((error) => {
-      console.warn("Stream badge image prerender failed", error);
+    // Neither the member access refresh nor the badge prerender is needed for
+    // the first Home paint; on a single-core TV they competed with the catalog
+    // rows for the main thread and the network.
+    runAfterFirstHomePaint(() => {
+      void MemberAccessRepository.getAccess().catch((error) => {
+        console.warn("Profile member access refresh failed", error);
+      });
+      void preloadStreamBadgeImages().catch((error) => {
+        console.warn("Stream badge image prerender failed", error);
+      });
     });
   }
   const experienceRoute = activeProfile ? await resolveExperienceRoute(activeProfile.id) : "home";
-  void StartupSyncService.requestSyncNow({
-    notifyPullCompleted: ["home", "plugins"].includes(experienceRoute)
-  }).catch((error) => {
-    console.warn("Profile background sync failed", error);
+  // The startup sync fans out to about ten remote surfaces. Home paints from
+  // its local cache first and refreshes when the pull completes, so starting
+  // the pull after that paint keeps the first screen responsive.
+  runAfterFirstHomePaint(() => {
+    void StartupSyncService.requestSyncNow({
+      notifyPullCompleted: ["home", "plugins"].includes(experienceRoute)
+    }).catch((error) => {
+      console.warn("Profile background sync failed", error);
+    });
   });
   const storedResumeRoute =
     restoreWebOsRoute && typeof Router.consumeWebOsResumeRoute === "function"
@@ -314,10 +476,14 @@ async function routeAfterAuthentication() {
   const profileRoute = await shouldShowProfileSelection();
   loginTrace("authenticated route profile decision", { show: profileRoute.show === true });
   if (profileRoute.show) {
-    await Router.navigate("profileSelection", {
-      skipInitialProfileSync: true,
-      profilePinEnabled: profileRoute.pinStates
-    });
+    // Without a live answer the picker runs its own profile/lock refresh so
+    // PIN badges and PIN prompts never rely on the cached state.
+    await Router.navigate(
+      "profileSelection",
+      profileRoute.liveStateKnown
+        ? { skipInitialProfileSync: true, profilePinEnabled: profileRoute.pinStates }
+        : {}
+    );
     return;
   }
 
@@ -500,10 +666,30 @@ function setupProviderCredentialForegroundLifecycle() {
   window.addEventListener("focus", requestAfterBackground);
 }
 
+/**
+ * Samsung Tizen title deep links: the link a launch carries waits through startup, as on webOS. An app opened again
+ * while it runs gets an appcontrol event on the same page, with the new request.
+ */
+function setupTizenAppControlLifecycle() {
+  if (!Platform.isTizen()) return;
+
+  takeTizenLaunchDeepLink();
+  window.addEventListener("appcontrol", () => {
+    if (takeTizenLaunchDeepLink() && appShellRendered) {
+      void openPendingLaunchDeepLink(Router, NON_BACKSTACK_ROUTES);
+    }
+  });
+}
+
 function setupTizenPlaybackLifecycle() {
   if (!Platform.isTizen()) return;
 
   document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      // Finish a player exit that the TV suspended before its history traversal committed.
+      void Router.resumePendingHistoryReturn();
+      return;
+    }
     if (document.visibilityState !== "hidden" || Router.getCurrent() !== "player") return;
 
     // Samsung requires hidden playback to follow the player exit path.
@@ -532,6 +718,12 @@ function setupPluginServiceLifecycle() {
   if (!Platform.isTizen() || shouldDisableTizenPluginSupport()) {
     return;
   }
+
+  // The service only serves plugins, so its watchdog probe is skipped while
+  // the player route owns the single TV core.
+  PluginServiceClient.configureLifecycleMonitor({
+    pauseProbeWhen: () => Router.getCurrent() === "player"
+  });
 
   const checkWhenForegrounded = () => {
     if (document.visibilityState === "hidden" || document.webkitHidden === true) {
@@ -575,17 +767,17 @@ async function bootstrapApp() {
   if (shouldDisableTizenPluginSupport()) {
     markBootStage("PluginService disabled on Tizen below 6.0");
   } else {
-    markBootStage("Starting optional PluginService");
-    // The WRT bridge has already been loaded by index.html. Platform.init() is
-    // therefore the first stable point at which the service can be started.
-    // PluginService is optional: keep its watchdog/recovery loop active, but
-    // never make the application shell wait for its initial /health response.
-    void PluginServiceClient.startLifecycleMonitor().catch(() => {
-      // Health diagnostics and the lifecycle watchdog own the retry/reporting
-      // path. A failed optional service must not fail application bootstrap.
-    });
+    // PluginService is optional and only serves installed plugins. It used to
+    // be launched here, which spawned the Node process during Home render on
+    // every Tizen 6+ TV and probed it every 10 s for the whole session.
+    // PluginServiceClient now starts it, and its watchdog, the first time
+    // plugin code needs the service.
+    markBootStage("PluginService starts on first plugin use");
   }
   applyPerformanceMode();
+  watchTvFramePace();
+  startTvArtworkLazyLoader();
+  installFrameBudgetSampler();
   markBootStage("Loading language resources");
   await I18n.init();
 
@@ -594,12 +786,14 @@ async function bootstrapApp() {
   PlayerController.init();
 
   installCustomPosterFallback();
+  preloadMaterialIconFont();
   installWebOsImgurImageFallback();
   MediaServerSyncService.start();
   AmbientMode.start();
   FocusEngine.init();
   setupProviderCredentialForegroundLifecycle();
   setupTizenPlaybackLifecycle();
+  setupTizenAppControlLifecycle();
   setupPluginRuntimeLifecycle();
   setupWebOsAppLifecycle();
 
@@ -612,7 +806,9 @@ async function bootstrapApp() {
   if (!getTvRuntimePerformanceProfile().isPerformanceConstrained) {
     warmStreamingLibs({ delayMs: 1400 });
   }
-  void checkForAppUpdateOnStartup();
+  runAfterFirstHomePaint(() => {
+    void checkForAppUpdateOnStartup();
+  });
 
   markBootStage("Restoring session");
   DeviceSessionRegistration.start();
@@ -628,6 +824,7 @@ async function bootstrapApp() {
       StartupSyncService.stop();
       ProviderCredentialSyncService.cancelForegroundPull();
       void MediaServerSyncService.stop();
+      ProfileSyncService.clearCachedProfileLockStates();
       hasSelectedProfileThisSession = false;
       const shouldBypassQr = Boolean(LocalStore.get(GUEST_QR_BYPASS_KEY, false));
       if (isSignedOutRouteAllowed()) {
@@ -693,7 +890,8 @@ async function bootstrapApp() {
 
   markBootStage("Checking authentication");
   await AuthManager.bootstrap();
-  installPartyEffects();
+  // Party toasts and the party availability request can wait for Home.
+  runAfterFirstHomePaint(() => installPartyEffects());
 }
 
 async function bootstrapAddonRemoteMode() {

@@ -1,4 +1,5 @@
 import { Platform } from "../../platform/index.js";
+import { focusWithoutScroll } from "./focusWithoutScroll.js";
 
 function restoreVidaaViewportOrigin() {
   const documentRef = globalThis?.document;
@@ -27,24 +28,10 @@ function scheduleVidaaViewportRestore() {
   } catch (_) {}
 }
 
-function focusWithoutDocumentScroll(node, { preventScroll = true } = {}) {
-  if (!node || typeof node.focus !== "function") {
-    return;
-  }
-  const vidaa = Platform.isVidaa();
-  if (!vidaa && !preventScroll) {
-    try {
-      node.focus();
-    } catch (_) {}
-    return;
-  }
-  try {
-    node.focus({ preventScroll: true });
-  } catch (_) {
-    try {
-      node.focus();
-    } catch (_) {}
-  }
+// Upstream's focusWithoutScroll, plus the VIDAA viewport reset: the VIDAA browser
+// can still shift the document origin after a focus, even with preventScroll.
+function focusWithoutDocumentScroll(node) {
+  focusWithoutScroll(node);
   scheduleVidaaViewportRestore();
 }
 

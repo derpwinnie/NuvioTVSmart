@@ -53,6 +53,7 @@ tests/helpers/*
 !tests/test-introdb-proxy.mjs
 *.ipk
 *.wgt
+*.zip
 dist/
 .cache/
 .pm2/
@@ -60,6 +61,8 @@ logs/
 app.bundle.js
 ecosystem.config.cjs
 scripts/commit-build-poller.mjs
+store-assets/
+.claude/
 .DS_Store
 
 # Python cache

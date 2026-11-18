@@ -138,7 +138,6 @@ export {
   HERO_ROTATE_INTERVAL_MS,
   HOME_BACKGROUND_RENDER_DELAY_LEGACY_MS,
   HOME_BACKGROUND_RENDER_DELAY_MS,
-  HOME_LAZY_IMAGE_EVICT_MARGIN_PX,
   HOME_LEGACY_LAZY_HYDRATION_DEBOUNCE_MS,
   HOME_LEGACY_LAZY_HYDRATION_MAX_PER_FRAME,
   HOME_ADDON_MANIFEST_TIMEOUT_MS,
@@ -224,6 +223,7 @@ export {
   HERO_IMAGE_PRELOAD_CACHE_LIMIT,
   HERO_IMAGE_PRELOAD_TIMEOUT_MS,
   heroImagePreloadCache,
+  preloadHeroBackdrop,
   preloadImageSource,
   preloadHeroAssets,
   prepareHeroImageEnter
@@ -365,3 +365,6 @@ export { animateVidaaFocusScroll, VIDAA_FOCUS_SCROLL_DURATION_MS } from "../../n
 export { isVidaaNavigationBusy } from "../../navigation/vidaaNavigationActivity.js";
 export { settleVidaaHomeReturnFocus } from "./vidaaHomeReturnFocus.js";
 export { bindExpandedBackdropLoad } from "./vidaaHomeImageWindow.js";
+export { PlayerSettingsStore } from "../../../data/local/playerSettingsStore.js";
+
+export { isAutoPlayEffectivelyEnabled } from "../../../core/streams/streamAutoPlaySelector.js";

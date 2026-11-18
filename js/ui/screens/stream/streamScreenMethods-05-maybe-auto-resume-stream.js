@@ -54,7 +54,7 @@ export function createStreamScreenMethods05() {
       this.autoResumeUiActive = true;
       this.streams = [candidate];
       this.addonFilter = "all";
-      void this.playStream(candidate.id, { cachedLink: cached });
+      void this.playStream(candidate.id, { cachedLink: cached, autoSelected: true });
       return true;
     },
     maybeAutoResumeStream({ allLoaded = false } = {}) {
@@ -101,7 +101,7 @@ export function createStreamScreenMethods05() {
         identityMatch || (canReusePreferredStream ? this.streams.find((stream) => String(stream?.id || "") === preferredStreamId) : null);
       if (match?.id) {
         this.autoResumeAttempted = true;
-        void this.playStream(match.id, { autoPlaySelected: true });
+        void this.playStream(match.id, { autoSelected: true });
         return;
       }
       if (!allLoaded && !this.streamSearchCompleted) {
@@ -164,7 +164,7 @@ export function createStreamScreenMethods05() {
       this.autoPlayAttempted = true;
       this.autoPlayLaunching = true;
       this.cancelAutoPlaySelectionWait();
-      void this.playStream(selected.id, { autoPlaySelected: true });
+      void this.playStream(selected.id, { autoSelected: true });
     },
     cancelAutoPlaySelectionWait() {
       if (this.autoPlaySelectionWaitTimer) {
@@ -182,7 +182,7 @@ export function createStreamScreenMethods05() {
       }
       const total = Math.max(0, Math.trunc(Number(seconds) || 0));
       if (total <= 0) {
-        void this.playStream(stream.id, { autoPlaySelected: true });
+        void this.playStream(stream.id, { autoSelected: true });
         return;
       }
       this.endVidaaAutoPlaySelecting();
@@ -200,7 +200,7 @@ export function createStreamScreenMethods05() {
         if (this.autoPlayCountdown.secondsLeft <= 0) {
           const targetId = this.autoPlayCountdown.streamId;
           this.cancelAutoPlayCountdown();
-          void this.playStream(targetId, { autoPlaySelected: true });
+          void this.playStream(targetId, { autoSelected: true });
           return;
         }
         this.requestRender({ delayMs: 0 });

@@ -41,6 +41,12 @@ export function createPlayerScreenMethods17() {
       return extractPlaybackHttpStatus(PlayerController.getLastHlsErrorDetail?.());
     },
     getWebHeaderRestrictedStreamMessage(streamCandidate = this.getCurrentStreamCandidate(), requestHeadersOverride = null) {
+      // Tizen forwards declared request headers through the local playback proxy
+      // (and AVPlay handles Cookie/User-Agent itself), so this is not a device
+      // limitation there. Android likewise never blocks these sources.
+      if (Environment.isTizen()) {
+        return "";
+      }
       const candidate = streamCandidate || {};
       const raw = candidate?.raw || {};
       const rawBehaviorHints = raw?.behaviorHints || {};
@@ -228,6 +234,26 @@ export function createPlayerScreenMethods17() {
         details = null
       } = {}
     ) {
+      // A link that has likely expired is fetched again, and a failed auto-selected
+      // source falls back to the next matching one, before the error is shown.
+      const errorOptions = {
+        mediaErrorCode,
+        detail,
+        error,
+        eventDetail,
+        streamCandidate,
+        playbackUrl,
+        reason,
+        resolverStatus,
+        resolverDetail,
+        details
+      };
+      if (
+        this.tryRefreshExpiredLinkAfterError?.(message, errorOptions) ||
+        this.tryFallbackToNextSourceAfterError?.(message, errorOptions)
+      ) {
+        return;
+      }
       this.startupErrorMessage = String(message || "").trim() || t("player_error_playback_fallback", {}, "Playback error");
       this.startupErrorMediaCode = Number(mediaErrorCode || 0);
       this.startupErrorDetails = Array.isArray(details)
@@ -263,6 +289,7 @@ export function createPlayerScreenMethods17() {
       this.subtitleDelayOverlayVisible = false;
       this.subtitleTimingDialogVisible = false;
       this.resetSubtitleAutoSyncState();
+      this.resetAutomaticSubtitleSyncState({ resetStartupKey: true });
       this.audioDialogVisible = false;
       this.speedDialogVisible = false;
       this.episodePanelVisible = false;

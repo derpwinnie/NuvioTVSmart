@@ -174,6 +174,8 @@ export function createSearchScreenMethods01() {
       ScreenUtils.show(this.container);
       this.searchRouteEnterPending = true;
       this.activationGuardUntil = Date.now() + 220;
+      this.lastSearchInputWasVoice = false;
+      this.searchBackToFieldLatched = false;
       this.layoutPrefs = LayoutPreferences.get();
       const sidebarProfilePromise = getSidebarProfileState().catch((err) => {
         console.warn("Search sidebar profile failed to load", err);
@@ -205,6 +207,7 @@ export function createSearchScreenMethods01() {
       this.voiceRecognition = this.voiceRecognition || null;
       this.searchToastTimer = null;
       this.inputSearchTimer = null;
+      this.imeDismissed = false;
       this.posterOptionsMenu = null;
       this.posterOptionsController = null;
       this.pendingPosterOptionsFocusId = "";
@@ -333,7 +336,8 @@ export function createSearchScreenMethods01() {
         this.requestRender();
         return;
       }
-      const preserveInputEditing = document.activeElement === input;
+      const preserveInputEditing =
+        document.activeElement === input || Boolean(this.imeDismissed && this.container?.querySelector(".focusable.focused") === input);
       const selectionSnapshot = preserveInputEditing ? null : getInputSelectionSnapshot(input);
 
       while (header.nextSibling) {

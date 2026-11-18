@@ -1,5 +1,6 @@
 import { ensureHeroMdbListRatings } from "./homeHeroMdbListLoad.js";
 import { registerHomeDomNodes } from "./homeDomUpdate.js";
+import { createHeroDescriptionAutoScroller } from "./heroDescriptionAutoScroll.js";
 import * as internals from "./homeScreenContext.js";
 
 export function createHomeScreenMethods05() {
@@ -51,17 +52,18 @@ export function createHomeScreenMethods05() {
       if (backdrop) {
         const src = display.backdrop || "";
         if (backdrop instanceof HTMLImageElement) {
-          const shouldFreezeBackdrop = Boolean(hero?.heroMetaEnriching) && String(backdrop.getAttribute("src") || "").trim();
+          const shouldFreezeBackdrop =
+            Boolean(hero?.heroMetaEnriching) && String(backdrop.heroBackdropCanvasSrc || backdrop.getAttribute("src") || "").trim();
           if (!shouldFreezeBackdrop) {
             animateHeroBackdropSwap(backdrop, src, display.title || "featured", heroCrossfadeMs, {
               transitionMode: heroTransitionMode
             });
           } else {
-            backdrop.setAttribute("alt", display.title || "featured");
+            backdrop.setAttribute("alt", "");
           }
         } else if (src) {
           backdrop.setAttribute("src", src);
-          backdrop.setAttribute("alt", display.title || "featured");
+          backdrop.setAttribute("alt", "");
           backdrop.classList.remove("placeholder");
         } else {
           backdrop.removeAttribute("src");
@@ -166,6 +168,23 @@ export function createHomeScreenMethods05() {
         )
       );
       void ensureHeroMdbListRatings.call(this);
+      this.applyHeroDescriptionAutoScroll();
+    },
+    applyHeroDescriptionAutoScroll() {
+      const node = this.container?.querySelector(".home-hero-card .home-hero-description");
+      if (!node) {
+        this.heroDescriptionAutoScroller?.stop();
+        return;
+      }
+      if (!this.heroDescriptionAutoScroller) {
+        this.heroDescriptionAutoScroller = createHeroDescriptionAutoScroller({
+          isPaused: () => this.isTrailerPlaying?.() === true || this.pauseOverlayVisible === true,
+          onHoldChange: (holding) => {
+            this.heroDescriptionScrollHolding = Boolean(holding);
+          }
+        });
+      }
+      this.heroDescriptionAutoScroller.apply(node, Boolean(this.layoutPrefs?.heroDescriptionAutoScrollEnabled));
     },
     setSidebarExpanded(expanded) {
       const nextExpanded = Boolean(expanded);

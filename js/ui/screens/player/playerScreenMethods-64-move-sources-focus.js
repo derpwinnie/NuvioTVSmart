@@ -17,6 +17,8 @@ export function createPlayerScreenMethods64() {
 
   return {
     moveSourcesFocus(direction) {
+      // Android: any move (Up included) keeps the panel from jumping to the playing stream later.
+      this.sourcesUserMoved = true;
       const orderedSources = this.getOrderedStreamCandidates();
       const filters = this.getSourceFilters(orderedSources);
       const list = this.getFilteredSources(orderedSources);
@@ -73,6 +75,16 @@ export function createPlayerScreenMethods64() {
       }
 
       if (zone === "list") {
+        if (direction === "left" || direction === "right") {
+          // Android: Left/Right in the source list switch to the previous/next addon filter.
+          const current = filters.indexOf(this.sourceFilter);
+          const next = filters[current + (direction === "right" ? 1 : -1)];
+          if (current >= 0 && next) {
+            this.setSourceFilter(next);
+            this.renderSourcesPanel();
+          }
+          return;
+        }
         if (direction === "up") {
           if (index > 0) {
             this.sourcesFocus = { zone: "list", index: index - 1 };
@@ -166,7 +178,7 @@ export function createPlayerScreenMethods64() {
 
       return false;
     },
-    showAspectToast(label, { durationMs = 1400 } = {}) {
+    showAspectToast(label, durationMs = 1400) {
       const toast = this.uiRefs?.aspectToast;
       if (!toast) {
         return;
@@ -179,9 +191,12 @@ export function createPlayerScreenMethods64() {
         clearTimeout(this.aspectToastTimer);
       }
 
-      this.aspectToastTimer = setTimeout(() => {
-        toast.classList.add("hidden");
-      }, durationMs);
+      this.aspectToastTimer = setTimeout(
+        () => {
+          toast.classList.add("hidden");
+        },
+        Math.max(500, Number(durationMs) || 1400)
+      );
     },
     getAspectModeDefinition(mode = this.aspectModes?.[this.aspectModeIndex]) {
       const modeId = normalizeAspectMode(typeof mode === "object" ? mode?.id : mode);
@@ -232,12 +247,16 @@ export function createPlayerScreenMethods64() {
       if (video) {
         const rect = this.calculateAspectRect(mode.id, video);
         const usingTizenAvPlay = Boolean(Environment.isTizen() && PlayerController.isUsingAvPlay?.());
+        const usingTizenHtmlVideo = Environment.isTizen() && !usingTizenAvPlay;
+        // Keep the video element on the player viewport wherever native text
+        // tracks render inside it. Tizen positions those cues against the
+        // viewport, so a letterboxed element clips their bottom line; webOS
+        // also needs the full viewport for its screensaver.
+        const useFullViewport = Environment.isWebOS() || usingTizenHtmlVideo;
         const canTransformVideo = !Environment.isWebOS() && !usingTizenAvPlay;
         const videoRect = usingTizenAvPlay ? rect.displayRect : rect;
         video.style.position = "fixed";
-        if (Environment.isWebOS()) {
-          // webOS suppresses its screensaver only when the video element itself
-          // occupies the full viewport. Keep aspect handling inside that element.
+        if (useFullViewport) {
           video.style.left = "0px";
           video.style.top = "0px";
           video.style.width = "100vw";
@@ -254,8 +273,11 @@ export function createPlayerScreenMethods64() {
         video.style.maxHeight = "none";
         video.style.background = "black";
         video.style.transformOrigin = "center center";
+        const stretchByObjectFit = usingTizenHtmlVideo && mode.id === "STRETCH";
         video.style.transform =
-          !canTransformVideo || (rect.scaleX === 1 && rect.scaleY === 1) ? "none" : `scale(${rect.scaleX}, ${rect.scaleY})`;
+          !canTransformVideo || stretchByObjectFit || (rect.scaleX === 1 && rect.scaleY === 1)
+            ? "none"
+            : `scale(${rect.scaleX}, ${rect.scaleY})`;
         if (typeof PlayerController.setAvPlayDisplayRect === "function") {
           PlayerController.setAvPlayDisplayRect(rect.displayRect, rect.displayMethod);
         }

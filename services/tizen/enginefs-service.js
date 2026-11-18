@@ -29,6 +29,8 @@ function patchTizenMediaRuntimeCode(code, filename) {
   if (!/media-http\.cjs$/i.test(String(filename || ""))) {
     return source;
   }
+  source = require("./runtime/enginefs-cache-routes-patch.cjs")(source);
+  source = require("./runtime/enginefs-tracks-reader-patch.cjs")(source);
 
   // The router decodes the path and then the query options. Child URLs need
   // the same two encoding layers as the original app-side URL. At this point
@@ -223,6 +225,7 @@ function startEngineFsRuntime() {
   probeNodeRuntime();
   configureRuntimeEnv();
   started = true;
+  require("./runtime/node-runtime-compat.cjs")({ Buffer: Buffer, stream: require("stream") });
   loadTizenMediaRuntime();
   diagnostic("EngineFS runtime module loaded", { port: process.env.PORT });
   // AVPlay can expose text tracks without rendering them. Keep the fallback

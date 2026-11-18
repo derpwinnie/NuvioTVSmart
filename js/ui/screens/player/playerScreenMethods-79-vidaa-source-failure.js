@@ -8,7 +8,7 @@ import { nextVidaaStallRestarts } from "../../../platform/vidaa/vidaaStallRestar
 // an alert on top and the next source focused. The startup error card is not used:
 // its Go Back leaves the player when playback came from continue watching.
 // Other platforms keep their error card and sources line.
-export function createPlayerScreenMethods75() {
+export function createPlayerScreenMethods79() {
   const { PlayerController, Environment, t } = internals;
 
   return {
@@ -28,7 +28,7 @@ export function createPlayerScreenMethods75() {
       this.markPlaybackSourceFailed(playbackUrl, candidate);
       if (reaction === "failover") {
         if (failoverToast) {
-          this.showAspectToast(failoverToast, { durationMs: 4000 });
+          this.showAspectToast(failoverToast, 4000);
         }
         this.startVidaaAutoPlayFailover(candidate, next, { logMessage });
         return reaction;

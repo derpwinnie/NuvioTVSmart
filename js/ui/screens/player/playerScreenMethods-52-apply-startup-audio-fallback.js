@@ -1,8 +1,10 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
+import { isEditingHdrSubtitleStyle, normalizeHdrBrightness, normalizeHdrTextColor } from "../../../core/player/hdrSubtitleStyle.js";
 
 export function createPlayerScreenMethods52() {
   const {
+    SubtitleAppearance,
     PlayerController,
     selectStartupAudioFallbackOption,
     hasOnlyImplicitStartupAudioOptions,
@@ -40,6 +42,12 @@ export function createPlayerScreenMethods52() {
         };
       }
       const fallbackOption = selectStartupAudioFallbackOption(audioOptions);
+      if (!this.isEmbeddedTrackDiscoverySupported?.() && fallbackOption?.entry?.implicitAudioTrack) {
+        // Nothing to select: the container cannot expose its tracks, so the
+        // runtime's default audio track is already the only fallback.
+        this.startupAudioPreferenceApplied = true;
+        return true;
+      }
       if (!fallbackOption?.entry || !Number.isFinite(fallbackOption.entryIndex)) {
         this.startupAudioPreferenceApplied = true;
         return true;
@@ -219,10 +227,12 @@ export function createPlayerScreenMethods52() {
       const selectedOption = this.collectSubtitleOptionItems().find((entry) => entry.selected);
       if (selectedOption?.id !== option.id || selectedOption?.sourceType !== option.sourceType) {
         this.startupSubtitlePreferenceApplying = true;
+        this.startupSubtitleRestoring = true;
         try {
           this.selectSubtitleOption(option, { focusOptions: false });
         } finally {
           this.startupSubtitlePreferenceApplying = false;
+          this.startupSubtitleRestoring = false;
         }
       }
       const appliedOption = this.collectSubtitleOptionItems().find((entry) => entry.selected);
@@ -435,6 +445,14 @@ export function createPlayerScreenMethods52() {
     },
     getSubtitleStyleControls() {
       const style = this.subtitleStyleSettings || {};
+      const appearance = SubtitleAppearance.normalizeSubtitleAppearance(style);
+      const background = SubtitleAppearance.splitSubtitleBackground(style.backgroundColor);
+      const subtitleFontLabel = (fontId) =>
+        fontId === "serif"
+          ? t("sub_font_serif", {}, "Serif")
+          : fontId === "mono"
+            ? t("sub_font_mono", {}, "Monospace")
+            : t("sub_font_default", {}, "Default");
       const selectedEmbeddedTrack = this.webOsEmbeddedTextSubtitleTrack;
       const embeddedAssStyleManaged = Boolean(
         Environment.isWebOS() &&
@@ -472,11 +490,17 @@ export function createPlayerScreenMethods52() {
         : TizenCapabilities.isAdvancedSubtitleStylingLimited()
           ? t("player_subtitle_tizen_advanced_unavailable_short", {}, "Not fully supported on this TV")
           : t("subtitle_style_unavailable_native", {}, "Unavailable with native subtitles");
+      const isEditingHdrStyle = isEditingHdrSubtitleStyle(style, this.isCurrentPlaybackHdr?.() === true);
       return [
         {
           id: "delay",
           label: t("subtitle_tab_delay", {}, "Delay"),
           value: formatSubtitleDelay(this.subtitleDelayMs)
+        },
+        {
+          id: "font",
+          label: t("sub_font", {}, "Font"),
+          value: subtitleFontLabel(style.fontId)
         },
         {
           id: "fontSize",
@@ -495,13 +519,28 @@ export function createPlayerScreenMethods52() {
         },
         {
           id: "textColor",
-          label: t("subtitle_style_text_color", {}, "Text Color"),
-          value: styleChipLabel(style.textColor || "#FFFFFF")
+          label: isEditingHdrStyle ? t("sub_hdr_text_color", {}, "HDR Text Color") : t("subtitle_style_text_color", {}, "Text Color"),
+          value: styleChipLabel(isEditingHdrStyle ? normalizeHdrTextColor(style.hdrTextColor) : style.textColor || "#FFFFFF")
         },
         {
           id: "textOpacity",
           label: t("subtitle_style_text_opacity", {}, "Text Opacity"),
           value: `${normalizeSubtitleTextOpacity(style.textOpacity)}%`
+        },
+        {
+          id: "backgroundColor",
+          label: t("sub_background", {}, "Background"),
+          value: background.opacity > 0 ? styleChipLabel(background.color) : t("subtitle_style_off", {}, "Off")
+        },
+        {
+          id: "backgroundOpacity",
+          label: t("sub_bg_opacity", {}, "Background Opacity"),
+          value: `${background.opacity}%`
+        },
+        {
+          id: "backgroundRadius",
+          label: t("sub_bg_roundness", {}, "Corner Roundness"),
+          value: String(appearance.backgroundRadius)
         },
         {
           id: "outlineEnabled",
@@ -514,10 +553,39 @@ export function createPlayerScreenMethods52() {
           value: styleChipLabel(style.outlineColor || "#000000")
         },
         {
+          id: "outlineSize",
+          label: t("sub_outline_width", {}, "Outline Width"),
+          value: String(appearance.outlineSize)
+        },
+        {
+          id: "shadowEnabled",
+          label: t("sub_shadow", {}, "Drop Shadow"),
+          value: appearance.shadowEnabled ? t("subtitle_style_on", {}, "On") : t("subtitle_style_off", {}, "Off")
+        },
+        {
+          id: "shadowOpacity",
+          label: t("sub_shadow_opacity", {}, "Shadow Opacity"),
+          value: `${appearance.shadowOpacity}%`
+        },
+        {
+          id: "shadowSize",
+          label: t("sub_shadow_size", {}, "Shadow Size"),
+          value: String(appearance.shadowSize)
+        },
+        {
           id: "verticalOffset",
           label: t("subtitle_style_bottom_offset", {}, "Bottom Offset"),
           value: formatSubtitleVerticalOffset(style.verticalOffset)
         },
+        ...(isEditingHdrStyle
+          ? [
+              {
+                id: "hdrBrightness",
+                label: t("sub_hdr_brightness", {}, "HDR Brightness"),
+                value: `${normalizeHdrBrightness(style.hdrBrightness)}%`
+              }
+            ]
+          : []),
         { id: "reset", label: t("subtitle_style_defaults", {}, "Reset Defaults"), value: "" }
       ].map((item) => {
         const disabled = availability[item.id] === false;

@@ -21,10 +21,12 @@ import {
   mdbTrackingPages
 } from "./mdbListTrackingCodec.js";
 import { normalizeMdbSnapshot, projectMdbTracking } from "./mdbListTrackingProjection.js";
+import { MdbListEpisodeMappingService } from "./mdbListEpisodeMappingService.js";
 
 const PLAYBACK_KEY = "mdbListTrackingPlayback";
 const KEY = "mdbListTracking",
-  TTL = 15 * 60 * 1000;
+  TTL = 15 * 60 * 1000,
+  SNAPSHOT_SCHEMA = 2;
 const queues = new Map(),
   refreshes = new Map(),
   retries = new Map();
@@ -43,7 +45,7 @@ const scopeKey = (scope) =>
 function read(scope) {
   const identity = cacheIdentity(scope);
   if (cachedRead?.identity === identity) return cachedRead.snapshot;
-  const cached = LocalStore.get(KEY, {})?.[scope.profileId];
+  const cached = unpackSnapshot(LocalStore.get(KEY, {})?.[scope.profileId]);
   let snapshot =
     validSnapshot(cached) &&
     cached.generation === scope.generation &&
@@ -60,7 +62,7 @@ function read(scope) {
           initialized: false,
           invalidated: false
         };
-  const sidecar = LocalStore.get(PLAYBACK_KEY, {})?.[scope.profileId];
+  const sidecar = unpackPlayback(LocalStore.get(PLAYBACK_KEY, {})?.[scope.profileId]);
   if (
     snapshot.storageRevision &&
     sidecar?.storageRevision === snapshot.storageRevision &&
@@ -105,6 +107,58 @@ function validSnapshot(snapshot) {
   }
 }
 
+// Persist one media record per title instead of copying it into every watched
+// episode. A large history otherwise exceeds the webOS localStorage quota.
+function mediaKey(row) {
+  return `${row.type === "movie" ? "movie" : "show"}:${mdbContentId(row.media.ids)}`;
+}
+function packRows(rows, media) {
+  return rows.map((row) => {
+    const { media: rowMedia, ...rest } = row,
+      key = mediaKey(row);
+    media[key] ||= rowMedia;
+    return { ...rest, mediaKey: key };
+  });
+}
+function unpackRows(rows, media) {
+  return (rows || []).map(({ mediaKey, ...row }) => ({ ...row, media: media?.[mediaKey] }));
+}
+function packSnapshot(snapshot) {
+  const media = {};
+  return {
+    ...snapshot,
+    schemaVersion: SNAPSHOT_SCHEMA,
+    media,
+    watched: packRows(snapshot.watched, media),
+    playback: packRows(snapshot.playback, media)
+  };
+}
+function unpackSnapshot(snapshot) {
+  if (!snapshot || snapshot.schemaVersion !== SNAPSHOT_SCHEMA) return snapshot;
+  const { media, ...rest } = snapshot;
+  return {
+    ...rest,
+    schemaVersion: 1,
+    watched: unpackRows(snapshot.watched, media),
+    playback: unpackRows(snapshot.playback, media)
+  };
+}
+function packPlayback(snapshot) {
+  const media = {};
+  return {
+    schemaVersion: SNAPSHOT_SCHEMA,
+    generation: snapshot.generation,
+    accountId: snapshot.accountId,
+    storageRevision: snapshot.storageRevision,
+    media,
+    playback: packRows(snapshot.playback, media)
+  };
+}
+function unpackPlayback(sidecar) {
+  if (!sidecar || sidecar.schemaVersion !== SNAPSHOT_SCHEMA) return sidecar;
+  const { media, ...rest } = sidecar;
+  return { ...rest, playback: unpackRows(sidecar.playback, media) };
+}
 function cacheIdentity(scope) {
   return `${scopeKey(scope)}:${LocalStore.revision(KEY)}:${LocalStore.revision(PLAYBACK_KEY)}:${MdbListAccount.user(scope.profileId)?.id}`;
 }
@@ -123,15 +177,19 @@ function save(scope, snapshot) {
     previous.storageRevision &&
     Object.keys(snapshot).every((key) => key === "playback" || snapshot[key] === previous[key]);
   if (playbackOnly) {
-    setSnapshotMap(PLAYBACK_KEY, scope.profileId, {
-      generation: scope.generation,
-      accountId: snapshot.accountId,
-      storageRevision: previous.storageRevision,
-      playback: snapshot.playback
-    });
+    setSnapshotMap(
+      PLAYBACK_KEY,
+      scope.profileId,
+      packPlayback({
+        generation: scope.generation,
+        accountId: snapshot.accountId,
+        storageRevision: previous.storageRevision,
+        playback: snapshot.playback
+      })
+    );
   } else {
     snapshot = { ...snapshot, storageRevision: `${Date.now()}:${Math.random()}` };
-    setSnapshotMap(KEY, scope.profileId, snapshot);
+    setSnapshotMap(KEY, scope.profileId, packSnapshot(snapshot));
   }
   cachedRead = { identity: cacheIdentity(scope), snapshot };
 }
@@ -392,7 +450,7 @@ export const MdbListTracking = {
     MdbListAccount.check(scope);
     await this.refresh();
     MdbListAccount.check(scope);
-    return projection(this.getSnapshot());
+    return remappedProjection(this.getSnapshot());
   },
   isHidden(contentId, season = null) {
     const snapshot = this.getSnapshot();
@@ -403,8 +461,32 @@ export const MdbListTracking = {
     if (!Number.isFinite(context.progressPercent) || !["start", "pause", "stop"].includes(action))
       return;
     return serialize(scope, async () => {
+      let targetContext = context;
+      if (
+        String(context.contentType || "").toLowerCase() === "series" &&
+        context.seasonNumber != null &&
+        context.episodeNumber != null
+      ) {
+        // The player knows the add-on's numbering; MDBList reads and writes TMDB's.
+        const mapped = await MdbListEpisodeMappingService.resolveToTmdb({
+          contentId: context.contentId,
+          ids: { tmdb: context.tmdbId, imdb: context.imdbId, tvdb: context.tvdbId },
+          tmdbShowId: context.tmdbId,
+          season: context.seasonNumber,
+          episode: context.episodeNumber,
+          videoId: context.videoId || null,
+          title: context.episodeTitle || null
+        }).catch(() => null);
+        if (mapped) {
+          targetContext = {
+            ...context,
+            seasonNumber: mapped.season,
+            episodeNumber: mapped.episode
+          };
+        }
+      }
       let snapshot = read(scope),
-        target = mdbMutationTarget(context, snapshot);
+        target = mdbMutationTarget(targetContext, snapshot);
       if (!target) return;
       try {
         const { payload, headers } = await MdbListAccount.api(scope, `/scrobble/${action}`, {
@@ -500,7 +582,11 @@ export const MdbListTracking = {
     return serialize(scope, async () => {
       const initial = read(scope),
         unique = new Map();
-      for (const item of items) {
+      // Local marks are in the add-on's numbering; MDBList stores TMDB's.
+      const mappedItems = await MdbListEpisodeMappingService.remapItemsToMdbList(items).catch(
+        () => items
+      );
+      for (const item of mappedItems) {
         const target = mdbMutationTarget(item, initial, remove);
         if (target)
           unique.set(
@@ -578,6 +664,27 @@ function projection(snapshot) {
   if (cachedProjection?.snapshot !== snapshot)
     cachedProjection = { snapshot, value: projectMdbTracking(normalizeMdbSnapshot(snapshot)) };
   return cachedProjection.value;
+}
+
+// MDBList stores episodes in TMDB numbering. Continue Watching and next-up must use the
+// add-on's numbering, so the projected progress is translated once per snapshot.
+const remappedProjectionCache = new WeakMap();
+
+function remappedProjection(snapshot) {
+  const value = projection(snapshot);
+  const cached = remappedProjectionCache.get(value);
+  if (cached) {
+    return cached;
+  }
+  const request = (async () => {
+    const [playbackItems, watchedShowSeedItems] = await Promise.all([
+      MdbListEpisodeMappingService.remapItemsToAddon(value.playbackItems),
+      MdbListEpisodeMappingService.remapItemsToAddon(value.watchedShowSeedItems)
+    ]);
+    return { ...value, playbackItems, watchedShowSeedItems };
+  })().catch(() => value);
+  remappedProjectionCache.set(value, request);
+  return request;
 }
 
 async function refreshResult(task, strict) {

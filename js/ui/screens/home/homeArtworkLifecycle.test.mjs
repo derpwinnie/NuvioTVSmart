@@ -15,18 +15,21 @@ const ROW_SELECTOR = ".home-row, .home-modern-row, .home-grid-section, .home-row
 const LIFECYCLE_SELECTOR =
   ".home-main .content-poster, .home-main .home-poster-landscape-logo, .home-main .home-continue-bg";
 
-function buildHome({ rescale = null, tv = true, route = "home" } = {}) {
+function buildHome({ rescale = null, tv = true, route = "home", constants = {} } = {}) {
   const context = vm.createContext({
     console,
     setTimeout,
     clearTimeout,
     requestAnimationFrame: (callback) => callback(),
     internals: {
-      MODERN_HOME_CONSTANTS: { smartTvLazyHydrationDebounceMs: 0, verticalScrollSettlePollMs: 0 },
+      MODERN_HOME_CONSTANTS: {
+        smartTvLazyHydrationDebounceMs: 0,
+        verticalScrollSettlePollMs: 0,
+        ...constants
+      },
       CW_DAYS_CAP: 30,
       HOME_LAZY_IMAGE_LIFECYCLE_SELECTOR: LIFECYCLE_SELECTOR,
       HOME_LAZY_IMAGE_ROW_SELECTOR: ROW_SELECTOR,
-      HOME_LAZY_IMAGE_EVICT_MARGIN_PX: 1600,
       HOME_LEGACY_LAZY_HYDRATION_DEBOUNCE_MS: 180,
       HOME_LEGACY_LAZY_HYDRATION_MAX_PER_FRAME: 2,
       Router: { getCurrent: () => route },
@@ -40,9 +43,12 @@ function buildHome({ rescale = null, tv = true, route = "home" } = {}) {
     rescaleHomeArtwork: rescale?.rescale || (() => Promise.resolve(null)),
     releaseHomeArtwork: rescale?.release || (() => {}),
     shouldRescaleHomeArtwork: rescale?.enabled || (() => false),
-    getHomeArtworkPixelRatio: () => 1,
+    getTvArtworkPixelRatio: () => 1,
     getHomeArtworkObjectFit: rescale?.fit || (() => "cover"),
-    isRescalableArtworkFit: (fit) => fit === "cover" || fit === "fill"
+    isRescalableArtworkFit: (fit) => fit === "cover" || fit === "fill",
+    getArtworkEvictIdleMs: () => 0,
+    getArtworkEvictMarginPx: () => 1600,
+    getDeviceMemoryGb: () => 0
   });
   context.globalThis = context;
   context.innerWidth = 1920;
@@ -137,6 +143,10 @@ function makeScreen(context, { rows, images }) {
     lastHomeLazyImageHydrationAnchorRow: null,
     isPerformanceConstrained: () => false,
     isLegacyTvRuntime: () => false,
+    isSidebarFocusActive: () => false,
+    shouldUseImmediateFocusScroll: () => false,
+    isModernVerticalScrollActive: () => false,
+    isModernHydrationScrollActive: () => false,
     getCurrentFocusedNode: () => null
   });
 }
@@ -193,6 +203,41 @@ test("browser and folder detail do not evict images through the Home lifecycle",
     screen.hydrateHomeLazyImages(null, { forceFullScan: true, refreshIndex: true });
     assert.equal(image.src, "https://art/a.jpg");
   }
+});
+
+test("sidebar focus does not start a Home artwork pass", () => {
+  const context = buildHome();
+  const row = makeRow(context, { top: 100 });
+  const images = [makeImage(context, { row, src: "https://art/g.jpg" })];
+  const screen = makeScreen(context, { rows: [row], images });
+  screen.isSidebarFocusActive = () => true;
+
+  screen.scheduleHomeLazyImageHydration(row, { refreshIndex: true });
+  assert.equal(images[0].src, "", "opening the menu must not hydrate posters behind it");
+
+  // A frame queued before the sidebar took focus must also be dropped.
+  screen.hydrateHomeLazyImages(row, { forceFullScan: true, refreshIndex: true });
+  assert.equal(images[0].src, "");
+  assert.equal(images[0].dataset.src, "https://art/g.jpg");
+});
+
+test("animated vertical navigation waits for the camera to settle before hydrating", async () => {
+  const context = buildHome({ constants: { verticalScrollSettlePollMs: 5 } });
+  const row = makeRow(context, { top: 100 });
+  const images = [makeImage(context, { row, src: "https://art/settle.jpg" })];
+  const screen = makeScreen(context, { rows: [row], images });
+  screen.layoutMode = "modern";
+  let scrolling = true;
+  screen.isModernVerticalScrollActive = () => scrolling;
+  screen.isModernHydrationScrollActive = () => scrolling;
+
+  screen.scheduleHomeLazyImageHydration(row, { deferUntilVerticalSettle: true });
+  await new Promise((resolve) => setTimeout(resolve, 15));
+  assert.equal(images[0].src, "", "poster work must not start while the camera is moving");
+
+  scrolling = false;
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(images[0].src, "https://art/settle.jpg");
 });
 
 test("a released and rehydrated poster rejects the earlier request even when the URL is unchanged", async () => {

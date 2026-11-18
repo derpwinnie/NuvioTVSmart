@@ -4,8 +4,15 @@ import { Platform } from "../../../platform/index.js";
 import { isVidaaNavigationBusy, VIDAA_NAVIGATION_SETTLE_MS } from "../../navigation/vidaaNavigationActivity.js";
 
 export function createHomeScreenMethods29() {
-  const { Router, catalogRepository, buildModernRowKey, MODERN_HOME_CONSTANTS, HOME_MAX_ITEMS_PER_ROW_DEFAULT, createPosterCardMarkup } =
-    internals;
+  const {
+    Router,
+    LayoutPreferences,
+    catalogRepository,
+    buildModernRowKey,
+    MODERN_HOME_CONSTANTS,
+    HOME_MAX_ITEMS_PER_ROW_DEFAULT,
+    createPosterCardMarkup
+  } = internals;
 
   return {
     setupModernTrackScrollPagination() {
@@ -95,6 +102,8 @@ export function createHomeScreenMethods29() {
               if (!deferredAppendTimer) deferredAppendTimer = setTimeout(appendWhenSettled, 50);
               return true;
             }
+            // Read the poster preferences once per appended chunk, not per card.
+            const posterSettings = LayoutPreferences.get();
             const newMarkup = itemsToAppend
               .map((item, i) =>
                 createPosterCardMarkup(
@@ -108,7 +117,8 @@ export function createHomeScreenMethods29() {
                   false,
                   preferLandscape,
                   true,
-                  this.watchedTitleIds
+                  this.watchedTitleIds,
+                  posterSettings
                 )
               )
               .join("");
@@ -265,6 +275,7 @@ export function createHomeScreenMethods29() {
           if (prefetchTimer) {
             return;
           }
+          const waitsForDwell = Boolean(context?.focusedNode && this.isPerformanceConstrained?.());
           const runPrefetch = () => {
             prefetchTimer = 0;
             if (!track.isConnected || Router.getCurrent() !== "home") {
@@ -273,6 +284,10 @@ export function createHomeScreenMethods29() {
             }
             if (isVidaaLoadingBusy()) {
               prefetchTimer = setTimeout(runPrefetch, 50);
+              return;
+            }
+            if (waitsForDwell && this.getCurrentFocusedNode()?.closest?.(".home-track") !== track) {
+              pendingPrefetchContext = null;
               return;
             }
             const requestContext = pendingPrefetchContext;
@@ -299,7 +314,11 @@ export function createHomeScreenMethods29() {
           };
           prefetchTimer = setTimeout(
             runPrefetch,
-            Platform.isVidaa() ? VIDAA_NAVIGATION_SETTLE_MS : MODERN_HOME_CONSTANTS.trackPaginationPrefetchDelayMs
+            Platform.isVidaa()
+              ? VIDAA_NAVIGATION_SETTLE_MS
+              : waitsForDwell
+                ? MODERN_HOME_CONSTANTS.trackPaginationPrefetchDwellConstrainedMs
+                : MODERN_HOME_CONSTANTS.trackPaginationPrefetchDelayMs
           );
         };
         handler.cancelPending = () => {

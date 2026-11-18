@@ -219,6 +219,44 @@ export function createPlayerScreenMethods51() {
       }
       return null;
     },
+    maybeReapplyTizenStartupAudioPreference() {
+      if (
+        !Environment.isTizen() ||
+        !this.startupAudioPreferenceApplied ||
+        this.userAudioTrackSelected ||
+        this.tizenLateAudioPreferenceAttempted
+      ) {
+        return false;
+      }
+      // AVPlay publishes its own tracks; the companion-service list stays empty
+      // when that service is not running, so either source counts here.
+      if (!this.embeddedAudioTracks?.length && !this.collectAudioOptionItems().some((entry) => !entry.entry?.implicitAudioTrack)) {
+        return false;
+      }
+      const targets = this.getStartupPreferredAudioLanguageTargets();
+      if (!targets.length) {
+        return false;
+      }
+      this.invalidateTrackDialogCaches();
+      const rememberedOption = this.findRememberedAudioOption();
+      if (rememberedOption?.entry) {
+        if (rememberedOption.entry.selected) {
+          return false;
+        }
+        this.tizenLateAudioPreferenceAttempted = true;
+        this.startupAudioPreferenceApplied = false;
+        return true;
+      }
+      const selectedOption = this.collectAudioOptionItems().find((entry) => entry.selected);
+      if (selectedOption?.supported && targets.some((target) => this.matchesStartupAudioTarget(selectedOption, target))) {
+        return false;
+      }
+      // Metadata arrived after the bounded fallback had already settled startup.
+      // Re-open the normal preference pass once, unless the viewer chose a track.
+      this.tizenLateAudioPreferenceAttempted = true;
+      this.startupAudioPreferenceApplied = false;
+      return true;
+    },
     applyStartupAudioPreference() {
       const implicitFallback = Environment.isVidaa() ? this.startupImplicitAudioFallback : null;
       if (implicitFallback) {
@@ -250,9 +288,17 @@ export function createPlayerScreenMethods51() {
       // so the option list can still hold nothing but the synthetic startup entry.
       // Concluding there means falling back to the runtime's first audio track and
       // latching that choice, which is why the preferred language never applied.
-      const isStillLoading = this.isAudioPreferenceDiscoveryPending() || hasOnlyImplicitStartupAudioOptions(this.collectAudioOptionItems());
+      const embeddedTrackDiscoverySupported = this.isEmbeddedTrackDiscoverySupported?.() !== false;
+      const isStillLoading =
+        embeddedTrackDiscoverySupported &&
+        (this.isAudioPreferenceDiscoveryPending() || hasOnlyImplicitStartupAudioOptions(this.collectAudioOptionItems()));
       const matchedRememberedOption = this.findRememberedAudioOption();
-      const rememberedOption = isStillLoading && matchedRememberedOption?.entry?.implicitAudioTrack ? null : matchedRememberedOption;
+      // The implicit entry is the runtime's untitled default: selecting it
+      // over Luna only costs a timeout. Real native tracks stay selectable.
+      const rememberedOption =
+        matchedRememberedOption?.entry?.implicitAudioTrack && (isStillLoading || !embeddedTrackDiscoverySupported)
+          ? null
+          : matchedRememberedOption;
       if (rememberedOption?.entry && Number.isFinite(rememberedOption.entryIndex)) {
         this.startupAudioFallbackApplied = false;
         if (selectionReady(rememberedOption)) {
