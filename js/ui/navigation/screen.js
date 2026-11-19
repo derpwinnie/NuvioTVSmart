@@ -1,46 +1,9 @@
-import { Platform } from "../../platform/index.js";
-import { focusWithoutScroll } from "./focusWithoutScroll.js";
-
-function restoreVidaaViewportOrigin() {
-  const documentRef = globalThis?.document;
-  try {
-    if (documentRef?.documentElement) {
-      documentRef.documentElement.scrollLeft = 0;
-      documentRef.documentElement.scrollTop = 0;
-    }
-    if (documentRef?.body) {
-      documentRef.body.scrollLeft = 0;
-      documentRef.body.scrollTop = 0;
-    }
-    globalThis?.scrollTo?.(0, 0);
-  } catch (_) {
-    // Older VIDAA browsers may expose only part of the scroll API.
-  }
-}
-
-function scheduleVidaaViewportRestore() {
-  if (!Platform.isVidaa()) {
-    return;
-  }
-  restoreVidaaViewportOrigin();
-  try {
-    globalThis?.requestAnimationFrame?.(() => restoreVidaaViewportOrigin());
-  } catch (_) {}
-}
-
-// Upstream's focusWithoutScroll, plus the VIDAA viewport reset: the VIDAA browser
-// can still shift the document origin after a focus, even with preventScroll.
-// preventScroll: false keeps upstream's plain focus() outside VIDAA.
-function focusWithoutDocumentScroll(node, { preventScroll = true } = {}) {
-  if (!preventScroll && !Platform.isVidaa()) {
-    try {
-      node?.focus?.();
-    } catch (_) {}
-    return;
-  }
-  focusWithoutScroll(node);
-  scheduleVidaaViewportRestore();
-}
+import {
+  focusRouteEntry,
+  focusWithoutScroll,
+  revealVidaaDirectionalFocus,
+  scheduleVidaaViewportRestore
+} from "./vidaaFocus.js";
 
 export const ScreenUtils = {
   // Micro-fade for fast-path TVs: returns the full enter class on capable
@@ -106,14 +69,14 @@ export const ScreenUtils = {
     if (modalOpen) {
       const existingFocused = container?.querySelector?.(".focusable.focused") || null;
       if (existingFocused instanceof HTMLElement && container?.contains(existingFocused)) {
-        focusWithoutDocumentScroll(existingFocused);
+        focusWithoutScroll(existingFocused);
         return existingFocused;
       }
       return null;
     }
     const existingFocused = container?.querySelector?.(".focusable.focused") || null;
     if (existingFocused instanceof HTMLElement && container?.contains(existingFocused)) {
-      focusWithoutDocumentScroll(existingFocused);
+      focusWithoutScroll(existingFocused);
       return existingFocused;
     }
     const first = container?.querySelector(selector);
@@ -121,7 +84,7 @@ export const ScreenUtils = {
       return;
     }
     first.classList.add("focused");
-    focusWithoutDocumentScroll(first, { preventScroll: false });
+    focusRouteEntry(first);
   },
 
   moveFocus(container, direction, selector = ".focusable") {
@@ -142,7 +105,7 @@ export const ScreenUtils = {
 
     current.classList.remove("focused");
     list[nextIndex].classList.add("focused");
-    focusWithoutDocumentScroll(list[nextIndex]);
+    focusWithoutScroll(list[nextIndex]);
   },
 
   moveFocusDirectional(container, direction, selector = ".focusable") {
@@ -164,7 +127,7 @@ export const ScreenUtils = {
     if (!current.classList.contains("focused")) {
       list.forEach((node) => node.classList.remove("focused"));
       current.classList.add("focused");
-      focusWithoutDocumentScroll(current);
+      focusWithoutScroll(current);
       return;
     }
 
@@ -260,16 +223,8 @@ export const ScreenUtils = {
 
     current.classList.remove("focused");
     target.classList.add("focused");
-    focusWithoutDocumentScroll(target);
-    if (!Platform.isVidaa()) {
-      return;
-    }
-    try {
-      if (typeof target.scrollIntoView === "function") {
-        target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "auto" });
-      }
-    } catch (_) {}
-    scheduleVidaaViewportRestore();
+    focusWithoutScroll(target);
+    revealVidaaDirectionalFocus(target);
   },
 
   handleDpadNavigation(event, container, selector = ".focusable") {

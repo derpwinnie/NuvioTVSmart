@@ -305,4 +305,32 @@ for (const platform of ["vidaa", "tizen", "webos", "browser"]) {
   assert.equal(getVidaaCardScrollTop(cardScroller(200), card(550), { center: true }), 450);
 }
 
+globalThis.HTMLElement ??= class {};
+const { resetFocusWithoutScrollSupportForTests } =
+  await import("../js/ui/navigation/focusWithoutScroll.js");
+// The first focus of a screen keeps upstream's plain focus() (the browser may
+// scroll to it) outside VIDAA; VIDAA focuses without moving the document.
+for (const platform of ["vidaa", "tizen", "webos", "browser"]) {
+  globalThis.__NUVIO_PLATFORM__ = platform;
+  Platform.current = null;
+  resetFocusWithoutScrollSupportForTests();
+  const calls = [];
+  const first = {
+    classList: { add() {}, remove() {}, contains: () => false },
+    focus(...args) {
+      calls.push(args.length ? Boolean(args[0]?.preventScroll) : "plain");
+    }
+  };
+  const container = { querySelector: (selector) => (selector.includes(".focused") ? null : first) };
+  ScreenUtils.setInitialFocus(container);
+  if (platform === "vidaa") {
+    assert.ok(
+      calls.length && calls.every((call) => call !== "plain"),
+      "vidaa: first focus never scrolls"
+    );
+  } else {
+    assert.deepEqual(calls, ["plain"], `${platform}: first focus is upstream's plain focus()`);
+  }
+}
+
 console.log("VIDAA continuous focus scrolling and geometry regressions passed.");
