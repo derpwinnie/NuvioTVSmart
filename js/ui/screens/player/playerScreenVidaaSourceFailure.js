@@ -1,6 +1,9 @@
 /* eslint-disable no-unused-vars */
 import * as internals from "./playerScreenContext.js";
-import { decideVidaaSourceFailureReaction, isVidaaFailoverMediaError } from "../../../platform/vidaa/vidaaAutoPlayFailover.js";
+import {
+  decideVidaaSourceFailureReaction,
+  isVidaaFailoverMediaError
+} from "../../../platform/vidaa/vidaaAutoPlayFailover.js";
 import { nextVidaaStallRestarts } from "../../../platform/vidaa/vidaaStallRestart.js";
 
 // VIDAA: every "this source cannot play here" ends the same way. Auto-play moves on to
@@ -8,7 +11,7 @@ import { nextVidaaStallRestarts } from "../../../platform/vidaa/vidaaStallRestar
 // an alert on top and the next source focused. The startup error card is not used:
 // its Go Back leaves the player when playback came from continue watching.
 // Other platforms keep their error card and sources line.
-export function createPlayerScreenMethods79() {
+export function createPlayerScreenVidaaSourceFailureMethods() {
   const { PlayerController, Environment, t } = internals;
 
   return {
@@ -23,8 +26,14 @@ export function createPlayerScreenMethods79() {
       logMessage = "VIDAA auto-play: source cannot play, trying the next one"
     } = {}) {
       const { settings, eligibility } = this.getVidaaAutoPlayFailoverContext();
-      const next = eligibility === "eligible" ? this.pickVidaaAutoPlayFailoverCandidate(candidate, settings) : null;
-      const reaction = decideVidaaSourceFailureReaction({ eligibility, hasNextCandidate: Boolean(next) });
+      const next =
+        eligibility === "eligible"
+          ? this.pickVidaaAutoPlayFailoverCandidate(candidate, settings)
+          : null;
+      const reaction = decideVidaaSourceFailureReaction({
+        eligibility,
+        hasNextCandidate: Boolean(next)
+      });
       this.markPlaybackSourceFailed(playbackUrl, candidate);
       if (reaction === "failover") {
         if (failoverToast) {
@@ -35,7 +44,11 @@ export function createPlayerScreenMethods79() {
       }
       const hint =
         reaction === "none-left"
-          ? t("player_vidaa_no_source_left", {}, "No other source could be tried automatically. Choose another source.")
+          ? t(
+              "player_vidaa_no_source_left",
+              {},
+              "No other source could be tried automatically. Choose another source."
+            )
           : t("player_vidaa_choose_another_source", {}, "Choose another source.");
       this.showVidaaSourcesAlert({ title, message: `${message} ${hint}` });
       return reaction;
@@ -57,11 +70,16 @@ export function createPlayerScreenMethods79() {
       this.openSourcesPanel();
       this.sourcesAlert = {
         title: title || t("player_error_title", {}, "Playback Error"),
-        message: String(message || "").trim() || t("player_error_playback_fallback", {}, "Playback error")
+        message:
+          String(message || "").trim() || t("player_error_playback_fallback", {}, "Playback error")
       };
       // Focus the source after the failed one: OK plays the next candidate.
       const listLength = this.getFilteredSources().length;
-      if (!keepPlayback && this.sourcesFocus?.zone === "list" && this.sourcesFocus.index + 1 < listLength) {
+      if (
+        !keepPlayback &&
+        this.sourcesFocus?.zone === "list" &&
+        this.sourcesFocus.index + 1 < listLength
+      ) {
         this.sourcesFocus = { zone: "list", index: this.sourcesFocus.index + 1 };
       }
       this.renderSourcesPanel();
@@ -70,7 +88,11 @@ export function createPlayerScreenMethods79() {
     // Called at the end of showStartupError. Returns true when the error went to the
     // sources list instead of the card (VIDAA with sources to choose from).
     presentStartupErrorInVidaaSources() {
-      if (!Environment.isVidaa() || !this.streamCandidates?.length || this.isExternalFrameMode?.()) {
+      if (
+        !Environment.isVidaa() ||
+        !this.streamCandidates?.length ||
+        this.isExternalFrameMode?.()
+      ) {
         return false;
       }
       const message = this.startupErrorMessage;
@@ -97,7 +119,10 @@ export function createPlayerScreenMethods79() {
     // (decode errors after a seek are often one-off, shared budget with stall restarts),
     // then fail over (auto-play). Returns true when one of them started.
     recoverVidaaPlaybackError(candidate, mediaErrorCode) {
-      if (!Environment.isVidaa() || !isVidaaFailoverMediaError(mediaErrorCode, globalThis.navigator?.onLine)) {
+      if (
+        !Environment.isVidaa() ||
+        !isVidaaFailoverMediaError(mediaErrorCode, globalThis.navigator?.onLine)
+      ) {
         return false;
       }
       const attempt = this.claimVidaaPlaybackRestart(this.activePlaybackUrl);

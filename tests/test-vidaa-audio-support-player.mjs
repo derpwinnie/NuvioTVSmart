@@ -21,10 +21,10 @@ const logs = [];
 console.info = (...args) => logs.push(args);
 console.warn = (...args) => logs.push(args);
 
-const { createPlayerScreenMethods78, resetVidaaAudioCounterProbe } =
-  await import("../js/ui/screens/player/playerScreenMethods-78-vidaa-audio-support.js");
-const { createPlayerScreenMethods79 } =
-  await import("../js/ui/screens/player/playerScreenMethods-79-vidaa-source-failure.js");
+const { createPlayerScreenVidaaAudioSupportMethods, resetVidaaAudioCounterProbe } =
+  await import("../js/ui/screens/player/playerScreenVidaaAudioSupport.js");
+const { createPlayerScreenVidaaSourceFailureMethods } =
+  await import("../js/ui/screens/player/playerScreenVidaaSourceFailure.js");
 const { PlayerController } = await import("../js/ui/screens/player/playerScreenContext.js");
 const { VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY } =
   await import("../js/platform/vidaa/vidaaAudioSupport.js");
@@ -39,8 +39,8 @@ const learned = () => JSON.parse(store.get(VIDAA_UNSUPPORTED_AUDIO_CODECS_KEY) |
 function createScreen({ eligibility = "eligible", next = { id: "b" } } = {}) {
   const calls = [];
   const state = {
-    ...createPlayerScreenMethods78(),
-    ...createPlayerScreenMethods79(),
+    ...createPlayerScreenVidaaAudioSupportMethods(),
+    ...createPlayerScreenVidaaSourceFailureMethods(),
     activePlaybackUrl: URL_A,
     streamCandidates: [{ id: "a" }, { id: "b" }],
     paused: false,

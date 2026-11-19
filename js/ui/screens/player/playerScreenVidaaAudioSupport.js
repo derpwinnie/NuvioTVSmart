@@ -56,7 +56,7 @@ export function resetVidaaAudioCounterProbe() {
   memorySynced = false;
 }
 
-export function createPlayerScreenMethods78() {
+export function createPlayerScreenVidaaAudioSupportMethods() {
   const { PlayerController, Environment, t } = internals;
 
   return {
@@ -67,7 +67,10 @@ export function createPlayerScreenMethods78() {
       }
       this.vidaaAudioProbe = { url: String(probeUrl || ""), ...summarizeVidaaAudioProbe(tracks) };
       if (this.vidaaAudioProbe.url === String(this.activePlaybackUrl || "")) {
-        this.forgetVidaaCodecIfDecoding(this.vidaaAudioProbe, PlayerController.video?.webkitAudioDecodedByteCount);
+        this.forgetVidaaCodecIfDecoding(
+          this.vidaaAudioProbe,
+          PlayerController.video?.webkitAudioDecodedByteCount
+        );
       }
       if (this.vidaaAudioCheckTimer && this.vidaaAudioProbe.url === this.vidaaAudioCheckUrl) {
         this.runVidaaAudioCheck();
@@ -76,7 +79,12 @@ export function createPlayerScreenMethods78() {
     // Starts the check for the active source once its first frame is shown.
     startVidaaAudioCheck() {
       const url = String(this.activePlaybackUrl || "");
-      if (!Environment.isVidaa() || !url || this.vidaaAudioCheckTimer || this.vidaaAudioCheckDoneUrl === url) {
+      if (
+        !Environment.isVidaa() ||
+        !url ||
+        this.vidaaAudioCheckTimer ||
+        this.vidaaAudioCheckDoneUrl === url
+      ) {
         return;
       }
       syncVidaaAudioMemoryOnce();
@@ -85,7 +93,10 @@ export function createPlayerScreenMethods78() {
       this.vidaaAudioCheckAudioDone = false;
       this.vidaaVideoCheckState = createVidaaSilentAudioCheck();
       this.vidaaVideoCheckDone = false;
-      this.vidaaAudioCheckTimer = setInterval(() => this.runVidaaAudioCheck(), VIDAA_SILENT_AUDIO_CHECK_INTERVAL_MS);
+      this.vidaaAudioCheckTimer = setInterval(
+        () => this.runVidaaAudioCheck(),
+        VIDAA_SILENT_AUDIO_CHECK_INTERVAL_MS
+      );
       // Start the one-time counter self-test (plain files) now so its result is in
       // before a verdict.
       ensureVidaaAudioCounterProbe();
@@ -118,7 +129,11 @@ export function createPlayerScreenMethods78() {
     // is taken off the list.
     forgetVidaaCodecIfDecoding(probe, decodedBytes) {
       const codecId = probe?.playedCodecId;
-      if (!codecId || !(Number(decodedBytes) > 0) || !readVidaaUnsupportedAudioCodecs(LocalStore).has(codecId)) {
+      if (
+        !codecId ||
+        !(Number(decodedBytes) > 0) ||
+        !readVidaaUnsupportedAudioCodecs(LocalStore).has(codecId)
+      ) {
         return;
       }
       forgetVidaaUnsupportedAudioCodecs(LocalStore, [codecId]);
@@ -205,7 +220,12 @@ export function createPlayerScreenMethods78() {
       // Codecs this device already failed on: no need to wait the full time, but give
       // a short grace so a codec that decodes by now (firmware update) can prove it.
       const remembered =
-        counterVerified && probe && areAllVidaaAudioCodecsUnsupported(probe.codecIds, readVidaaUnsupportedAudioCodecs(LocalStore));
+        counterVerified &&
+        probe &&
+        areAllVidaaAudioCodecsUnsupported(
+          probe.codecIds,
+          readVidaaUnsupportedAudioCodecs(LocalStore)
+        );
       if (remembered && state.playedSeconds >= VIDAA_REMEMBERED_CODEC_GRACE_SECONDS) {
         this.finishVidaaAudioCheck();
         this.reportVidaaUndecodableMedia("audio", { probe, detectedBy: "remembered-codec" });
@@ -235,13 +255,21 @@ export function createPlayerScreenMethods78() {
       if (probe?.playedCodecId) {
         learnVidaaUnsupportedAudioCodecs(LocalStore, [probe.playedCodecId]);
       }
-      this.reportVidaaUndecodableMedia("audio", { probe, detectedBy: "silent-playback", playedSeconds });
+      this.reportVidaaUndecodableMedia("audio", {
+        probe,
+        detectedBy: "silent-playback",
+        playedSeconds
+      });
       return true;
     },
     reportVidaaUndecodableMedia(kind, { probe = null, detectedBy = "", playedSeconds = 0 } = {}) {
       const playbackUrl = this.activePlaybackUrl;
-      const candidate = this.getStreamCandidateByUrl(playbackUrl) || this.getCurrentStreamCandidate();
-      const codecIds = detectedBy === "silent-playback" && probe?.playedCodecId ? [probe.playedCodecId] : probe?.codecIds || [];
+      const candidate =
+        this.getStreamCandidateByUrl(playbackUrl) || this.getCurrentStreamCandidate();
+      const codecIds =
+        detectedBy === "silent-playback" && probe?.playedCodecId
+          ? [probe.playedCodecId]
+          : probe?.codecIds || [];
       const codec = formatVidaaAudioCodecNames(codecIds);
       // Codec ids, list positions and seconds only: stream URLs carry tokens.
       console.warn(`VIDAA: source ${kind} cannot be decoded on this device`, {
@@ -255,7 +283,11 @@ export function createPlayerScreenMethods78() {
           candidate,
           playbackUrl,
           title: t("player_vidaa_video_unsupported_title", {}, "Video not supported"),
-          message: t("player_vidaa_video_unsupported", {}, "This source's video can't be shown on this device."),
+          message: t(
+            "player_vidaa_video_unsupported",
+            {},
+            "This source's video can't be shown on this device."
+          ),
           failoverToast: t(
             "player_vidaa_video_unsupported_trying_next",
             {},
@@ -270,8 +302,16 @@ export function createPlayerScreenMethods78() {
         playbackUrl,
         title: t("player_vidaa_audio_unsupported_title", {}, "Audio not supported"),
         message: codec
-          ? t("player_vidaa_audio_unsupported", { codec }, `This source's audio (${codec}) isn't supported on this device.`)
-          : t("player_vidaa_audio_unsupported_unknown", {}, "This source's audio isn't supported on this device."),
+          ? t(
+              "player_vidaa_audio_unsupported",
+              { codec },
+              `This source's audio (${codec}) isn't supported on this device.`
+            )
+          : t(
+              "player_vidaa_audio_unsupported_unknown",
+              {},
+              "This source's audio isn't supported on this device."
+            ),
         failoverToast: codec
           ? t(
               "player_vidaa_audio_unsupported_trying_next",

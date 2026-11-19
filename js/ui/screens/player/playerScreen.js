@@ -76,10 +76,9 @@ import { createPlayerScreenMethods74 } from "./playerScreenMethods-74-automatic-
 import { createPlayerScreenMethods75 } from "./playerScreenMethods-75-hdr-presentation.js";
 import { createPlayerScreenMethods76 } from "./playerScreenMethods-76-chapters-panel.js";
 import { createPlayerScreenMethods77 } from "./playerScreenMethods-77-episode-options.js";
-import { createPlayerScreenMethods78 } from "./playerScreenMethods-78-vidaa-audio-support.js";
-import { createPlayerScreenMethods79 } from "./playerScreenMethods-79-vidaa-source-failure.js";
 
 import { createPlayerPartyMethods } from "./playerParty.js";
+import { createPlayerScreenVidaaMethods } from "./playerScreenVidaa.js";
 export * from "./playerScreenContext.js";
 export const PlayerScreen = {
   ...StreamInfoMethods,
@@ -160,7 +159,6 @@ export const PlayerScreen = {
   ...createPlayerScreenMethods75(),
   ...createPlayerScreenMethods76(),
   ...createPlayerScreenMethods77(),
-  ...createPlayerScreenMethods78(),
-  ...createPlayerScreenMethods79(),
-  ...createPlayerPartyMethods()
+  ...createPlayerPartyMethods(),
+  ...createPlayerScreenVidaaMethods()
 };
