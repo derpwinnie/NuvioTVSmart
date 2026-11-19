@@ -328,7 +328,8 @@ export function createPlayerScreenMethods35() {
         String(settings.streamAutoPlayMode || "MANUAL").toUpperCase() !== "MANUAL" && isAutoPlayEffectivelyEnabled(settings);
       const eligibility = getVidaaAutoPlayFailoverEligibility({
         autoPlayOn,
-        autoPlaySelected: this.params?.autoPlaySelected,
+        // Upstream marks a source picked by auto selection with autoPlayNav.
+        autoPlaySelected: this.params?.autoPlayNav,
         manualSelection: this.params?.streamRouteParams?.manualSelection,
         userPickedSource: this.vidaaUserPickedSource
       });

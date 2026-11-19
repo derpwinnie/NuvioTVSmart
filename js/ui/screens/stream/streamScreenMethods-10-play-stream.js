@@ -16,7 +16,6 @@ export function createStreamScreenMethods10() {
   } = internals;
 
   return {
-    // autoSelected: the auto-play/auto-resume logic picked this source, not the user.
     async playStream(streamId, { cachedLink = null, autoSelected = false } = {}) {
       const loadToken = this.loadToken;
       const profileId = activeStreamLinkProfile();
@@ -106,8 +105,6 @@ export function createStreamScreenMethods10() {
         fromLinkCache: Boolean(cachedLink),
         // Android autoPlayNav: picked by auto source selection, so it may fall back.
         autoPlayNav: Boolean(autoSelected),
-        // VIDAA failover (vidaaAutoPlayFailover.js) reads the same fact under its own name.
-        autoPlaySelected: Boolean(autoSelected),
         streamRouteParams: this.params ? { ...this.params } : null,
         fromDetailRoute: Boolean(this.params?.fromDetailRoute),
         nextEpisodeVideoId: this.params?.nextEpisodeVideoId || null,
