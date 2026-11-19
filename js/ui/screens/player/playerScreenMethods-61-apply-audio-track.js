@@ -176,6 +176,9 @@ export function createPlayerScreenMethods61() {
       if (!audioTracks.length || !Number.isFinite(nativeTrackIndex) || nativeTrackIndex < 0 || nativeTrackIndex >= audioTracks.length) {
         return;
       }
+      if (Environment.isVidaa()) {
+        return this.applyVidaaNativeAudioTrack(selectedEntry, nativeTrackIndex, { rememberSelection });
+      }
 
       if (Environment.isWebOS()) {
         this.pendingWebOsAudioSelection = {

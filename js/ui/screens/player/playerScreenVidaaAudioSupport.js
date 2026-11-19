@@ -18,6 +18,12 @@ import {
 } from "../../../platform/vidaa/vidaaAudioSupport.js";
 import { checkVidaaVideoPresence } from "../../../platform/vidaa/vidaaVideoSupport.js";
 import {
+  resolveVidaaAudioTrackIndex,
+  selectVidaaAudioTrack,
+  vidaaAudioSelectionMatches
+} from "../../../platform/vidaa/vidaaAudioTrackIdentity.js";
+import { createPlayerScreenMethods59 } from "./playerScreenMethods-59-handle-subtitle-dialog-key.js";
+import {
   isVidaaMediaCounterVerified,
   markVidaaMediaCounterVerified,
   vidaaPlaybackPipeline
@@ -58,8 +64,56 @@ export function resetVidaaAudioCounterProbe() {
 
 export function createPlayerScreenVidaaAudioSupportMethods() {
   const { PlayerController, Environment, t } = internals;
+  const { getMergedAudioTrackEntries } = createPlayerScreenMethods59();
 
   return {
+    // Upstream's entries copy the track data; VIDAA also keeps the native track
+    // so a selection can follow it when the firmware reorders the list.
+    getMergedAudioTrackEntries(audioTracks = []) {
+      const entries = getMergedAudioTrackEntries.call(this, audioTracks);
+      if (Environment.isVidaa()) {
+        entries.forEach((entry) => {
+          if (String(entry?.id || "").startsWith("audio-track-")) {
+            entry.nativeAudioTrack = audioTracks[entry.audioTrackIndex] || null;
+          }
+        });
+      }
+      return entries;
+    },
+    // VIDAA native audio selection (see vidaaAudioTrackIdentity.js). Called by
+    // applyAudioTrack instead of the plain index-based flag write.
+    applyVidaaNativeAudioTrack(selectedEntry, entryTrackIndex, { rememberSelection = false } = {}) {
+      const tracks = this.getAudioTracks();
+      const targetIndex = resolveVidaaAudioTrackIndex(
+        tracks,
+        selectedEntry?.nativeAudioTrack,
+        entryTrackIndex
+      );
+      const refresh = () => {
+        this.invalidateTrackDialogCaches();
+        this.renderControlButtons();
+        this.renderAudioDialog();
+      };
+      if (targetIndex < 0) {
+        console.info("VIDAA audio selection skipped", { reason: "track-changed" });
+        refresh();
+        return false;
+      }
+      const rollback = selectVidaaAudioTrack(tracks, targetIndex);
+      if (!vidaaAudioSelectionMatches(this.getAudioTracks(), targetIndex)) {
+        rollback(this.getAudioTracks());
+        console.info("VIDAA audio selection rejected by the TV", { targetIndex });
+        refresh();
+        return false;
+      }
+      this.selectedAudioTrackIndex = targetIndex;
+      this.selectedEmbeddedAudioTrackIndex = -1;
+      if (rememberSelection) {
+        this.rememberAudioTrackSelection(this.getAudioTrackPreference(selectedEntry));
+      }
+      refresh();
+      return true;
+    },
     // Called with the track probe result of `probeUrl` (the MKV header read).
     recordVidaaAudioProbe(probeUrl, tracks) {
       if (!Environment.isVidaa()) {
