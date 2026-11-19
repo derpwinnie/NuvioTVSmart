@@ -109,7 +109,8 @@ export function createHomeScreenMethods20() {
         );
       }
       const canResumePreservedTvHome = Boolean(
-        (Platform.isTizen() || Platform.isWebOS()) &&
+        // VIDAA port: VIDAA keeps the rendered Home too (Empi 2483a4fc, real-TV tested).
+        (Platform.isTizen() || Platform.isWebOS() || Platform.isVidaa?.()) &&
         isHomeRouteReturn &&
         this.homeDomPreserved &&
         this.hasLoadedOnce &&

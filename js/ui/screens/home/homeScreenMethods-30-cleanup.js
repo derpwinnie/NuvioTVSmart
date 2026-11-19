@@ -125,7 +125,8 @@ export function createHomeScreenMethods30() {
       this.cachedModernPortraitPosterMetrics = null;
       this.cachedModernLandscapePosterMetrics = null;
       const preserveRenderedTvHome = Boolean(
-        (Platform.isTizen() || Platform.isWebOS()) &&
+        // VIDAA port: VIDAA keeps the rendered Home too (Empi 2483a4fc, real-TV tested).
+        (Platform.isTizen() || Platform.isWebOS() || Platform.isVidaa?.()) &&
         this.hasLoadedOnce &&
         Array.isArray(this.rows) &&
         this.rows.length &&
